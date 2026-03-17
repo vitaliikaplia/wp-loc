@@ -1,0 +1,223 @@
+<?php
+
+if ( ! defined( 'ABSPATH' ) ) exit;
+
+class WP_LOC_Frontend {
+
+    public function __construct() {
+        add_filter( 'language_attributes', [ $this, 'html_lang_attribute' ] );
+        add_action( 'wp_head', [ $this, 'output_hreflang_tags' ] );
+        add_action( 'pre_get_posts', [ $this, 'filter_posts_by_language' ] );
+    }
+
+    /**
+     * Set <html lang="..."> attribute
+     */
+    public function html_lang_attribute( string $output ): string {
+        if ( is_admin() ) return $output;
+
+        $locale = wp_loc_get_current_locale();
+        $lang_attr = str_replace( '_', '-', $locale );
+
+        $rtl_locales = [ 'ar', 'he', 'fa', 'ur' ];
+        $lang_code = strtolower( substr( $locale, 0, 2 ) );
+        $dir = in_array( $lang_code, $rtl_locales, true ) ? 'rtl' : 'ltr';
+
+        return sprintf( 'lang="%s" dir="%s"', esc_attr( $lang_attr ), esc_attr( $dir ) );
+    }
+
+    /**
+     * Output hreflang and canonical tags
+     */
+    public function output_hreflang_tags(): void {
+        if ( ! is_singular() ) return;
+
+        $post_id = get_queried_object_id();
+        $db = WP_LOC::instance()->db;
+        $element_type = WP_LOC_DB::post_element_type( get_post_type( $post_id ) );
+
+        $current_lang = $db->get_element_language( $post_id, $element_type );
+        $trid = $db->get_trid( $post_id, $element_type );
+
+        $active = WP_LOC_Languages::get_active_languages();
+        $default = WP_LOC_Languages::get_default_language();
+
+        $translations = [];
+
+        if ( $trid ) {
+            $all_translations = $db->get_element_translations( $trid, $element_type );
+
+            foreach ( $all_translations as $slug => $row ) {
+                if ( ! isset( $active[ $slug ] ) ) continue;
+
+                $translated_post = get_post( $row->element_id );
+                if ( ! $translated_post || $translated_post->post_status !== 'publish' ) continue;
+
+                $permalink = get_permalink( $row->element_id );
+
+                if ( $slug !== $default ) {
+                    $parsed = parse_url( $permalink );
+                    $path = isset( $parsed['path'] ) ? '/' . trim( $parsed['path'], '/' ) : '';
+                    $permalink = home_url( "/{$slug}{$path}/" );
+                }
+
+                $translations[ $slug ] = $permalink;
+            }
+        } else {
+            $permalink = get_permalink( $post_id );
+            if ( $current_lang && $current_lang !== $default ) {
+                $parsed = parse_url( $permalink );
+                $path = isset( $parsed['path'] ) ? '/' . trim( $parsed['path'], '/' ) : '';
+                $permalink = home_url( "/{$current_lang}{$path}/" );
+            }
+            if ( $current_lang ) {
+                $translations[ $current_lang ] = $permalink;
+            }
+        }
+
+        // Output hreflang tags
+        foreach ( $translations as $slug => $url ) {
+            echo '<link rel="alternate" hreflang="' . esc_attr( $slug ) . '" href="' . esc_url( $url ) . '" />' . "\n";
+        }
+
+        // x-default
+        if ( isset( $translations[ $default ] ) ) {
+            echo '<link rel="alternate" hreflang="x-default" href="' . esc_url( $translations[ $default ] ) . '" />' . "\n";
+        }
+
+        // Canonical
+        $canonical = get_permalink( $post_id );
+        if ( $current_lang && $current_lang !== $default ) {
+            $parsed = parse_url( $canonical );
+            $path = isset( $parsed['path'] ) ? '/' . trim( $parsed['path'], '/' ) : '';
+            $canonical = home_url( "/{$current_lang}{$path}/" );
+        }
+        echo '<link rel="canonical" href="' . esc_url( $canonical ) . '" />' . "\n";
+    }
+
+    /**
+     * Filter frontend posts by current language
+     */
+    public function filter_posts_by_language( \WP_Query $query ): void {
+        if ( is_admin() || ! $query->is_main_query() ) return;
+
+        $lang_slug = get_query_var( 'lang' );
+        if ( ! $lang_slug ) return;
+
+        $active = WP_LOC_Languages::get_active_languages();
+        if ( ! isset( $active[ $lang_slug ] ) ) return;
+
+        $table = WP_LOC::instance()->db->get_table();
+
+        add_filter( 'posts_join', function ( $join ) use ( $table ) {
+            global $wpdb;
+            if ( strpos( $join, 'wp_loc_ft' ) !== false ) return $join;
+            $join .= " LEFT JOIN {$table} AS wp_loc_ft ON {$wpdb->posts}.ID = wp_loc_ft.element_id AND wp_loc_ft.element_type = CONCAT('post_', {$wpdb->posts}.post_type)";
+            return $join;
+        } );
+
+        add_filter( 'posts_where', function ( $where ) use ( $lang_slug ) {
+            global $wpdb;
+            $where .= $wpdb->prepare(
+                " AND (wp_loc_ft.language_code = %s OR wp_loc_ft.element_id IS NULL)",
+                $lang_slug
+            );
+            return $where;
+        } );
+    }
+}
+
+/**
+ * Get language switcher data for templates
+ *
+ * @return array [ ['code' => 'uk', 'locale' => 'uk', 'active' => true, 'url' => '...', 'flag' => '...', 'name' => '...'], ... ]
+ */
+function wp_loc_get_lang_switcher(): array {
+    $active = WP_LOC_Languages::get_active_languages();
+    $current = wp_loc_get_current_lang();
+    $default = WP_LOC_Languages::get_default_language();
+    $db = WP_LOC::instance()->db;
+
+    $switcher = [];
+
+    // Front page
+    if ( is_front_page() ) {
+        foreach ( $active as $code => $data ) {
+            $prefix = ( $code === $default ) ? '' : "/{$code}";
+            $locale = $data['locale'] ?? $code;
+
+            $switcher[] = [
+                'code'   => $code,
+                'locale' => $locale,
+                'active' => $code === $current,
+                'url'    => home_url( $prefix . '/' ),
+                'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
+                'name'   => WP_LOC_Languages::get_language_display_name( $locale ),
+            ];
+        }
+        return $switcher;
+    }
+
+    // Singular posts with translations
+    $current_post_id = get_queried_object_id();
+    $post_type = get_post_type( $current_post_id );
+    $element_type = $post_type ? WP_LOC_DB::post_element_type( $post_type ) : '';
+    $trid = $current_post_id && $element_type ? $db->get_trid( $current_post_id, $element_type ) : null;
+
+    if ( $trid ) {
+        $translations = $db->get_element_translations( $trid, $element_type );
+
+        $urls = [];
+        foreach ( $translations as $slug => $row ) {
+            if ( ! isset( $active[ $slug ] ) ) continue;
+
+            $translated_post = get_post( $row->element_id );
+            if ( ! $translated_post || $translated_post->post_status !== 'publish' ) continue;
+
+            $path = trim( parse_url( get_permalink( $row->element_id ), PHP_URL_PATH ), '/' );
+            $prefix = ( $slug === $default ) ? '' : "/{$slug}";
+            $urls[ $slug ] = home_url( $prefix . '/' . $path . '/' );
+        }
+
+        foreach ( $active as $code => $data ) {
+            $locale = $data['locale'] ?? $code;
+            $url = $urls[ $code ] ?? home_url( $code === $default ? '/' : "/{$code}/" );
+
+            $switcher[] = [
+                'code'   => $code,
+                'locale' => $locale,
+                'active' => $code === $current,
+                'url'    => $url,
+                'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
+                'name'   => WP_LOC_Languages::get_language_display_name( $locale ),
+            ];
+        }
+
+        return $switcher;
+    }
+
+    // Fallback: replace language prefix in current URL
+    $uri_path = trim( parse_url( $_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH ), '/' );
+    $segments = explode( '/', $uri_path );
+    $uri_lang_prefix = array_key_exists( $segments[0] ?? '', $active ) ? $segments[0] : null;
+    $clean_segments = $uri_lang_prefix ? array_slice( $segments, 1 ) : $segments;
+    $clean_path = implode( '/', $clean_segments );
+
+    foreach ( $active as $code => $data ) {
+        $locale = $data['locale'] ?? $code;
+        $prefix = ( $code === $default ) ? '' : '/' . $code;
+        $full_path = trim( $prefix . '/' . $clean_path, '/' );
+        $url = home_url( $full_path ? '/' . $full_path . '/' : '/' );
+
+        $switcher[] = [
+            'code'   => $code,
+            'locale' => $locale,
+            'active' => $code === $current,
+            'url'    => $url,
+            'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
+            'name'   => WP_LOC_Languages::get_language_display_name( $locale ),
+        ];
+    }
+
+    return $switcher;
+}

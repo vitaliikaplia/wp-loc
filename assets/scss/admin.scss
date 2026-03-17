@@ -1,0 +1,182 @@
+// ===========================================
+// WP-LOC Admin Styles
+// ===========================================
+
+// Colors — WordPress admin palette
+$color-muted:     #666;
+$color-wp-blue:   #2271b1;
+$color-success:   #00a32a;
+$color-warning:   #996800;
+$color-disabled:  #999;
+$color-danger:    #b32d2e;
+$color-border:    #f0f0f1;
+
+// Shared values
+$flag-height: 14px;
+$status-font-size: 11px;
+$transition-speed: .15s;
+
+// Reusable flag mixin
+@mixin flag-icon {
+  height: $flag-height;
+  width: auto;
+}
+
+// ===========================================
+// Admin Bar — Language Switcher
+// ===========================================
+
+#wpadminbar .wp-loc-lang-switcher {
+  .ab-item,
+  .ab-submenu {
+    img {
+      @include flag-icon;
+      margin-right: 5px;
+      vertical-align: text-bottom;
+    }
+  }
+}
+
+// ===========================================
+// Translation Meta Box (post editor sidebar)
+// ===========================================
+
+.wp-loc-metabox-message {
+  color: $color-muted;
+}
+
+.wp-loc-create-translations {
+  width: 100%;
+  text-align: center;
+
+  &-gap {
+    margin-bottom: 8px;
+  }
+}
+
+.wp-loc-translations-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    margin: 0;
+    padding: 6px 0;
+    border-bottom: 1px solid $color-border;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .wp-loc-flag-small {
+    @include flag-icon;
+  }
+
+  a {
+    text-decoration: none;
+    flex: 1;
+  }
+
+  .wp-loc-lang-name-missing {
+    flex: 1;
+    color: $color-disabled;
+  }
+
+  .wp-loc-create-single-translation {
+    padding: 0 6px !important;
+    min-height: 22px !important;
+    line-height: 20px !important;
+    font-size: 14px !important;
+  }
+
+  .wp-loc-lang-active a {
+    font-weight: bold;
+  }
+}
+
+// Status indicators in meta box
+.wp-loc-status-active    { color: $color-wp-blue; font-size: $status-font-size; }
+.wp-loc-status-published { color: $color-success;  font-size: $status-font-size; }
+.wp-loc-status-draft     { color: $color-warning;  font-size: $status-font-size; }
+
+// ===========================================
+// Post List — Translations Column
+// Column width is set dynamically via inline <style>
+// ===========================================
+
+.wp-loc-t {
+  display: inline-block;
+  position: relative;
+  width: 28px;
+  height: 20px;
+  text-align: center;
+  vertical-align: middle;
+  text-decoration: none;
+
+  .wp-loc-flag {
+    @include flag-icon;
+    vertical-align: middle;
+    transition: opacity $transition-speed;
+  }
+
+  .wp-loc-pencil {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity $transition-speed;
+  }
+
+  // Hover: hide flag, show pencil
+  &:hover {
+    .wp-loc-flag  { opacity: 0; }
+    .wp-loc-pencil { opacity: 1; }
+  }
+}
+
+.wp-loc-t-published .wp-loc-pencil { color: $color-wp-blue; }
+.wp-loc-t-draft     .wp-loc-pencil { color: $color-warning; }
+.wp-loc-t-missing                 { opacity: .35; }
+
+// ===========================================
+// Languages List Table (Settings > Languages)
+// ===========================================
+
+.wp-loc-languages-table {
+  .lang-drag-handle {
+    cursor: move;
+    font-size: 18px;
+  }
+
+  .wp-loc-slug-input {
+    width: 60px;
+  }
+
+  .wp-loc-flag-small {
+    @include flag-icon;
+  }
+
+  .wp-loc-default-only {
+    color: $color-disabled;
+  }
+
+  .wp-loc-delete-link {
+    color: $color-danger;
+  }
+}
+
+// ===========================================
+// Settings Page (Settings > Post Types)
+// ===========================================
+
+.wp-loc-settings-label {
+  display: block;
+  margin-bottom: 6px;
+
+  code {
+    color: $color-muted;
+  }
+}
