@@ -101,17 +101,47 @@
                 return;
             }
 
-            const badge = document.createElement('span');
-            badge.className = 'wp-loc-gutenberg-lang-badge';
-            badge.title = wpLocAdmin.adminLangName;
-            badge.setAttribute('aria-label', wpLocAdmin.adminLangName);
-            badge.innerHTML = '<img src="' + wpLocAdmin.adminLangFlag + '" alt="' + wpLocAdmin.adminLangName + '" />';
+            const switcher = document.createElement('div');
+            switcher.className = 'wp-loc-gutenberg-lang-badge';
+            const hasDropdown = Array.isArray(wpLocAdmin.gutenbergLanguages) && wpLocAdmin.gutenbergLanguages.length > 1;
+
+            if (hasDropdown) {
+                switcher.setAttribute('tabindex', '0');
+            } else {
+                switcher.classList.add('is-static');
+            }
+
+            let menuHtml = '';
+            if (hasDropdown) {
+                menuHtml += '<div class="wp-loc-gutenberg-lang-dropdown">';
+
+                wpLocAdmin.gutenbergLanguages.forEach(function(lang) {
+                    const itemClass = lang.active ? 'wp-loc-gutenberg-lang-item is-active' : 'wp-loc-gutenberg-lang-item';
+                    const flag = '<img src="' + lang.flag + '" alt="' + lang.name + '" />';
+                    const label = '<span>' + lang.name + '</span>';
+
+                    if (lang.active || !lang.url) {
+                        menuHtml += '<span class="' + itemClass + '">' + flag + label + '</span>';
+                    } else {
+                        menuHtml += '<a href="' + lang.url + '" class="' + itemClass + '">' + flag + label + '</a>';
+                    }
+                });
+
+                menuHtml += '</div>';
+            }
+
+            switcher.innerHTML =
+                '<span class="wp-loc-gutenberg-lang-current" aria-label="' + wpLocAdmin.adminLangName + '" title="' + wpLocAdmin.adminLangName + '">' +
+                    '<img src="' + wpLocAdmin.adminLangFlag + '" alt="' + wpLocAdmin.adminLangName + '" />' +
+                    '<span class="wp-loc-gutenberg-lang-label">' + wpLocAdmin.adminLangName + '</span>' +
+                '</span>' +
+                menuHtml;
 
             const toolsGroup = toolbar.querySelector('.editor-document-tools');
             if (toolsGroup && toolsGroup.nextSibling) {
-                toolbar.insertBefore(badge, toolsGroup.nextSibling);
+                toolbar.insertBefore(switcher, toolsGroup.nextSibling);
             } else {
-                toolbar.appendChild(badge);
+                toolbar.appendChild(switcher);
             }
         };
 

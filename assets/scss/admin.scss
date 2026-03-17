@@ -39,15 +39,78 @@ $transition-speed: .15s;
 
 // Gutenberg header language badge
 .wp-loc-gutenberg-lang-badge {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  min-width: 32px;
-  height: 36px;
   margin-left: 6px;
-  padding: 0 6px;
+  height: 36px;
+
+  &:hover,
+  &:focus-within {
+    .wp-loc-gutenberg-lang-dropdown {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+  }
+}
+
+.wp-loc-gutenberg-lang-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 10px;
   box-sizing: border-box;
+  border-radius: 2px;
+}
+
+.wp-loc-gutenberg-lang-badge.is-static {
+  .wp-loc-gutenberg-lang-current {
+    cursor: default;
+  }
+}
+
+.wp-loc-gutenberg-lang-label {
+  font-size: 13px;
+  color: #1e1e1e;
+  white-space: nowrap;
+}
+
+.wp-loc-gutenberg-lang-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 180px;
+  padding: 6px 0;
+  background: #fff;
+  border: 1px solid #dcdcde;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .08);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity $transition-speed, transform $transition-speed, visibility $transition-speed;
+  z-index: 1000;
+}
+
+.wp-loc-gutenberg-lang-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: #1e1e1e;
+  text-decoration: none;
+
+  &:hover {
+    background: #f6f7f7;
+    color: #1e1e1e;
+  }
+
+  &.is-active {
+    background: #f0f6fc;
+    color: $color-wp-blue;
+    font-weight: 600;
+  }
 
   img {
     @include flag-icon;

@@ -30,10 +30,27 @@ class WP_LOC_Admin {
         $deps   = [ 'jquery' ];
         $admin_lang = self::get_admin_lang();
         $admin_locale = self::get_admin_locale();
+        $gutenberg_languages = [];
+        $editing_post_id = isset( $_GET['post'] ) ? (int) $_GET['post'] : 0;
 
         // Add wp-data dependency on post edit screens for Gutenberg metabox refresh
         if ( $screen && $screen->is_block_editor ) {
             $deps[] = 'wp-data';
+            if ( $editing_post_id && get_post( $editing_post_id ) ) {
+                $base_url = remove_query_arg( [ 'paged', 'wp_loc_lang' ] );
+
+                foreach ( WP_LOC_Languages::get_active_languages() as $slug => $data ) {
+                    $locale = $data['locale'] ?? $slug;
+
+                    $gutenberg_languages[] = [
+                        'code'   => $slug,
+                        'name'   => WP_LOC_Languages::get_display_name( $slug ),
+                        'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
+                        'url'    => $slug === $admin_lang ? '' : add_query_arg( 'wp_loc_lang', $slug, $base_url ),
+                        'active' => $slug === $admin_lang,
+                    ];
+                }
+            }
         }
 
         wp_enqueue_style( 'wp-loc-admin', WP_LOC_URL . 'assets/css/admin.min.css', [], WP_LOC_VERSION );
@@ -44,6 +61,7 @@ class WP_LOC_Admin {
             'adminLang'     => $admin_lang,
             'adminLangName' => WP_LOC_Languages::get_display_name( $admin_lang ),
             'adminLangFlag' => WP_LOC_Languages::get_flag_url( $admin_locale ),
+            'gutenbergLanguages' => $gutenberg_languages,
         ] );
     }
 
