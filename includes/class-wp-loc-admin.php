@@ -28,6 +28,8 @@ class WP_LOC_Admin {
     public function enqueue_assets(): void {
         $screen = get_current_screen();
         $deps   = [ 'jquery' ];
+        $admin_lang = self::get_admin_lang();
+        $admin_locale = self::get_admin_locale();
 
         // Add wp-data dependency on post edit screens for Gutenberg metabox refresh
         if ( $screen && $screen->is_block_editor ) {
@@ -37,8 +39,11 @@ class WP_LOC_Admin {
         wp_enqueue_style( 'wp-loc-admin', WP_LOC_URL . 'assets/css/admin.min.css', [], WP_LOC_VERSION );
         wp_enqueue_script( 'wp-loc-admin', WP_LOC_URL . 'assets/js/admin.min.js', $deps, WP_LOC_VERSION, true );
         wp_localize_script( 'wp-loc-admin', 'wpLocAdmin', [
-            'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-            'nonce'   => wp_create_nonce( 'wp_loc_ajax' ),
+            'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+            'nonce'         => wp_create_nonce( 'wp_loc_ajax' ),
+            'adminLang'     => $admin_lang,
+            'adminLangName' => WP_LOC_Languages::get_display_name( $admin_lang ),
+            'adminLangFlag' => WP_LOC_Languages::get_flag_url( $admin_locale ),
         ] );
     }
 
@@ -270,13 +275,19 @@ class WP_LOC_Admin {
             $li_class = $is_active ? ' class="wp-loc-lang-active"' : '';
 
             echo '<li' . $li_class . '>';
-            echo '<img class="wp-loc-flag-small" src="' . esc_url( $flag ) . '" alt="" />';
 
             if ( $has_translation ) {
-                echo '<a href="' . esc_url( $edit_link ) . '">';
-                echo esc_html( WP_LOC_Languages::get_display_name( $slug ) );
+                $is_published = $translated_post && $translated_post->post_status === 'publish';
+                $icon_class = $is_published ? 'wp-loc-t-published' : 'wp-loc-t-draft';
+                $flag_img = '<img class="wp-loc-flag" src="' . esc_url( $flag ) . '" alt="" />';
+                $pencil = '<span class="wp-loc-pencil">✎</span>';
+
+                echo '<a href="' . esc_url( $edit_link ) . '" class="wp-loc-metabox-link" title="' . esc_attr__( 'Edit translation', 'wp-loc' ) . '">';
+                echo '<span class="wp-loc-t ' . esc_attr( $icon_class ) . '" aria-hidden="true">' . $flag_img . $pencil . '</span>';
+                echo '<span class="wp-loc-metabox-link-text">' . esc_html( WP_LOC_Languages::get_display_name( $slug ) ) . '</span>';
                 echo '</a>';
             } else {
+                echo '<img class="wp-loc-flag-small" src="' . esc_url( $flag ) . '" alt="" />';
                 echo '<span class="wp-loc-lang-name-missing">' . esc_html( WP_LOC_Languages::get_display_name( $slug ) ) . '</span>';
                 echo '<button type="button" class="button button-small wp-loc-create-single-translation" data-post-id="' . esc_attr( $post->ID ) . '" data-lang="' . esc_attr( $slug ) . '">';
                 echo '+';

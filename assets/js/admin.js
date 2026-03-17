@@ -43,14 +43,17 @@
             lang: lang
         }, function(response) {
             if (response.success) {
-                const name = $li.find('.wp-loc-lang-name-missing').text();
-                $li.find('.wp-loc-lang-name-missing, .wp-loc-create-single-translation').remove();
-                const statusClass = response.data.status === 'publish' ? 'wp-loc-status-published' : 'wp-loc-status-draft';
-                const statusLabel = response.data.status === 'publish' ? '✓' : 'Draft';
-                $li.find('.wp-loc-flag-small').after(
-                    '<a href="' + response.data.edit_url + '">' + name + '</a>' +
-                    '<span class="' + statusClass + '">' + statusLabel + '</span>'
-                );
+                const $metabox = $('#wp_loc_translations .inside');
+
+                $.post(wpLocAdmin.ajaxUrl, {
+                    action: 'wp_loc_refresh_metabox',
+                    nonce: wpLocAdmin.nonce,
+                    post_id: postId
+                }, function(refreshResponse) {
+                    if (refreshResponse.success) {
+                        $metabox.html(refreshResponse.data.html);
+                    }
+                });
             } else {
                 $btn.prop('disabled', false).text('+');
             }
@@ -62,7 +65,6 @@
     // Gutenberg — refresh translation metabox after first save (auto-draft → saved)
     if (typeof wp !== 'undefined' && wp.data && wp.data.subscribe) {
         let wasSaving = false;
-        let wasAutoDraft = true;
 
         wp.data.subscribe(function() {
             const editor = wp.data.select('core/editor');
@@ -88,6 +90,40 @@
             }
 
             wasSaving = isSaving;
+        });
+    }
+
+    // Gutenberg — show current admin language flag in the header toolbar
+    if (wpLocAdmin.adminLangFlag && wpLocAdmin.adminLangName) {
+        const renderGutenbergLanguageBadge = function() {
+            const toolbar = document.querySelector('.edit-post-header-toolbar');
+            if (!toolbar || toolbar.querySelector('.wp-loc-gutenberg-lang-badge')) {
+                return;
+            }
+
+            const badge = document.createElement('span');
+            badge.className = 'wp-loc-gutenberg-lang-badge';
+            badge.title = wpLocAdmin.adminLangName;
+            badge.setAttribute('aria-label', wpLocAdmin.adminLangName);
+            badge.innerHTML = '<img src="' + wpLocAdmin.adminLangFlag + '" alt="' + wpLocAdmin.adminLangName + '" />';
+
+            const toolsGroup = toolbar.querySelector('.editor-document-tools');
+            if (toolsGroup && toolsGroup.nextSibling) {
+                toolbar.insertBefore(badge, toolsGroup.nextSibling);
+            } else {
+                toolbar.appendChild(badge);
+            }
+        };
+
+        renderGutenbergLanguageBadge();
+
+        const observer = new MutationObserver(function() {
+            renderGutenbergLanguageBadge();
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
         });
     }
 

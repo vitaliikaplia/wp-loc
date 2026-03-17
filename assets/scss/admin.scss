@@ -37,6 +37,24 @@ $transition-speed: .15s;
   }
 }
 
+// Gutenberg header language badge
+.wp-loc-gutenberg-lang-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  height: 36px;
+  margin-left: 6px;
+  padding: 0 6px;
+  box-sizing: border-box;
+
+  img {
+    @include flag-icon;
+    display: block;
+  }
+}
+
 // ===========================================
 // Translation Meta Box (post editor sidebar)
 // ===========================================
@@ -74,6 +92,27 @@ $transition-speed: .15s;
 
   a {
     text-decoration: none;
+    flex: 1;
+  }
+
+  .wp-loc-metabox-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .wp-loc-metabox-link:hover,
+  .wp-loc-metabox-link:focus {
+    .wp-loc-flag {
+      opacity: 0;
+    }
+
+    .wp-loc-pencil {
+      opacity: 1;
+    }
+  }
+
+  .wp-loc-metabox-link-text {
     flex: 1;
   }
 
