@@ -2,104 +2,171 @@
 # Copyright (C) 2026 Vitalii Kaplia
 msgid ""
 msgstr ""
-"Project-Id-Version: WP-LOC 1.0.0\n"
+"Project-Id-Version: wp-loc\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-16 12:00+0000\n"
-"PO-Revision-Date: 2026-03-16 12:00+0000\n"
-"Last-Translator: Vitalii Kaplia\n"
-"Language-Team: Ukrainian\n"
+"POT-Creation-Date: 2026-03-17 23:44+0200\n"
+"PO-Revision-Date: 2026-03-17 23:44+0200\n"
+"Last-Translator: Vitalii Kaplia <vitalii.kaplia@gmail.com>\n"
+"Language-Team: Vitalii Kaplia <vitalii.kaplia@gmail.com>\n"
 "Language: uk\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2);\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2);\n"
+"X-Generator: Poedit 3.9\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"X-Poedit-KeywordsList: __;_e;esc_html_e\n"
+"X-Poedit-Basepath: ..\n"
+"X-Poedit-SearchPath-0: .\n"
 
-msgid "Languages"
-msgstr "Мови"
-
-msgid "Languages saved."
-msgstr "Мови збережено."
-
-msgid "Language \"%s\" deleted."
-msgstr "Мову \"%s\" видалено."
-
-msgid "Save"
-msgstr "Зберегти"
-
-msgid "Missing slug for locale %s"
-msgstr "Відсутній слаг для локалі %s"
-
-msgid "Duplicate slug \"%s\" detected."
-msgstr "Виявлено дублікат слагу \"%s\"."
-
-msgid "Enabled"
-msgstr "Увімкнено"
-
-msgid "Name"
-msgstr "Назва"
-
-msgid "Locale"
-msgstr "Локаль"
-
-msgid "Slug"
-msgstr "Слаг"
-
-msgid "Flag"
-msgstr "Прапор"
-
-msgid "Action"
-msgstr "Дія"
-
-msgid "Delete"
-msgstr "Видалити"
-
-msgid "Translations"
-msgstr "Переклади"
-
-msgid "Save the post first to manage translations."
-msgstr "Спочатку збережіть запис, щоб керувати перекладами."
-
-msgid "Create translations"
-msgstr "Створити переклади"
-
+#: includes/class-wp-loc-acf.php:22
 msgid "Translation Mode"
 msgstr "Режим перекладу"
 
-msgid "Is this field shared or translatable between languages?"
-msgstr "Це поле спільне чи перекладається для різних мов?"
+#: includes/class-wp-loc-acf.php:23
+msgid ""
+"Should multilingual logic be disabled, shared, or translated for this field?"
+msgstr ""
+"Чи слід для цього поля вимкнути багатомовну логіку, зробити її спільною або "
+"перекласти?"
 
+#: includes/class-wp-loc-acf.php:27
+msgid "Do not apply multilingual logic"
+msgstr "Не застосовувати багатомовну логіку"
+
+#: includes/class-wp-loc-acf.php:28
 msgid "Shared across all languages"
 msgstr "Спільне для всіх мов"
 
+#: includes/class-wp-loc-acf.php:29
 msgid "Translatable"
 msgstr "Перекладається"
 
-msgid "Display Name"
-msgstr "Відображення"
-
-msgid "Creating new content is only available in the primary language of the site. Switch to the default language first."
-msgstr "Створення нового контенту доступне лише в основній мові сайту. Спочатку перемкніться на мову за замовчуванням."
-
-msgid "Action not allowed"
-msgstr "Дія не дозволена"
-
-msgid "Auto-resolved from default language translation"
-msgstr "Автоматично визначено з перекладу основної мови"
-
-msgid "Settings"
-msgstr "Налаштування"
-
-msgid "Settings saved."
-msgstr "Налаштування збережено."
-
-msgid "Translatable Post Types"
-msgstr "Типи записів для перекладу"
-
-msgid "Select which post types should support multilingual translations."
-msgstr "Оберіть які типи записів мають підтримувати багатомовні переклади."
-
+#: includes/class-wp-loc-admin-languages.php:22
 msgid "Multilingual"
 msgstr "Багатомовність"
 
-msgid "Edit translation"
-msgstr "Редагувати переклад"
+#: includes/class-wp-loc-admin-languages.php:37
+#: includes/class-wp-loc-admin-languages.php:38 wp-loc.php:37
+msgid "Languages"
+msgstr "Мови"
+
+#: includes/class-wp-loc-admin-languages.php:78
+#: includes/class-wp-loc-admin-settings.php:130
+msgid "Save"
+msgstr "Зберегти"
+
+#: includes/class-wp-loc-admin-languages.php:97
+#, php-format
+msgid "Missing slug for locale %s"
+msgstr "Відсутній слаг для локалі %s"
+
+#: includes/class-wp-loc-admin-languages.php:100
+#, php-format
+msgid "Duplicate slug \"%s\" detected."
+msgstr "Виявлено дублікат слагу \"%s\"."
+
+#: includes/class-wp-loc-admin-languages.php:249
+msgid "Enabled"
+msgstr "Увімкнено"
+
+#: includes/class-wp-loc-admin-languages.php:250
+msgid "Name"
+msgstr "Назва"
+
+#: includes/class-wp-loc-admin-languages.php:251
+msgid "Locale"
+msgstr "Локаль"
+
+#: includes/class-wp-loc-admin-languages.php:252
+msgid "Slug"
+msgstr "Слаг"
+
+#: includes/class-wp-loc-admin-languages.php:253
+msgid "Display Name"
+msgstr "Відображення"
+
+#: includes/class-wp-loc-admin-languages.php:254
+msgid "Flag"
+msgstr "Прапор"
+
+#: includes/class-wp-loc-admin-languages.php:255
+msgid "Action"
+msgstr "Дія"
+
+#: includes/class-wp-loc-admin-settings.php:19
+#: includes/class-wp-loc-admin-settings.php:20
+#: includes/class-wp-loc-admin-settings.php:83 wp-loc.php:38
+msgid "Settings"
+msgstr "Налаштування"
+
+#: includes/class-wp-loc-admin-settings.php:87
+msgid "Settings saved."
+msgstr "Налаштування збережено."
+
+#: includes/class-wp-loc-admin-settings.php:96
+msgid "Translatable Post Types"
+msgstr "Типи записів для перекладу"
+
+#: includes/class-wp-loc-admin-settings.php:111
+msgid "Select which post types should support multilingual translations."
+msgstr "Оберіть які типи записів мають підтримувати багатомовні переклади."
+
+#: includes/class-wp-loc-admin-settings.php:115
+msgid "Frontend Language Switcher"
+msgstr "Перемикач мови на фронтенді"
+
+#: includes/class-wp-loc-admin-settings.php:123
+msgid "Show flags in the frontend language switcher"
+msgstr "Показувати прапорці в перемикачі мови інтерфейсу"
+
+#: includes/class-wp-loc-admin-settings.php:125
+msgid ""
+"Controls whether flags are rendered by the frontend language switcher helper."
+msgstr ""
+"Визначає, чи відображаються прапорці у допоміжному модулі перемикання мови "
+"інтерфейсу."
+
+#: includes/class-wp-loc-admin.php:205 includes/class-wp-loc-admin.php:598
+msgid "Translations"
+msgstr "Переклади"
+
+#: includes/class-wp-loc-admin.php:447 includes/class-wp-loc-admin.php:459
+#: includes/class-wp-loc-admin.php:468
+msgid ""
+"Creating new content is only available in the primary language of the site. "
+"Switch to the default language first."
+msgstr ""
+"Створення нового контенту доступне лише в основній мові сайту. Спочатку "
+"перемкніться на мову за замовчуванням."
+
+#: includes/class-wp-loc-admin.php:448 includes/class-wp-loc-admin.php:460
+#: includes/class-wp-loc-admin.php:469
+msgid "Action not allowed"
+msgstr "Дія не дозволена"
+
+#: includes/class-wp-loc-options.php:197
+msgid "Auto-resolved from default language translation"
+msgstr "Автоматично визначено з перекладу основної мови"
+
+#~ msgid "Languages saved."
+#~ msgstr "Мови збережено."
+
+#~ msgid "Language \"%s\" deleted."
+#~ msgstr "Мову \"%s\" видалено."
+
+#~ msgid "Delete"
+#~ msgstr "Видалити"
+
+#~ msgid "Save the post first to manage translations."
+#~ msgstr "Спочатку збережіть запис, щоб керувати перекладами."
+
+#~ msgid "Create translations"
+#~ msgstr "Створити переклади"
+
+#~ msgid "Is this field shared or translatable between languages?"
+#~ msgstr "Це поле спільне чи перекладається для різних мов?"
+
+#~ msgid "Edit translation"
+#~ msgstr "Редагувати переклад"

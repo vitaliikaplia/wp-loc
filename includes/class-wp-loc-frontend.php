@@ -152,7 +152,7 @@ function wp_loc_get_lang_switcher(): array {
                 'active' => $code === $current,
                 'url'    => home_url( $prefix . '/' ),
                 'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
-                'name'   => WP_LOC_Languages::get_language_display_name( $locale ),
+                'name'   => WP_LOC_Languages::get_display_name( $code ),
             ];
         }
         return $switcher;
@@ -189,7 +189,7 @@ function wp_loc_get_lang_switcher(): array {
                 'active' => $code === $current,
                 'url'    => $url,
                 'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
-                'name'   => WP_LOC_Languages::get_language_display_name( $locale ),
+                'name'   => WP_LOC_Languages::get_display_name( $code ),
             ];
         }
 
@@ -215,9 +215,50 @@ function wp_loc_get_lang_switcher(): array {
             'active' => $code === $current,
             'url'    => $url,
             'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
-            'name'   => WP_LOC_Languages::get_language_display_name( $locale ),
+            'name'   => WP_LOC_Languages::get_display_name( $code ),
         ];
     }
 
     return $switcher;
+}
+
+/**
+ * Get frontend language switcher HTML markup.
+ */
+function wp_loc_get_language_switcher_html(): string {
+    $languages = wp_loc_get_lang_switcher();
+
+    if ( empty( $languages ) ) {
+        return '';
+    }
+
+    $show_flags = WP_LOC_Admin_Settings::show_switcher_flags();
+    $html = '<ul class="languageSwitcher">';
+
+    foreach ( $languages as $lang ) {
+        $item_class = $lang['active'] ? ' class="active"' : '';
+
+        $html .= '<li' . $item_class . '>';
+        $html .= '<a href="' . esc_url( $lang['url'] ) . '">';
+
+        if ( $show_flags && ! empty( $lang['flag'] ) ) {
+            $html .= '<img src="' . esc_url( $lang['flag'] ) . '" alt="' . esc_attr( $lang['name'] ) . '" />';
+            $html .= ' ';
+        }
+
+        $html .= esc_html( $lang['name'] );
+        $html .= '</a>';
+        $html .= '</li>';
+    }
+
+    $html .= '</ul>';
+
+    return $html;
+}
+
+/**
+ * Output frontend language switcher HTML markup.
+ */
+function wp_loc_the_language_switcher(): void {
+    echo wp_loc_get_language_switcher_html();
 }

@@ -45,11 +45,23 @@ foreach ( $switcher as $lang ) {
     echo '</a>';
 }
 
+// Or render ready-to-use markup:
+wp_loc_the_language_switcher();
+
 // Get translated post ID
 $translated_id = icl_object_id( $post_id, 'page', true, 'en' );
 
 // Register a multilingual option
 do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
+```
+
+### In Twig (Timber)
+```twig
+{{ wp_loc_language_switcher() }}
+
+{% for lang in wp_loc_languages() %}
+  <a href="{{ lang.url }}" class="{{ lang.active ? 'active' : '' }}">{{ lang.name }}</a>
+{% endfor %}
 ```
 
 ## License

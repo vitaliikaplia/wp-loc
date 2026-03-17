@@ -59,6 +59,38 @@
         });
     });
 
+    // Gutenberg — refresh translation metabox after first save (auto-draft → saved)
+    if (typeof wp !== 'undefined' && wp.data && wp.data.subscribe) {
+        let wasSaving = false;
+        let wasAutoDraft = true;
+
+        wp.data.subscribe(function() {
+            const editor = wp.data.select('core/editor');
+            if (!editor) return;
+
+            const isSaving = editor.isSavingPost() && !editor.isAutosavingPost();
+
+            if (wasSaving && !isSaving) {
+                const postId = editor.getCurrentPostId();
+                const $metabox = $('#wp_loc_translations .inside');
+
+                if ($metabox.find('.wp-loc-metabox-message').length || $metabox.find('.wp-loc-create-translations').length) {
+                    $.post(wpLocAdmin.ajaxUrl, {
+                        action: 'wp_loc_refresh_metabox',
+                        nonce: wpLocAdmin.nonce,
+                        post_id: postId
+                    }, function(response) {
+                        if (response.success) {
+                            $metabox.html(response.data.html);
+                        }
+                    });
+                }
+            }
+
+            wasSaving = isSaving;
+        });
+    }
+
     // Reading Settings — disable page selects for non-default languages
     if (window.wpLocDisablePageSelects) {
         const selects = document.querySelectorAll('#page_on_front, #page_for_posts');

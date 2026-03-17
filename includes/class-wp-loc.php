@@ -18,6 +18,7 @@ class WP_LOC {
     public $acf;
     public $admin_settings;
     public $media;
+    public $timber;
 
     public static function instance() {
         if ( self::$instance === null ) {
@@ -44,6 +45,7 @@ class WP_LOC {
             'class-wp-loc-options',
             'class-wp-loc-compat',
             'class-wp-loc-media',
+            'class-wp-loc-timber',
         ];
 
         foreach ( $includes as $file ) {
@@ -66,6 +68,7 @@ class WP_LOC {
         // Settings loads on both admin and frontend (filter + is_translatable helper)
         $this->admin_settings  = new WP_LOC_Admin_Settings();
         $this->media           = new WP_LOC_Media();
+        $this->timber          = new WP_LOC_Timber();
 
         if ( is_admin() ) {
             $this->admin           = new WP_LOC_Admin();

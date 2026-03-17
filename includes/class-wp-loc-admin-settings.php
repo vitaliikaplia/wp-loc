@@ -5,6 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class WP_LOC_Admin_Settings {
 
     const OPTION_KEY = 'wp_loc_translatable_post_types';
+    const SHOW_FLAGS_OPTION_KEY = 'wp_loc_show_switcher_flags';
 
     public function __construct() {
         add_action( 'admin_menu', [ $this, 'add_menu' ], 20 );
@@ -44,14 +45,23 @@ class WP_LOC_Admin_Settings {
         return in_array( $post_type, $translatable, true );
     }
 
+    /**
+     * Check whether frontend language switcher should display flags
+     */
+    public static function show_switcher_flags(): bool {
+        return (bool) get_option( self::SHOW_FLAGS_OPTION_KEY, true );
+    }
+
     public function handle_save(): void {
         if ( ! isset( $_POST['wp_loc_settings_nonce'] ) ) return;
         if ( ! wp_verify_nonce( $_POST['wp_loc_settings_nonce'], 'wp_loc_save_settings' ) ) return;
         if ( ! current_user_can( 'manage_options' ) ) return;
 
         $selected = isset( $_POST['wp_loc_post_types'] ) ? array_map( 'sanitize_key', (array) $_POST['wp_loc_post_types'] ) : [];
+        $show_flags = isset( $_POST['wp_loc_show_switcher_flags'] ) ? 1 : 0;
 
         update_option( self::OPTION_KEY, $selected );
+        update_option( self::SHOW_FLAGS_OPTION_KEY, $show_flags );
 
         wp_redirect( add_query_arg( [
             'page'    => 'wp-loc-settings',
@@ -66,6 +76,7 @@ class WP_LOC_Admin_Settings {
 
         $saved = get_option( self::OPTION_KEY );
         $selected = ( $saved !== false && is_array( $saved ) ) ? $saved : [ 'post', 'page' ];
+        $show_flags = self::show_switcher_flags();
 
         ?>
         <div class="wrap">
@@ -98,6 +109,20 @@ class WP_LOC_Admin_Settings {
                                 <?php endforeach; ?>
                             </fieldset>
                             <p class="description"><?php esc_html_e( 'Select which post types should support multilingual translations.', 'wp-loc' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Frontend Language Switcher', 'wp-loc' ); ?></th>
+                        <td>
+                            <label class="wp-loc-settings-label">
+                                <input type="checkbox"
+                                       name="wp_loc_show_switcher_flags"
+                                       value="1"
+                                       <?php checked( $show_flags ); ?>
+                                />
+                                <?php esc_html_e( 'Show flags in the frontend language switcher', 'wp-loc' ); ?>
+                            </label>
+                            <p class="description"><?php esc_html_e( 'Controls whether flags are rendered by the frontend language switcher helper.', 'wp-loc' ); ?></p>
                         </td>
                     </tr>
                 </table>

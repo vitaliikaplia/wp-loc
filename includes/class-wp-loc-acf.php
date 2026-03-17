@@ -20,15 +20,16 @@ class WP_LOC_ACF {
 
         acf_render_field_setting( $field, [
             'label'         => __( 'Translation Mode', 'wp-loc' ),
-            'instructions'  => __( 'Is this field shared or translatable between languages?', 'wp-loc' ),
+            'instructions'  => __( 'Should multilingual logic be disabled, shared, or translated for this field?', 'wp-loc' ),
             'name'          => 'translation_mode',
             'type'          => 'radio',
             'choices'       => [
+                'none'         => __( 'Do not apply multilingual logic', 'wp-loc' ),
                 'shared'       => __( 'Shared across all languages', 'wp-loc' ),
                 'translatable' => __( 'Translatable', 'wp-loc' ),
             ],
             'layout'        => 'vertical',
-            'default_value' => 'shared',
+            'default_value' => 'none',
             'ui'            => 0,
         ], true );
     }
@@ -40,6 +41,12 @@ class WP_LOC_ACF {
         if ( ! is_array( $field ) || ! isset( $field['name'] ) ) return $value;
         if ( strpos( (string) $post_id, 'options' ) !== 0 ) return $value;
 
+        $translation_mode = $this->get_translation_mode( $field );
+
+        if ( $translation_mode === 'none' ) {
+            return $value;
+        }
+
         $current_locale = WP_LOC_Admin::get_admin_locale();
         if ( ! $current_locale ) {
             $langs = WP_LOC_Languages::get_active_languages();
@@ -47,11 +54,8 @@ class WP_LOC_ACF {
             $current_locale = $langs[ $default ]['locale'] ?? 'en_US';
         }
 
-        $translatable_fields = get_option( 'wp_loc_acf_translatable_fields', [] );
-        $is_translatable = isset( $translatable_fields[ $field['name'] ] );
-
         // Translatable field: save to language-specific option
-        if ( $is_translatable ) {
+        if ( $translation_mode === 'translatable' ) {
             $option_name = "_options_{$current_locale}_{$field['name']}";
             update_option( $option_name, $value );
             return null; // Prevent default ACF save
@@ -78,12 +82,10 @@ class WP_LOC_ACF {
         $default_lang = WP_LOC_Languages::get_default_language();
 
         if ( $admin_lang === $default_lang ) return $field;
-
-        $translatable_fields = get_option( 'wp_loc_acf_translatable_fields', [] );
-        $is_translatable = isset( $translatable_fields[ $field['name'] ] );
+        $translation_mode = $this->get_translation_mode( $field );
 
         // Shared field + non-default language → readonly
-        if ( ! $is_translatable ) {
+        if ( $translation_mode === 'shared' ) {
             $field['readonly'] = 1;
             $field['disabled'] = 1;
             $field['wrapper']['class'] = ( $field['wrapper']['class'] ?? '' ) . ' acf-disabled';
@@ -100,9 +102,7 @@ class WP_LOC_ACF {
             return $null;
         }
 
-        $translatable_fields = get_option( 'wp_loc_acf_translatable_fields', [] );
-
-        if ( ! isset( $translatable_fields[ $field['name'] ] ) ) {
+        if ( $this->get_translation_mode( $field ) !== 'translatable' ) {
             return $null;
         }
 
@@ -126,12 +126,20 @@ class WP_LOC_ACF {
      */
     public function save_translatable_fields_config( array $field_group ): void {
         $translatable_fields = get_option( 'wp_loc_acf_translatable_fields', [] );
+        $field_modes = get_option( 'wp_loc_acf_field_translation_modes', [] );
 
         $fields = acf_get_fields( $field_group['key'] );
         if ( ! is_array( $fields ) ) return;
 
         foreach ( $fields as $field ) {
-            if ( isset( $field['translation_mode'] ) && $field['translation_mode'] === 'translatable' ) {
+            if ( empty( $field['name'] ) ) {
+                continue;
+            }
+
+            $mode = $field['translation_mode'] ?? 'none';
+            $field_modes[ $field['name'] ] = $mode;
+
+            if ( $mode === 'translatable' ) {
                 $translatable_fields[ $field['name'] ] = $field['key'];
             } else {
                 unset( $translatable_fields[ $field['name'] ] );
@@ -139,5 +147,33 @@ class WP_LOC_ACF {
         }
 
         update_option( 'wp_loc_acf_translatable_fields', $translatable_fields );
+        update_option( 'wp_loc_acf_field_translation_modes', $field_modes );
+    }
+
+    /**
+     * Resolve the configured translation mode for a field.
+     */
+    private function get_translation_mode( array $field ): string {
+        if ( isset( $field['translation_mode'] ) && in_array( $field['translation_mode'], [ 'none', 'shared', 'translatable' ], true ) ) {
+            return $field['translation_mode'];
+        }
+
+        if ( empty( $field['name'] ) ) {
+            return 'none';
+        }
+
+        $field_modes = get_option( 'wp_loc_acf_field_translation_modes', [] );
+
+        if ( isset( $field_modes[ $field['name'] ] ) && in_array( $field_modes[ $field['name'] ], [ 'none', 'shared', 'translatable' ], true ) ) {
+            return $field_modes[ $field['name'] ];
+        }
+
+        $translatable_fields = get_option( 'wp_loc_acf_translatable_fields', [] );
+
+        if ( isset( $translatable_fields[ $field['name'] ] ) ) {
+            return 'translatable';
+        }
+
+        return 'none';
     }
 }

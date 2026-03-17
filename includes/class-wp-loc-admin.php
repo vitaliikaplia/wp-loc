@@ -13,6 +13,7 @@ class WP_LOC_Admin {
         add_action( 'add_meta_boxes', [ $this, 'add_translation_meta_box' ] );
         add_action( 'admin_init', [ $this, 'handle_create_translations' ] );
         add_action( 'wp_ajax_wp_loc_create_translation', [ $this, 'ajax_create_translation' ] );
+        add_action( 'wp_ajax_wp_loc_refresh_metabox', [ $this, 'ajax_refresh_metabox' ] );
         add_action( 'admin_init', [ $this, 'restrict_non_default_language_creation' ] );
         add_filter( 'get_sample_permalink_html', [ $this, 'add_lang_prefix_to_permalink' ], 10, 4 );
         add_filter( 'get_pages', [ $this, 'filter_pages_by_language' ] );
@@ -25,8 +26,16 @@ class WP_LOC_Admin {
      * Enqueue admin CSS and JS
      */
     public function enqueue_assets(): void {
+        $screen = get_current_screen();
+        $deps   = [ 'jquery' ];
+
+        // Add wp-data dependency on post edit screens for Gutenberg metabox refresh
+        if ( $screen && $screen->is_block_editor ) {
+            $deps[] = 'wp-data';
+        }
+
         wp_enqueue_style( 'wp-loc-admin', WP_LOC_URL . 'assets/css/admin.min.css', [], WP_LOC_VERSION );
-        wp_enqueue_script( 'wp-loc-admin', WP_LOC_URL . 'assets/js/admin.min.js', [ 'jquery' ], WP_LOC_VERSION, true );
+        wp_enqueue_script( 'wp-loc-admin', WP_LOC_URL . 'assets/js/admin.min.js', $deps, WP_LOC_VERSION, true );
         wp_localize_script( 'wp-loc-admin', 'wpLocAdmin', [
             'ajaxUrl' => admin_url( 'admin-ajax.php' ),
             'nonce'   => wp_create_nonce( 'wp_loc_ajax' ),
@@ -396,6 +405,27 @@ class WP_LOC_Admin {
             'edit_url' => get_edit_post_link( $duplicate_id, 'raw' ),
             'status'   => get_post_status( $duplicate_id ),
         ] );
+    }
+
+    /**
+     * AJAX: refresh translation metabox HTML
+     */
+    public function ajax_refresh_metabox(): void {
+        check_ajax_referer( 'wp_loc_ajax', 'nonce' );
+
+        $post_id = (int) ( $_POST['post_id'] ?? 0 );
+        if ( ! $post_id || ! current_user_can( 'edit_post', $post_id ) ) {
+            wp_send_json_error();
+        }
+
+        $post = get_post( $post_id );
+        if ( ! $post ) {
+            wp_send_json_error();
+        }
+
+        ob_start();
+        $this->render_translation_meta_box( $post );
+        wp_send_json_success( [ 'html' => ob_get_clean() ] );
     }
 
     /**
