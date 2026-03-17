@@ -32,3 +32,9 @@ add_action( 'plugins_loaded', function () {
     load_plugin_textdomain( 'wp-loc', false, dirname( WP_LOC_BASENAME ) . '/languages' );
     WP_LOC::instance();
 } );
+
+add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), function ( array $links ): array {
+    $links[] = '<a href="' . admin_url( 'admin.php?page=wp-loc' ) . '">' . __( 'Languages', 'wp-loc' ) . '</a>';
+    $links[] = '<a href="' . admin_url( 'admin.php?page=wp-loc-settings' ) . '">' . __( 'Settings', 'wp-loc' ) . '</a>';
+    return $links;
+} );

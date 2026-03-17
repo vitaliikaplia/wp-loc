@@ -146,6 +146,10 @@ $transition-speed: .15s;
 // ===========================================
 
 .wp-loc-languages-table {
+  .column-sort {
+    width: 1em;
+  }
+
   .lang-drag-handle {
     cursor: move;
     font-size: 18px;
