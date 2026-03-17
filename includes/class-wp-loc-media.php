@@ -32,6 +32,7 @@ class WP_LOC_Media {
         // Sync featured image across translations
         add_action( 'updated_post_meta', [ $this, 'sync_thumbnail' ], 10, 4 );
         add_action( 'added_post_meta', [ $this, 'sync_thumbnail' ], 10, 4 );
+        add_action( 'deleted_post_meta', [ $this, 'sync_thumbnail_delete' ], 10, 4 );
 
         // Resolve attachment ID to current language (frontend)
         add_filter( 'wp_get_attachment_image_src', [ $this, 'maybe_resolve_attachment' ], 10, 4 );
@@ -287,6 +288,36 @@ class WP_LOC_Media {
         }
 
         $syncing_thumb = false;
+    }
+
+    /**
+     * Sync featured image removal across all translations of a post.
+     */
+    public function sync_thumbnail_delete( array $meta_ids, int $post_id, string $meta_key, $meta_value ): void {
+        if ( $meta_key !== '_thumbnail_id' ) return;
+        if ( self::$duplicating ) return;
+
+        $post = get_post( $post_id );
+        if ( ! $post || ! WP_LOC_Admin_Settings::is_translatable( $post->post_type ) ) return;
+
+        $db = WP_LOC::instance()->db;
+        $post_element_type = WP_LOC_DB::post_element_type( $post->post_type );
+        $trid = $db->get_trid( $post_id, $post_element_type );
+        if ( ! $trid ) return;
+
+        $translations = $db->get_element_translations( $trid, $post_element_type );
+
+        static $syncing_delete = false;
+        if ( $syncing_delete ) return;
+        $syncing_delete = true;
+
+        foreach ( $translations as $row ) {
+            $sibling_id = (int) $row->element_id;
+            if ( $sibling_id === $post_id ) continue;
+            delete_post_meta( $sibling_id, '_thumbnail_id' );
+        }
+
+        $syncing_delete = false;
     }
 
     /**

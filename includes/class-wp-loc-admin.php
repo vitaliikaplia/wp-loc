@@ -369,6 +369,13 @@ class WP_LOC_Admin {
         $source_lang = $current_lang ?: wp_loc_get_admin_lang();
         $db->set_element_language( $duplicate_id, $element_type, $lang_slug, $trid, $source_lang );
 
+        // Fix slug — wp_insert_post may have added "-2" because icl_translations
+        // registration happens after insert; now that language is set, re-apply original slug
+        wp_update_post( [
+            'ID'        => $duplicate_id,
+            'post_name' => $post->post_name,
+        ] );
+
         // Copy meta
         foreach ( $meta as $key => $values ) {
             if ( str_starts_with( $key, '_wp_loc_' ) ) continue;
@@ -380,7 +387,9 @@ class WP_LOC_Admin {
         }
 
         if ( $thumbnail_id ) {
-            set_post_thumbnail( $duplicate_id, $thumbnail_id );
+            $attachment_element_type = WP_LOC_DB::post_element_type( 'attachment' );
+            $translated_thumb = $db->get_element_translation( (int) $thumbnail_id, $attachment_element_type, $lang_slug );
+            set_post_thumbnail( $duplicate_id, $translated_thumb ?: $thumbnail_id );
         }
 
         wp_send_json_success( [
