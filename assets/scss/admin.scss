@@ -257,8 +257,18 @@ $transition-speed: .15s;
 .wp-loc-t-missing                 { opacity: .35; }
 
 .column-wp_loc_translations {
-  width: 1%;
+  width: 110px;
+  min-width: 110px;
   white-space: nowrap;
+}
+
+th.column-wp_loc_translations {
+  white-space: normal;
+  line-height: 1.25;
+}
+
+td.column-wp_loc_translations {
+  overflow: visible;
 }
 
 // ===========================================
