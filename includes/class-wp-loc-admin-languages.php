@@ -301,9 +301,14 @@ class WP_LOC_Languages_List_Table extends WP_List_Table {
 
     public function column_enabled( $item ): string {
         $checked = $item['enabled'] ? 'checked' : '';
-        $disabled = $item['is_default'] ? 'readonly onclick="return false;"' : '';
+        $field_name = 'wp_loc_languages[' . esc_attr( $item['locale'] ) . '][enabled]';
 
-        return '<input type="checkbox" name="wp_loc_languages[' . esc_attr( $item['locale'] ) . '][enabled]" value="1" ' . $checked . ' ' . $disabled . ' />';
+        if ( $item['is_default'] ) {
+            return '<input type="hidden" name="' . $field_name . '" value="1" />'
+                . '<input type="checkbox" value="1" ' . $checked . ' disabled class="wp-loc-default-language-toggle" />';
+        }
+
+        return '<input type="checkbox" name="' . $field_name . '" value="1" ' . $checked . ' />';
     }
 
     public function column_name( $item ): string {

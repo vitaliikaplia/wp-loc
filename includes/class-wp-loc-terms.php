@@ -979,14 +979,11 @@ class WP_LOC_Terms {
             add_filter( "{$taxonomy}_row_actions", [ $this, 'filter_term_row_actions' ], 10, 2 );
             add_action( "{$taxonomy}_add_form_fields", [ $this, 'render_term_translation_add_form' ] );
             add_action( 'quick_edit_custom_box', [ $this, 'render_term_quick_edit_hidden_fields' ], 10, 3 );
-            add_action( 'admin_head', [ $this, 'output_terms_column_width' ] );
-            add_action( 'admin_head', [ $this, 'hide_protected_bulk_checkbox_ui' ] );
         }
 
         if ( $screen->base === 'term' ) {
             add_action( "{$taxonomy}_term_edit_form_top", [ $this, 'render_term_edit_hidden_fields' ], 10, 2 );
             add_action( "{$taxonomy}_edit_form_fields", [ $this, 'render_term_translation_edit_form' ], 20, 2 );
-            add_action( "{$taxonomy}_edit_form", [ $this, 'hide_delete_link_for_protected_term' ], 20, 2 );
         }
     }
 
@@ -1014,50 +1011,6 @@ class WP_LOC_Terms {
         }
 
         return $columns;
-    }
-
-    /**
-     * Hide the master bulk-select checkbox on protected category screens.
-     */
-    public function hide_protected_bulk_checkbox_ui(): void {
-        $taxonomy = sanitize_key( $_REQUEST['taxonomy'] ?? '' );
-
-        if ( $taxonomy !== 'category' ) {
-            return;
-        }
-
-        $protected_selectors = [];
-
-        foreach ( get_terms( [
-            'taxonomy'   => $taxonomy,
-            'hide_empty' => false,
-            'number'     => 0,
-            'lang'       => 'all',
-        ] ) as $term ) {
-            if ( $term instanceof \WP_Term && self::is_protected_term( (int) $term->term_id, $taxonomy ) ) {
-                $protected_selectors[] = '#tag-' . (int) $term->term_id . ' .check-column input[type="checkbox"]';
-                $protected_selectors[] = '#tag-' . (int) $term->term_id . ' .check-column label';
-            }
-        }
-
-        $css = '.wp-list-table thead .check-column input[type="checkbox"], .wp-list-table tfoot .check-column input[type="checkbox"]{display:none!important;}';
-
-        if ( ! empty( $protected_selectors ) ) {
-            $css .= implode( ',', $protected_selectors ) . '{display:none!important;}';
-        }
-
-        echo '<style>' . $css . '</style>';
-    }
-
-    /**
-     * Hide the delete link on the term edit screen for protected default-term translations.
-     */
-    public function hide_delete_link_for_protected_term( \WP_Term $term, string $taxonomy ): void {
-        if ( ! self::is_protected_term( (int) $term->term_id, $taxonomy ) ) {
-            return;
-        }
-
-        echo '<style>#delete-link{display:none!important;}</style>';
     }
 
     /**
@@ -1232,17 +1185,6 @@ class WP_LOC_Terms {
         }
 
         return implode( '', $items );
-    }
-
-    /**
-     * Output width for term translations column.
-     */
-    public function output_terms_column_width(): void {
-        $active = WP_LOC_Languages::get_active_languages();
-        $other_langs = array_diff_key( $active, [ self::get_context_language() => true ] );
-        $width = count( $other_langs ) * 34 + 10;
-
-        echo '<style>.column-wp_loc_translations { width: ' . (int) $width . 'px; }</style>';
     }
 
     /**

@@ -20,6 +20,8 @@ class WP_LOC {
     public $media;
     public $terms;
     public $timber;
+    public $menus;
+    public $menu_sync;
 
     public static function instance() {
         if ( self::$instance === null ) {
@@ -48,6 +50,8 @@ class WP_LOC {
             'class-wp-loc-media',
             'class-wp-loc-terms',
             'class-wp-loc-timber',
+            'class-wp-loc-menus',
+            'class-wp-loc-menu-sync',
         ];
 
         foreach ( $includes as $file ) {
@@ -72,10 +76,12 @@ class WP_LOC {
         $this->media           = new WP_LOC_Media();
         $this->terms           = new WP_LOC_Terms();
         $this->timber          = new WP_LOC_Timber();
+        $this->menus           = new WP_LOC_Menus();
 
         if ( is_admin() ) {
             $this->admin           = new WP_LOC_Admin();
             $this->admin_languages = new WP_LOC_Admin_Languages();
+            $this->menu_sync       = new WP_LOC_Menu_Sync();
         }
 
         // Compatibility layer (only when no other multilingual plugin is active)

@@ -4,8 +4,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: wp-loc\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-18 01:50+0200\n"
-"PO-Revision-Date: 2026-03-18 01:50+0200\n"
+"POT-Creation-Date: 2026-03-18 15:27+0200\n"
+"PO-Revision-Date: 2026-03-18 15:31+0200\n"
 "Last-Translator: Vitalii Kaplia <vitalii.kaplia@gmail.com>\n"
 "Language-Team: Vitalii Kaplia <vitalii.kaplia@gmail.com>\n"
 "Language: ru_RU\n"
@@ -17,29 +17,29 @@ msgstr ""
 "X-Generator: Poedit 3.9\n"
 "X-Poedit-Basepath: ..\n"
 "X-Poedit-SourceCharset: UTF-8\n"
-"X-Poedit-KeywordsList: __;_e;esc_html_e\n"
+"X-Poedit-KeywordsList: __;_e;esc_html_e;esc_attr__;esc_html__\n"
 "X-Poedit-SearchPath-0: .\n"
 
-#: includes/class-wp-loc-acf.php:22
+#: includes/class-wp-loc-acf.php:219
 msgid "Translation Mode"
 msgstr "Режим перевода"
 
-#: includes/class-wp-loc-acf.php:23
+#: includes/class-wp-loc-acf.php:220
 msgid ""
 "Should multilingual logic be disabled, shared, or translated for this field?"
 msgstr ""
 "Следует ли отключить, сделать общим или перевести многоязычную логику для "
 "этого поля?"
 
-#: includes/class-wp-loc-acf.php:27
+#: includes/class-wp-loc-acf.php:224
 msgid "Do not apply multilingual logic"
 msgstr "Не применять многоязычную логику"
 
-#: includes/class-wp-loc-acf.php:28
+#: includes/class-wp-loc-acf.php:225
 msgid "Shared across all languages"
 msgstr "Общее для всех языков"
 
-#: includes/class-wp-loc-acf.php:29
+#: includes/class-wp-loc-acf.php:226
 msgid "Translatable"
 msgstr "Переводимое"
 
@@ -48,9 +48,19 @@ msgid "Multilingual"
 msgstr "Многоязычность"
 
 #: includes/class-wp-loc-admin-languages.php:37
-#: includes/class-wp-loc-admin-languages.php:38 wp-loc.php:37
+#: includes/class-wp-loc-admin-languages.php:38
+#: includes/class-wp-loc-admin-languages.php:63 wp-loc.php:37
 msgid "Languages"
 msgstr "Языки"
+
+#: includes/class-wp-loc-admin-languages.php:66
+msgid "Languages saved."
+msgstr "Языки сохранены."
+
+#: includes/class-wp-loc-admin-languages.php:70
+#, php-format
+msgid "Language \"%s\" deleted."
+msgstr "Язык \"%s\" удалён."
 
 #: includes/class-wp-loc-admin-languages.php:79
 #: includes/class-wp-loc-admin-settings.php:180
@@ -95,6 +105,10 @@ msgstr "Флаг"
 msgid "Action"
 msgstr "Действие"
 
+#: includes/class-wp-loc-admin-languages.php:348
+msgid "Delete"
+msgstr "Удалить"
+
 #: includes/class-wp-loc-admin-settings.php:21
 #: includes/class-wp-loc-admin-settings.php:22
 #: includes/class-wp-loc-admin-settings.php:114 wp-loc.php:38
@@ -136,13 +150,42 @@ msgstr ""
 "Определяет, отображаются ли флаги с помощью вспомогательной функции "
 "переключения языка в интерфейсе."
 
-#: includes/class-wp-loc-admin.php:268 includes/class-wp-loc-admin.php:667
-#: includes/class-wp-loc-terms.php:908 includes/class-wp-loc-terms.php:979
+#: includes/class-wp-loc-admin.php:62
+msgid "Auto-resolved from default language translation"
+msgstr "Автоматически определено из перевода языка по умолчанию"
+
+#: includes/class-wp-loc-admin.php:97
+msgid "Request failed."
+msgstr "Не удалось выполнить запрос."
+
+#: includes/class-wp-loc-admin.php:98
+msgid "Preview refreshed."
+msgstr "Предварительный просмотр обновлен."
+
+#: includes/class-wp-loc-admin.php:99
+msgid "Menu sync complete."
+msgstr "Синхронизация меню завершена."
+
+#: includes/class-wp-loc-admin.php:346 includes/class-wp-loc-admin.php:759
+#: includes/class-wp-loc-terms.php:1141 includes/class-wp-loc-terms.php:1201
 msgid "Translations"
 msgstr "Переводы"
 
-#: includes/class-wp-loc-admin.php:516 includes/class-wp-loc-admin.php:528
-#: includes/class-wp-loc-admin.php:537
+#: includes/class-wp-loc-admin.php:361
+msgid "Save the post first to manage translations."
+msgstr "Сначала сохраните запись, чтобы управлять переводами."
+
+#: includes/class-wp-loc-admin.php:376 includes/class-wp-loc-admin.php:397
+msgid "Create translations"
+msgstr "Создать переводы"
+
+#: includes/class-wp-loc-admin.php:421 includes/class-wp-loc-admin.php:787
+#: includes/class-wp-loc-terms.php:1179 includes/class-wp-loc-terms.php:1238
+msgid "Edit translation"
+msgstr "Редактировать перевод"
+
+#: includes/class-wp-loc-admin.php:594 includes/class-wp-loc-admin.php:606
+#: includes/class-wp-loc-admin.php:628
 msgid ""
 "Creating new content is only available in the primary language of the site. "
 "Switch to the default language first."
@@ -150,32 +193,181 @@ msgstr ""
 "Создание нового контента доступно только на основном языке сайта. Сначала "
 "переключитесь на язык по умолчанию."
 
-#: includes/class-wp-loc-admin.php:517 includes/class-wp-loc-admin.php:529
-#: includes/class-wp-loc-admin.php:538
+#: includes/class-wp-loc-admin.php:595 includes/class-wp-loc-admin.php:607
+#: includes/class-wp-loc-admin.php:629
 msgid "Action not allowed"
 msgstr "Действие не разрешено"
 
-#: includes/class-wp-loc-options.php:197
-msgid "Auto-resolved from default language translation"
-msgstr "Автоматически определено из перевода основного языка"
+#: includes/class-wp-loc-menu-sync.php:18
+#: includes/class-wp-loc-menu-sync.php:19
+msgid "Menus Sync"
+msgstr "Синхронизация меню"
 
-#~ msgid "Languages saved."
-#~ msgstr "Языки сохранены."
+#: includes/class-wp-loc-menu-sync.php:42
+#, php-format
+msgid ""
+"Menu sync complete. Synced %1$d targets, created %2$d menus, created %3$d "
+"items, skipped %4$d untranslated linked items."
+msgstr ""
+"Синхронизация меню завершена. Синхронизировано %1$d целевых меню, создано "
+"%2$d меню, создано %3$d элементов, пропущено %4$d непереведенных связанных "
+"элементов."
 
-#~ msgid "Language \"%s\" deleted."
-#~ msgstr "Язык \"%s\" удалён."
+#: includes/class-wp-loc-menu-sync.php:56
+msgid "You are not allowed to do this."
+msgstr "У вас нет прав на это действие."
 
-#~ msgid "Delete"
-#~ msgstr "Удалить"
+#: includes/class-wp-loc-menu-sync.php:137
+msgid "Missing translation"
+msgstr "Отсутствует перевод"
 
-#~ msgid "Save the post first to manage translations."
-#~ msgstr "Сначала сохраните запись, чтобы управлять переводами."
+#: includes/class-wp-loc-menu-sync.php:143
+msgid "Needs review"
+msgstr "Требует проверки"
 
-#~ msgid "Create translations"
-#~ msgstr "Создать переводы"
+#: includes/class-wp-loc-menu-sync.php:148
+msgid "Needs sync"
+msgstr "Требуется синхронизация"
+
+#: includes/class-wp-loc-menu-sync.php:151
+msgid "Up to date"
+msgstr "Актуально"
+
+#: includes/class-wp-loc-menu-sync.php:185
+msgid "Translation"
+msgstr "Перевод"
+
+#: includes/class-wp-loc-menu-sync.php:186
+msgid "Option"
+msgstr "Параметр"
+
+#: includes/class-wp-loc-menu-sync.php:187
+msgid "Warning"
+msgstr "Внимание"
+
+#: includes/class-wp-loc-menu-sync.php:188
+msgid "Structure"
+msgstr "Структура"
+
+#: includes/class-wp-loc-menu-sync.php:203
+msgid "Default menus"
+msgstr "Меню по умолчанию"
+
+#: includes/class-wp-loc-menu-sync.php:207
+msgid "Targets needing sync"
+msgstr "Объекты, требующие синхронизации"
+
+#: includes/class-wp-loc-menu-sync.php:211
+msgid "Warnings"
+msgstr "Предупреждения"
+
+#: includes/class-wp-loc-menu-sync.php:218
+msgid "Apply changes"
+msgstr "Применить изменения"
+
+#: includes/class-wp-loc-menu-sync.php:221
+msgid "Refresh"
+msgstr "Обновить"
+
+#: includes/class-wp-loc-menu-sync.php:225
+msgid "Select all"
+msgstr "Выбрать все"
+
+#: includes/class-wp-loc-menu-sync.php:226
+msgid "Deselect all"
+msgstr "Отменить выбор"
+
+#: includes/class-wp-loc-menu-sync.php:245
+msgid "No menus found."
+msgstr "Меню не найдено."
+
+#: includes/class-wp-loc-menu-sync.php:262
+#, php-format
+msgid "%s menu"
+msgstr "%s меню"
+
+#: includes/class-wp-loc-menu-sync.php:272
+msgid "Apply"
+msgstr "Применить"
+
+#: includes/class-wp-loc-menu-sync.php:278
+msgid "Nothing to sync for this language."
+msgstr "Для этого языка синхронизировать нечего."
+
+#: includes/class-wp-loc-menu-sync.php:289
+msgid "Details"
+msgstr "Детали"
+
+#: includes/class-wp-loc-menu-sync.php:320
+msgid "WP Menus Sync"
+msgstr "Синхронизация меню WP"
+
+#: includes/class-wp-loc-menu-sync.php:325
+#, php-format
+msgid ""
+"Menu synchronization will sync the menu structure from the default language "
+"of %s to the secondary languages."
+msgstr ""
+"Синхронизация меню перенесет структуру меню с языка по умолчанию %s на "
+"дополнительные языки."
+
+#: includes/class-wp-loc-menus.php:533
+#, php-format
+msgid "Add menu translation: %s"
+msgstr "Добавить перевод меню: %s"
+
+#: includes/class-wp-loc-menus.php:541
+#, php-format
+msgid "Sync menu structure and order (%d items)"
+msgstr "Синхронизировать структуру и порядок меню (%d элементов)"
+
+#: includes/class-wp-loc-menus.php:542
+#, php-format
+msgid "Sync menu structure (%d items)"
+msgstr "Синхронизировать структуру меню (%d элементов)"
+
+#: includes/class-wp-loc-menus.php:549
+#, php-format
+msgid "Remove outdated items (%d)"
+msgstr "Удалить устаревшие элементы (%d)"
+
+#: includes/class-wp-loc-menus.php:556
+#, php-format
+msgid "Update menu option auto_add to %s"
+msgstr "Изменить значение параметра меню auto_add на %s"
+
+#: includes/class-wp-loc-menus.php:563
+#, php-format
+msgid "Skip untranslated linked items (%d)"
+msgstr "Пропустить непереведенные элементы со ссылками (%d)"
+
+#: includes/class-wp-loc-menus.php:1198
+#, php-format
+msgid "Creating %1$s translation of \"%2$s\"."
+msgstr "Создание %1$s перевода \"%2$s\"."
+
+#: includes/class-wp-loc-menus.php:1217
+msgid "Translations:"
+msgstr "Переводы:"
+
+#: includes/class-wp-loc-terms.php:1127
+msgid ""
+"This term cannot be deleted because it belongs to the default category "
+"translation group."
+msgstr ""
+"Этот термин нельзя удалить, поскольку он входит в группу перевода категории "
+"по умолчанию."
+
+#: includes/class-wp-loc-terms.php:1413
+#, php-format
+msgid "Creating a translation in %s."
+msgstr "Создание перевода в %s."
+
+#~ msgid ""
+#~ "Display locations are mapped from the default-language menu automatically."
+#~ msgstr ""
+#~ "Места отображения определяются на основе меню на языке по умолчанию "
+#~ "автоматически."
 
 #~ msgid "Is this field shared or translatable between languages?"
 #~ msgstr "Это поле общее или переводимое для разных языков?"
-
-#~ msgid "Edit translation"
-#~ msgstr "Редактировать перевод"

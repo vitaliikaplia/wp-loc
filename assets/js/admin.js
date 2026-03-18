@@ -342,4 +342,154 @@
         document.body.classList.add('wp-loc-hide-term-delete-link');
     }
 
+    // Menus Sync — Ajax refresh/apply and compact details UI
+    (function initMenuSync() {
+        const page = document.querySelector('.wp-loc-menu-sync-page');
+
+        if (!page || !window.wpLocAdmin) {
+            return;
+        }
+
+        const feedback = page.querySelector('.wp-loc-menu-sync-feedback');
+        const content = page.querySelector('.wp-loc-menu-sync-content');
+        const i18n = Object.assign({
+            requestFailed: 'Request failed.',
+            previewRefreshed: 'Preview refreshed.',
+            menuSyncComplete: 'Menu sync complete.'
+        }, wpLocAdmin.i18n || {});
+        let busy = false;
+
+        const setFeedback = function(message, type) {
+            if (!feedback) {
+                return;
+            }
+
+            feedback.className = 'wp-loc-menu-sync-feedback';
+
+            if (!message) {
+                feedback.innerHTML = '';
+                return;
+            }
+
+            if (type) {
+                feedback.classList.add('is-' + type);
+            }
+
+            feedback.innerHTML = '<p>' + message + '</p>';
+        };
+
+        const setBusy = function(nextBusy) {
+            busy = nextBusy;
+            page.classList.toggle('is-busy', nextBusy);
+
+            page.querySelectorAll('.wp-loc-menu-sync-apply, .wp-loc-menu-sync-refresh').forEach(function(button) {
+                button.disabled = nextBusy;
+            });
+        };
+
+        const collectSelection = function() {
+            const sync = {};
+
+            page.querySelectorAll('.wp-loc-menu-sync-checkbox input:checked').forEach(function(input) {
+                const match = input.name.match(/^sync\[(\d+)\]\[([^\]]+)\]$/);
+
+                if (!match) {
+                    return;
+                }
+
+                const menuId = match[1];
+                const lang = match[2];
+
+                if (!sync[menuId]) {
+                    sync[menuId] = {};
+                }
+
+                sync[menuId][lang] = 1;
+            });
+
+            return sync;
+        };
+
+        const request = function(action, data, onSuccess) {
+            if (busy) {
+                return;
+            }
+
+            setBusy(true);
+            setFeedback('', '');
+
+            $.post(wpLocAdmin.ajaxUrl, Object.assign({
+                action: action,
+                nonce: wpLocAdmin.nonce
+            }, data || {})).done(function(response) {
+                if (!response || !response.success) {
+                    const message = response && response.data && response.data.message ? response.data.message : i18n.requestFailed;
+                    setFeedback(message, 'error');
+                    return;
+                }
+
+                if (response.data && response.data.html && content) {
+                    content.innerHTML = response.data.html;
+                }
+
+                if (typeof onSuccess === 'function') {
+                    onSuccess(response.data || {});
+                }
+            }).fail(function() {
+                setFeedback(i18n.requestFailed, 'error');
+            }).always(function() {
+                setBusy(false);
+            });
+        };
+
+        page.addEventListener('click', function(event) {
+            const toggle = event.target.closest('.wp-loc-menu-sync-toggle-details');
+
+            if (toggle) {
+                event.preventDefault();
+                const details = toggle.parentElement.querySelector('.wp-loc-menu-sync-details');
+                const expanded = toggle.getAttribute('aria-expanded') === 'true';
+
+                toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                if (details) {
+                    details.hidden = expanded;
+                }
+                return;
+            }
+
+            if (event.target.closest('.wp-loc-menu-sync-select-all')) {
+                event.preventDefault();
+                page.querySelectorAll('.wp-loc-menu-sync-checkbox input').forEach(function(input) {
+                    input.checked = true;
+                });
+                return;
+            }
+
+            if (event.target.closest('.wp-loc-menu-sync-deselect-all')) {
+                event.preventDefault();
+                page.querySelectorAll('.wp-loc-menu-sync-checkbox input').forEach(function(input) {
+                    input.checked = false;
+                });
+                return;
+            }
+
+            if (event.target.closest('.wp-loc-menu-sync-refresh')) {
+                event.preventDefault();
+                request('wp_loc_menu_sync_preview', {}, function() {
+                    setFeedback(i18n.previewRefreshed, 'success');
+                });
+                return;
+            }
+
+            if (event.target.closest('.wp-loc-menu-sync-apply')) {
+                event.preventDefault();
+                const sync = collectSelection();
+
+                request('wp_loc_menu_sync_apply', { sync: sync }, function(data) {
+                    setFeedback(data.message || i18n.menuSyncComplete, 'success');
+                });
+            }
+        });
+    })();
+
 })(jQuery);

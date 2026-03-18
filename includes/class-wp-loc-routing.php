@@ -68,17 +68,37 @@ class WP_LOC_Routing {
             return $query_vars;
         }
 
+        $active_languages = WP_LOC_Languages::get_active_languages();
+        $uri_lang = null;
+        $uri = trim( parse_url( $_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH ), '/' );
+        $parts = explode( '/', $uri );
+        $first = $parts[0] ?? '';
+
+        if ( array_key_exists( $first, $active_languages ) ) {
+            $uri_lang = $first;
+        }
+
+        if ( empty( $query_vars['lang'] ) && $uri_lang ) {
+            $query_vars['lang'] = $uri_lang;
+        }
+
+        if ( $uri_lang && ( $uri === $uri_lang || $uri === $uri_lang . '/' ) ) {
+            $query_vars['is_lang_front'] = 1;
+            $query_vars['page_id'] = get_option( 'page_on_front' );
+            unset( $query_vars['pagename'] );
+            return $query_vars;
+        }
+
         $effective_lang = isset( $query_vars['lang'] ) && $query_vars['lang']
             ? (string) $query_vars['lang']
             : WP_LOC_Languages::get_default_language();
 
         // Resolve pagename with language
-        if ( isset( $query_vars['pagename'], $query_vars['lang'] ) ) {
+        if ( isset( $query_vars['pagename'] ) && $effective_lang ) {
             $slug = $query_vars['pagename'];
-            $lang_slug = $query_vars['lang'];
+            $lang_slug = $effective_lang;
 
-            $active = WP_LOC_Languages::get_active_languages();
-            if ( isset( $active[ $lang_slug ] ) ) {
+            if ( isset( $active_languages[ $lang_slug ] ) ) {
                 global $wpdb;
                 $table = WP_LOC::instance()->db->get_table();
 
@@ -226,6 +246,30 @@ class WP_LOC_Routing {
         if ( get_query_var( 'is_lang_front' ) ) {
             return false;
         }
+
+        if ( get_option( 'show_on_front' ) === 'page' ) {
+            $current_lang = self::get_current_lang();
+            $default_lang = WP_LOC_Languages::get_default_language();
+
+            if ( $current_lang !== $default_lang ) {
+                $posts_page_id = (int) get_option( 'page_for_posts' );
+
+                if ( $posts_page_id ) {
+                    $posts_page_url = get_permalink( $posts_page_id );
+                    $requested_path = wp_parse_url( $requested_url, PHP_URL_PATH );
+                    $posts_page_path = wp_parse_url( $posts_page_url, PHP_URL_PATH );
+
+                    if ( $requested_path && $posts_page_path && untrailingslashit( $requested_path ) === untrailingslashit( $posts_page_path ) ) {
+                        return false;
+                    }
+                }
+
+                if ( is_home() && ! is_front_page() ) {
+                    return false;
+                }
+            }
+        }
+
         return $redirect_url;
     }
 
@@ -328,8 +372,9 @@ class WP_LOC_Routing {
             return $url;
         }
 
-        $default  = WP_LOC_Languages::get_default_language();
-        $raw_home = set_url_scheme( get_option( 'home' ) );
+        $default = WP_LOC_Languages::get_default_language();
+        $url_scheme = wp_parse_url( $url, PHP_URL_SCHEME );
+        $raw_home = set_url_scheme( get_option( 'home' ), $url_scheme ?: null );
 
         // Strip any existing language prefix (injected by home_url filter)
         foreach ( WP_LOC_Languages::get_additional_languages() as $lang_code ) {

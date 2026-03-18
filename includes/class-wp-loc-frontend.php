@@ -141,6 +141,33 @@ function wp_loc_get_lang_switcher(): array {
         return $switcher;
     }
 
+    // Posts page configured via Settings > Reading
+    if ( get_option( 'show_on_front' ) === 'page' && is_home() && ! is_front_page() ) {
+        $posts_page_id = (int) get_option( 'page_for_posts' );
+
+        foreach ( $active as $code => $data ) {
+            $locale = $data['locale'] ?? $code;
+            $url = $home . ( $code === $default ? '/' : "/{$code}/" );
+            $translated_posts_page_id = $posts_page_id ? $db->get_element_translation( $posts_page_id, WP_LOC_DB::post_element_type( 'page' ), $code ) : 0;
+            $target_page_id = $translated_posts_page_id ?: $posts_page_id;
+
+            if ( $target_page_id ) {
+                $url = get_permalink( $target_page_id );
+            }
+
+            $switcher[] = [
+                'code'   => $code,
+                'locale' => $locale,
+                'active' => $code === $current,
+                'url'    => $url,
+                'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
+                'name'   => WP_LOC_Languages::get_display_name( $code ),
+            ];
+        }
+
+        return $switcher;
+    }
+
     // Term archives with translations
     if ( is_category() || is_tag() || is_tax() ) {
         $queried_term = get_queried_object();

@@ -10,6 +10,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class WP_LOC_Compat {
 
+    private function get_context_language(): string {
+        return is_admin() ? wp_loc_get_admin_lang() : wp_loc_get_current_lang();
+    }
+
     public function __construct() {
         $this->register_filters();
         $this->register_constant();
@@ -27,7 +31,7 @@ class WP_LOC_Compat {
 
         // wpml_current_language
         add_filter( 'wpml_current_language', function () {
-            return wp_loc_get_current_lang();
+            return $this->get_context_language();
         } );
 
         // wpml_default_language
@@ -38,7 +42,7 @@ class WP_LOC_Compat {
         // wpml_active_languages
         add_filter( 'wpml_active_languages', function ( $value = null ) {
             $active = WP_LOC_Languages::get_active_languages();
-            $current = wp_loc_get_current_lang();
+            $current = $this->get_context_language();
             $default = WP_LOC_Languages::get_default_language();
 
             $result = [];
@@ -77,9 +81,34 @@ class WP_LOC_Compat {
 
         // wpml_element_language_code
         add_filter( 'wpml_element_language_code', function ( $value, $args ) {
-            $element_id = $args['element_id'] ?? 0;
-            $element_type = $args['element_type'] ?? 'post_post';
-            return WP_LOC::instance()->db->get_element_language( (int) $element_id, $element_type ) ?: $value;
+            $element_id = (int) ( $args['element_id'] ?? 0 );
+            $element_type = (string) ( $args['element_type'] ?? 'post_post' );
+
+            if ( ! $element_id ) {
+                return $value;
+            }
+
+            if ( $element_type === 'nav_menu' ) {
+                $term_taxonomy_id = WP_LOC_Terms::get_term_taxonomy_id( $element_id, 'nav_menu' );
+
+                if ( ! $term_taxonomy_id ) {
+                    return $value;
+                }
+
+                return WP_LOC::instance()->db->get_element_language( $term_taxonomy_id, WP_LOC_DB::tax_element_type( 'nav_menu' ) ) ?: $value;
+            }
+
+            if ( taxonomy_exists( $element_type ) ) {
+                $term_taxonomy_id = WP_LOC_Terms::get_term_taxonomy_id( $element_id, $element_type );
+
+                if ( ! $term_taxonomy_id ) {
+                    return $value;
+                }
+
+                return WP_LOC::instance()->db->get_element_language( $term_taxonomy_id, WP_LOC_DB::tax_element_type( $element_type ) ) ?: $value;
+            }
+
+            return WP_LOC::instance()->db->get_element_language( $element_id, $element_type ) ?: $value;
         }, 10, 2 );
 
         // wpml_switch_language action
@@ -95,10 +124,10 @@ class WP_LOC_Compat {
     private function register_constant(): void {
         add_action( 'after_setup_theme', function () {
             if ( ! defined( 'ICL_LANGUAGE_CODE' ) ) {
-                define( 'ICL_LANGUAGE_CODE', wp_loc_get_current_lang() );
+                define( 'ICL_LANGUAGE_CODE', $this->get_context_language() );
             }
             if ( ! defined( 'ICL_LANGUAGE_NAME' ) ) {
-                $locale = wp_loc_get_current_locale();
+                $locale = is_admin() ? WP_LOC_Admin::get_admin_locale() : wp_loc_get_current_locale();
                 define( 'ICL_LANGUAGE_NAME', WP_LOC_Languages::get_language_display_name( $locale ) );
             }
         }, 999 );
@@ -133,7 +162,17 @@ class WP_LOC_Compat {
         if ( ! $element_id ) return $return_original ? $element_id : null;
 
         $db = WP_LOC::instance()->db;
-        $target_lang = $language_code ?: wp_loc_get_current_lang();
+        $target_lang = $language_code ?: $this->get_context_language();
+
+        if ( $element_type === 'nav_menu' ) {
+            $translated_id = WP_LOC_Terms::get_term_translation( (int) $element_id, 'nav_menu', $target_lang );
+
+            if ( $translated_id ) {
+                return $translated_id;
+            }
+
+            return $return_original ? $element_id : null;
+        }
 
         // Determine element_type prefix
         $type_prefix = $element_type;
@@ -161,7 +200,7 @@ class WP_LOC_Compat {
 class WP_LOC_Sitepress_Mock {
 
     public function get_current_language(): string {
-        return wp_loc_get_current_lang();
+        return is_admin() ? wp_loc_get_admin_lang() : wp_loc_get_current_lang();
     }
 
     public function get_default_language(): string {
