@@ -8,6 +8,7 @@
     // Languages page — sortable table rows with auto-save
     if ($('.wp-loc-languages-table').length) {
         const $tbody = $('.wp-loc-languages-table tbody');
+        const i18n = wpLocAdmin && wpLocAdmin.i18n ? wpLocAdmin.i18n : {};
         $tbody.sortable({
             handle: '.lang-drag-handle',
             update: function() {
@@ -23,6 +24,79 @@
                     nonce: wpLocAdmin.nonce,
                     order: order
                 });
+            }
+        });
+
+        $('.wp-loc-slug-input').on('input blur', function() {
+            const value = $(this).val();
+            if (typeof value === 'string') {
+                $(this).val(value.toLowerCase().trim().replace(/\s+/g, '-'));
+            }
+        });
+
+        $('.wp-loc-languages-form').on('submit', function(event) {
+            const slugSet = new Set();
+            const displayNameSet = new Set();
+            let firstInvalidField = null;
+            let errorMessage = '';
+
+            $(this).find('.wp-loc-slug-input, .wp-loc-display-name-input').each(function() {
+                this.setCustomValidity('');
+            });
+
+            $(this).find('tbody tr').each(function() {
+                const $row = $(this);
+                const $slugInput = $row.find('.wp-loc-slug-input');
+                const $displayNameInput = $row.find('.wp-loc-display-name-input');
+                const slugValue = String($slugInput.val() || '').trim().toLowerCase();
+                const displayNameValue = String($displayNameInput.val() || '').trim();
+                const displayNameKey = displayNameValue.toLocaleLowerCase();
+
+                if (!slugValue) {
+                    errorMessage = i18n.missingSlug || 'Slug is required.';
+                    $slugInput[0].setCustomValidity(errorMessage);
+                    firstInvalidField = firstInvalidField || $slugInput;
+                    return false;
+                }
+
+                if (slugSet.has(slugValue)) {
+                    errorMessage = i18n.duplicateSlug || 'Each language slug must be unique.';
+                    $slugInput[0].setCustomValidity(errorMessage);
+                    firstInvalidField = firstInvalidField || $slugInput;
+                    return false;
+                }
+                slugSet.add(slugValue);
+
+                if (!displayNameValue) {
+                    errorMessage = i18n.missingDisplayName || 'Display name is required.';
+                    $displayNameInput[0].setCustomValidity(errorMessage);
+                    firstInvalidField = firstInvalidField || $displayNameInput;
+                    return false;
+                }
+
+                if (displayNameSet.has(displayNameKey)) {
+                    errorMessage = i18n.duplicateDisplayName || 'Each display name must be unique.';
+                    $displayNameInput[0].setCustomValidity(errorMessage);
+                    firstInvalidField = firstInvalidField || $displayNameInput;
+                    return false;
+                }
+                displayNameSet.add(displayNameKey);
+            });
+
+            if (firstInvalidField) {
+                event.preventDefault();
+                window.alert(errorMessage);
+                firstInvalidField.trigger('focus');
+            }
+        });
+
+        $(document).on('click', '.wp-loc-delete-link', function(event) {
+            const message = i18n.confirmDeleteLanguage
+                ? i18n.confirmDeleteLanguage
+                : 'Delete this language?';
+
+            if (!window.confirm(message)) {
+                event.preventDefault();
             }
         });
     }

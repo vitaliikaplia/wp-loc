@@ -150,6 +150,50 @@ msgstr ""
 "Визначає, чи відображаються прапорці у допоміжному модулі перемикання мови "
 "інтерфейсу."
 
+#: includes/class-wp-loc-admin-languages.php:71
+msgid ""
+"Manage site languages, URL slugs, display labels, and ordering for the "
+"multilingual interface."
+msgstr ""
+"Керуйте мовами сайту, URL-слугами, назвами для відображення та порядком у "
+"багатомовному інтерфейсі."
+
+#: includes/class-wp-loc-admin-languages.php:76
+msgid "Configured languages"
+msgstr "Налаштовані мови"
+
+#: includes/class-wp-loc-admin-languages.php:80 includes/class-wp-loc-admin-languages.php:252
+msgid "Enabled languages"
+msgstr "Увімкнені мови"
+
+#: includes/class-wp-loc-admin-languages.php:84
+msgid "Default language"
+msgstr "Мова за замовчуванням"
+
+#: includes/class-wp-loc-admin-languages.php:345
+msgid "Default"
+msgstr "За замовчуванням"
+
+#: includes/class-wp-loc-admin.php:100 includes/class-wp-loc-admin-languages.php:53
+msgid "Delete this language? Its language files will also be removed from WordPress."
+msgstr "Видалити цю мову? Її мовні файли також буде видалено з WordPress."
+
+#: includes/class-wp-loc-admin-languages.php:54
+msgid "Slug is required."
+msgstr "Слаг є обов’язковим."
+
+#: includes/class-wp-loc-admin-languages.php:55
+msgid "Each language slug must be unique."
+msgstr "Слаг кожної мови має бути унікальним."
+
+#: includes/class-wp-loc-admin-languages.php:56
+msgid "Display name is required."
+msgstr "Назва для відображення є обов’язковою."
+
+#: includes/class-wp-loc-admin-languages.php:57
+msgid "Each display name must be unique."
+msgstr "Назва для відображення кожної мови має бути унікальною."
+
 #: includes/class-wp-loc-admin.php:62
 msgid "Auto-resolved from default language translation"
 msgstr "Автоматично визначено з перекладу мови за замовчуванням"

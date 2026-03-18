@@ -97,6 +97,7 @@ class WP_LOC_Admin {
                 'requestFailed' => __( 'Request failed.', 'wp-loc' ),
                 'previewRefreshed' => __( 'Preview refreshed.', 'wp-loc' ),
                 'menuSyncComplete' => __( 'Menu sync complete.', 'wp-loc' ),
+                'confirmDeleteLanguage' => __( 'Delete this language? Its language files will also be removed from WordPress.', 'wp-loc' ),
             ],
         ] );
     }

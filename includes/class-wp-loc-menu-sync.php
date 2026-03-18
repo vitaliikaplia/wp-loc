@@ -189,6 +189,28 @@ class WP_LOC_Menu_Sync {
         };
     }
 
+    private function get_toolbar_html( array $stats, string $extra_class = '' ): string {
+        ob_start();
+        ?>
+        <div class="wp-loc-menu-sync-toolbar <?php echo esc_attr( trim( $extra_class ) ); ?>">
+            <div class="wp-loc-menu-sync-toolbar-actions">
+                <button type="button" class="button button-primary wp-loc-menu-sync-apply" <?php disabled( $stats['targets_needing_sync'] === 0 ); ?>>
+                    <?php esc_html_e( 'Apply changes', 'wp-loc' ); ?>
+                </button>
+                <button type="button" class="button wp-loc-menu-sync-refresh">
+                    <?php esc_html_e( 'Refresh', 'wp-loc' ); ?>
+                </button>
+            </div>
+            <div class="wp-loc-menu-sync-toolbar-actions">
+                <button type="button" class="button-link wp-loc-menu-sync-select-all"><?php esc_html_e( 'Select all', 'wp-loc' ); ?></button>
+                <button type="button" class="button-link wp-loc-menu-sync-deselect-all"><?php esc_html_e( 'Deselect all', 'wp-loc' ); ?></button>
+            </div>
+        </div>
+        <?php
+
+        return (string) ob_get_clean();
+    }
+
     private function get_sync_content_html(): string {
         $preview = $this->get_preview_data();
         $active_languages = WP_LOC_Languages::get_active_languages();
@@ -209,21 +231,6 @@ class WP_LOC_Menu_Sync {
             <div class="wp-loc-menu-sync-summary-card">
                 <span class="wp-loc-menu-sync-summary-value"><?php echo esc_html( (string) $stats['warnings_total'] ); ?></span>
                 <span class="wp-loc-menu-sync-summary-label"><?php esc_html_e( 'Warnings', 'wp-loc' ); ?></span>
-            </div>
-        </div>
-
-        <div class="wp-loc-menu-sync-toolbar">
-            <div class="wp-loc-menu-sync-toolbar-actions">
-                <button type="button" class="button button-primary wp-loc-menu-sync-apply" <?php disabled( $stats['targets_needing_sync'] === 0 ); ?>>
-                    <?php esc_html_e( 'Apply changes', 'wp-loc' ); ?>
-                </button>
-                <button type="button" class="button wp-loc-menu-sync-refresh">
-                    <?php esc_html_e( 'Refresh', 'wp-loc' ); ?>
-                </button>
-            </div>
-            <div class="wp-loc-menu-sync-toolbar-actions">
-                <button type="button" class="button-link wp-loc-menu-sync-select-all"><?php esc_html_e( 'Select all', 'wp-loc' ); ?></button>
-                <button type="button" class="button-link wp-loc-menu-sync-deselect-all"><?php esc_html_e( 'Deselect all', 'wp-loc' ); ?></button>
             </div>
         </div>
 
@@ -308,6 +315,8 @@ class WP_LOC_Menu_Sync {
                 </tbody>
             </table>
         </div>
+
+        <?php echo $this->get_toolbar_html( $stats, 'is-bottom' ); ?>
         <?php
 
         return (string) ob_get_clean();

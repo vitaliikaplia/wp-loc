@@ -272,25 +272,214 @@ td.column-wp_loc_translations {
 }
 
 // ===========================================
+// Shared Admin Page Rhythm
+// ===========================================
+
+.wp-loc-languages-page,
+.wp-loc-menu-sync-page {
+  h1 {
+    margin-bottom: 8px;
+  }
+
+  .description {
+    max-width: 840px;
+    margin-bottom: 0;
+  }
+}
+
+.wp-loc-menu-sync-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.wp-loc-menu-sync-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
+}
+
+.wp-loc-menu-sync-summary-value {
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 700;
+  color: #1d2327;
+}
+
+.wp-loc-menu-sync-summary-label {
+  color: #50575e;
+}
+
+.wp-loc-menu-sync-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 14px;
+}
+
+.wp-loc-menu-sync-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+// ===========================================
 // Languages List Table (Settings > Languages)
 // ===========================================
 
+.wp-loc-languages-form {
+  margin-top: 24px;
+}
+
+.wp-loc-languages-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 24px;
+}
+
+.wp-loc-languages-card {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+
+  .tablenav {
+    display: none;
+  }
+}
+
 .wp-loc-languages-table {
+  border: 1px solid #c3c4c7;
+  box-shadow: none;
+
+  tfoot {
+    display: none;
+  }
+
+  thead th {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #dcdcde;
+    background: #f6f7f7;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #1d2327;
+  }
+
+  tbody tr {
+    transition: background-color $transition-speed, transform $transition-speed;
+  }
+
+  tbody tr td {
+    background: #fff;
+  }
+
+  tbody tr:nth-child(even) td {
+    background: #f6f7f7;
+  }
+
+  tbody td {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    vertical-align: middle;
+  }
+
+  tbody tr:hover td {
+    background: #f0f6fc;
+  }
+
   .column-sort {
-    width: 1em;
+    width: 42px;
   }
 
   .lang-drag-handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    background: transparent;
+    color: #50575e;
     cursor: move;
     font-size: 18px;
+    transition: background-color $transition-speed, color $transition-speed;
+
+    &:hover {
+      background: #f0f0f1;
+      color: $color-wp-blue;
+    }
   }
 
   .wp-loc-slug-input {
-    width: 60px;
+    width: 80px;
+  }
+
+  .wp-loc-slug-input,
+  .wp-loc-display-name-input {
+    min-height: 30px;
+    padding: 0 8px;
+    border-color: #8c8f94;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .wp-loc-display-name-input {
+    width: 92px;
   }
 
   .wp-loc-flag-small {
     @include flag-icon;
+  }
+
+  .wp-loc-language-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    strong {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1d2327;
+    }
+  }
+
+  .wp-loc-language-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    padding: 0 7px;
+    border: 1px solid #dcdcde;
+    border-radius: 3px;
+    background: #f6f7f7;
+    color: #50575e;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .wp-loc-flag-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 38px;
+    min-height: 28px;
+    padding: 0 6px;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    background: #fff;
   }
 
   .wp-loc-default-only {
@@ -299,6 +488,13 @@ td.column-wp_loc_translations {
 
   .wp-loc-delete-link {
     color: $color-danger;
+    font-weight: 500;
+    text-decoration: none;
+
+    &:hover {
+      color: #8f2425;
+      text-decoration: underline;
+    }
   }
 
   .wp-loc-default-language-toggle {
@@ -410,6 +606,10 @@ td.column-wp_loc_translations {
 }
 
 @media (max-width: 960px) {
+  .wp-loc-languages-summary {
+    grid-template-columns: 1fr;
+  }
+
   .wp-loc-nav-menu-controls {
     margin: 12px 0 0;
   }
@@ -449,54 +649,18 @@ td.column-wp_loc_translations {
   }
 }
 
-.wp-loc-menu-sync-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin: 18px 0;
-}
-
-.wp-loc-menu-sync-summary-card {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
-  background: #fff;
-  border: 1px solid #dcdcde;
-  border-radius: 8px;
-}
-
-.wp-loc-menu-sync-summary-value {
-  font-size: 28px;
-  line-height: 1;
-  font-weight: 700;
-  color: #1d2327;
-}
-
-.wp-loc-menu-sync-summary-label {
-  color: #50575e;
-}
-
-.wp-loc-menu-sync-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin: 0 0 14px;
-}
-
-.wp-loc-menu-sync-toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
 .wp-loc-menu-sync-grid {
+  margin-top: 24px;
+
   .widefat td,
   .widefat th {
     vertical-align: top;
   }
+}
+
+.wp-loc-menu-sync-toolbar.is-bottom {
+  margin-top: 24px;
+  margin-bottom: 24px;
 }
 
 .wp-loc-menu-sync-source {

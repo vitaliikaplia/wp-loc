@@ -52,6 +52,13 @@ class WP_LOC_Admin_Languages {
             wp_localize_script( 'wp-loc-admin', 'wpLocAdmin', [
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
                 'nonce'   => wp_create_nonce( 'wp_loc_ajax' ),
+                'i18n'    => [
+                    'confirmDeleteLanguage' => __( 'Delete this language? Its language files will also be removed from WordPress.', 'wp-loc' ),
+                    'missingSlug' => __( 'Slug is required.', 'wp-loc' ),
+                    'duplicateSlug' => __( 'Each language slug must be unique.', 'wp-loc' ),
+                    'missingDisplayName' => __( 'Display name is required.', 'wp-loc' ),
+                    'duplicateDisplayName' => __( 'Each display name must be unique.', 'wp-loc' ),
+                ],
             ] );
         }
     }
@@ -59,8 +66,14 @@ class WP_LOC_Admin_Languages {
     public function render_page(): void {
         $table = new WP_LOC_Languages_List_Table();
         $table->prepare_items();
+        $languages = WP_LOC_Languages::get_languages();
+        $enabled_count = count( array_filter( $languages, static fn( $language ) => ! empty( $language['enabled'] ) ) );
+        $default_locale = get_option( 'WPLANG' ) ?: 'en_US';
+        $default_name = WP_LOC_Languages::get_language_display_name( $default_locale );
 
-        echo '<div class="wrap"><h1>' . esc_html__( 'Languages', 'wp-loc' ) . '</h1>';
+        echo '<div class="wrap wp-loc-languages-page">';
+        echo '<h1>' . esc_html__( 'Languages', 'wp-loc' ) . '</h1>';
+        echo '<p class="description">' . esc_html__( 'Manage site languages, URL slugs, display labels, and ordering for the multilingual interface.', 'wp-loc' ) . '</p>';
 
         if ( ! empty( $_GET['saved'] ) ) {
             echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Languages saved.', 'wp-loc' ) . '</p></div>';
@@ -70,13 +83,32 @@ class WP_LOC_Admin_Languages {
             echo '<div class="notice notice-warning is-dismissible"><p>' . sprintf( esc_html__( 'Language "%s" deleted.', 'wp-loc' ), esc_html( $_GET['deleted'] ) ) . '</p></div>';
         }
 
-        echo '<form method="post" action="' . esc_url( admin_url( 'admin.php?page=wp-loc' ) ) . '">';
+        echo '<div class="wp-loc-menu-sync-summary wp-loc-languages-summary">';
+        echo '<div class="wp-loc-menu-sync-summary-card">';
+        echo '<span class="wp-loc-menu-sync-summary-value">' . esc_html( (string) count( $languages ) ) . '</span>';
+        echo '<span class="wp-loc-menu-sync-summary-label">' . esc_html__( 'Configured languages', 'wp-loc' ) . '</span>';
+        echo '</div>';
+        echo '<div class="wp-loc-menu-sync-summary-card">';
+        echo '<span class="wp-loc-menu-sync-summary-value">' . esc_html( (string) $enabled_count ) . '</span>';
+        echo '<span class="wp-loc-menu-sync-summary-label">' . esc_html__( 'Enabled languages', 'wp-loc' ) . '</span>';
+        echo '</div>';
+        echo '<div class="wp-loc-menu-sync-summary-card">';
+        echo '<span class="wp-loc-menu-sync-summary-value">' . esc_html( $default_name ) . '</span>';
+        echo '<span class="wp-loc-menu-sync-summary-label">' . esc_html__( 'Default language', 'wp-loc' ) . '</span>';
+        echo '</div>';
+        echo '</div>';
+
+        echo '<form method="post" action="' . esc_url( admin_url( 'admin.php?page=wp-loc' ) ) . '" class="wp-loc-languages-form">';
         wp_nonce_field( 'wp_loc_save_languages', '_wp_loc_nonce' );
 
         echo '<input type="hidden" name="wp_loc_languages_order" id="wp_loc_languages_order" value="" />';
 
+        echo '<div class="wp-loc-languages-card">';
         $table->display();
-        submit_button( __( 'Save', 'wp-loc' ) );
+        echo '</div>';
+        echo '<div class="wp-loc-languages-actions">';
+        submit_button( __( 'Save', 'wp-loc' ), 'primary', 'submit', false );
+        echo '</div>';
         echo '</form>';
 
         echo '</div>';
@@ -91,6 +123,7 @@ class WP_LOC_Admin_Languages {
 
         $langs = [];
         $slugs = [];
+        $display_names = [];
 
         foreach ( $_POST['wp_loc_languages'] as $locale => $data ) {
             $slug = sanitize_title( $data['slug'] ?? '' );
@@ -102,7 +135,19 @@ class WP_LOC_Admin_Languages {
             }
             $slugs[] = $slug;
 
-            $display_name = sanitize_text_field( $data['display_name'] ?? strtoupper( $slug ) );
+            $display_name = trim( sanitize_text_field( $data['display_name'] ?? '' ) );
+            if ( $display_name === '' ) {
+                wp_die( sprintf( __( 'Missing display name for locale %s', 'wp-loc' ), esc_html( $locale ) ) );
+            }
+
+            $display_name_key = function_exists( 'mb_strtolower' )
+                ? mb_strtolower( $display_name )
+                : strtolower( $display_name );
+
+            if ( in_array( $display_name_key, $display_names, true ) ) {
+                wp_die( sprintf( __( 'Duplicate display name "%s" detected.', 'wp-loc' ), esc_html( $display_name ) ) );
+            }
+            $display_names[] = $display_name_key;
 
             $langs[ $slug ] = [
                 'locale'       => sanitize_text_field( $locale ),
@@ -296,7 +341,7 @@ class WP_LOC_Languages_List_Table extends WP_List_Table {
     }
 
     public function column_sort( $item ): string {
-        return '<span class="lang-drag-handle">&#x2630;</span>';
+        return '<span class="lang-drag-handle" aria-hidden="true">&#x2630;</span>';
     }
 
     public function column_enabled( $item ): string {
@@ -312,7 +357,12 @@ class WP_LOC_Languages_List_Table extends WP_List_Table {
     }
 
     public function column_name( $item ): string {
-        return esc_html( WP_LOC_Languages::get_language_display_name( $item['locale'] ) );
+        $name = WP_LOC_Languages::get_language_display_name( $item['locale'] );
+        $default_badge = $item['is_default']
+            ? '<span class="wp-loc-language-badge">' . esc_html__( 'Default', 'wp-loc' ) . '</span>'
+            : '';
+
+        return '<div class="wp-loc-language-name-cell"><strong>' . esc_html( $name ) . '</strong>' . $default_badge . '</div>';
     }
 
     public function column_locale( $item ): string {
@@ -320,16 +370,16 @@ class WP_LOC_Languages_List_Table extends WP_List_Table {
     }
 
     public function column_slug( $item ): string {
-        return '<input type="text" name="wp_loc_languages[' . esc_attr( $item['locale'] ) . '][slug]" value="' . esc_attr( $item['slug'] ) . '" class="wp-loc-slug-input" required />';
+        return '<input type="text" name="wp_loc_languages[' . esc_attr( $item['locale'] ) . '][slug]" value="' . esc_attr( $item['slug'] ) . '" class="wp-loc-slug-input" required maxlength="24" autocapitalize="off" autocomplete="off" spellcheck="false" />';
     }
 
     public function column_display_name( $item ): string {
-        return '<input type="text" name="wp_loc_languages[' . esc_attr( $item['locale'] ) . '][display_name]" value="' . esc_attr( $item['display_name'] ) . '" class="wp-loc-slug-input" />';
+        return '<input type="text" name="wp_loc_languages[' . esc_attr( $item['locale'] ) . '][display_name]" value="' . esc_attr( $item['display_name'] ) . '" class="wp-loc-display-name-input" required maxlength="60" autocomplete="off" />';
     }
 
     public function column_flag( $item ): string {
         $url = WP_LOC_Languages::get_flag_url( $item['locale'] );
-        return '<img class="wp-loc-flag-small" src="' . esc_url( $url ) . '" alt="" />';
+        return '<span class="wp-loc-flag-chip"><img class="wp-loc-flag-small" src="' . esc_url( $url ) . '" alt="" /></span>';
     }
 
     public function column_delete( $item ): string {
