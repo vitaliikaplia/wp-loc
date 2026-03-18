@@ -723,7 +723,15 @@ class WP_LOC_Admin {
         $default = WP_LOC_Languages::get_default_language();
         if ( $lang === $default ) return $html;
 
-        return str_replace( home_url(), home_url( "/{$lang}" ), $html );
+        $home = home_url();
+        $prefixed = home_url( "/{$lang}" );
+
+        // Replace only home_url() NOT already followed by /$lang/
+        return preg_replace(
+            '#' . preg_quote( $home, '#' ) . '(?!/' . preg_quote( $lang, '#' ) . '(?:/|"|\'|\s))#',
+            $prefixed,
+            $html
+        );
     }
 }
 

@@ -53,25 +53,11 @@ class WP_LOC_Frontend {
                 $translated_post = get_post( $row->element_id );
                 if ( ! $translated_post || $translated_post->post_status !== 'publish' ) continue;
 
-                $permalink = get_permalink( $row->element_id );
-
-                if ( $slug !== $default ) {
-                    $parsed = parse_url( $permalink );
-                    $path = isset( $parsed['path'] ) ? '/' . trim( $parsed['path'], '/' ) : '';
-                    $permalink = home_url( "/{$slug}{$path}/" );
-                }
-
-                $translations[ $slug ] = $permalink;
+                $translations[ $slug ] = get_permalink( $row->element_id );
             }
         } else {
-            $permalink = get_permalink( $post_id );
-            if ( $current_lang && $current_lang !== $default ) {
-                $parsed = parse_url( $permalink );
-                $path = isset( $parsed['path'] ) ? '/' . trim( $parsed['path'], '/' ) : '';
-                $permalink = home_url( "/{$current_lang}{$path}/" );
-            }
             if ( $current_lang ) {
-                $translations[ $current_lang ] = $permalink;
+                $translations[ $current_lang ] = get_permalink( $post_id );
             }
         }
 
@@ -86,13 +72,7 @@ class WP_LOC_Frontend {
         }
 
         // Canonical
-        $canonical = get_permalink( $post_id );
-        if ( $current_lang && $current_lang !== $default ) {
-            $parsed = parse_url( $canonical );
-            $path = isset( $parsed['path'] ) ? '/' . trim( $parsed['path'], '/' ) : '';
-            $canonical = home_url( "/{$current_lang}{$path}/" );
-        }
-        echo '<link rel="canonical" href="' . esc_url( $canonical ) . '" />' . "\n";
+        echo '<link rel="canonical" href="' . esc_url( get_permalink( $post_id ) ) . '" />' . "\n";
     }
 
     /**
@@ -202,9 +182,7 @@ function wp_loc_get_lang_switcher(): array {
             $translated_post = get_post( $row->element_id );
             if ( ! $translated_post || $translated_post->post_status !== 'publish' ) continue;
 
-            $path = trim( parse_url( get_permalink( $row->element_id ), PHP_URL_PATH ), '/' );
-            $prefix = ( $slug === $default ) ? '' : "/{$slug}";
-            $urls[ $slug ] = home_url( $prefix . '/' . $path . '/' );
+            $urls[ $slug ] = get_permalink( $row->element_id );
         }
 
         foreach ( $active as $code => $data ) {

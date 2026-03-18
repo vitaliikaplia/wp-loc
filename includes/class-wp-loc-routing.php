@@ -14,6 +14,10 @@ class WP_LOC_Routing {
         add_filter( 'redirect_canonical', [ $this, 'prevent_lang_front_redirect' ], 10, 2 );
         add_filter( 'wp_unique_post_slug', [ $this, 'allow_duplicate_slugs' ], 99, 6 );
 
+        add_filter( 'page_link', [ $this, 'add_lang_prefix_to_link' ], 10, 2 );
+        add_filter( 'post_link', [ $this, 'add_lang_prefix_to_link' ], 10, 2 );
+        add_filter( 'post_type_link', [ $this, 'add_lang_prefix_to_link' ], 10, 2 );
+
         add_action( 'init', [ $this, 'maybe_flush_rewrite_rules' ] );
     }
 
@@ -273,6 +277,39 @@ class WP_LOC_Routing {
         } while ( $exists );
 
         return ( $suffix === 2 ) ? $base_slug : "{$base_slug}-" . ( $suffix - 1 );
+    }
+
+    /**
+     * Add language prefix to post/page permalinks for non-default languages
+     */
+    public function add_lang_prefix_to_link( $url, $post_id ) {
+        if ( $post_id instanceof \WP_Post ) {
+            $post_id = $post_id->ID;
+        }
+
+        $post_type = get_post_type( $post_id );
+        if ( ! $post_type || ! WP_LOC_Admin_Settings::is_translatable( $post_type ) ) {
+            return $url;
+        }
+
+        $element_type = WP_LOC_DB::post_element_type( $post_type );
+        $lang = WP_LOC::instance()->db->get_element_language( (int) $post_id, $element_type );
+
+        if ( ! $lang ) {
+            return $url;
+        }
+
+        $default = WP_LOC_Languages::get_default_language();
+        if ( $lang === $default ) {
+            return $url;
+        }
+
+        $home = home_url();
+        if ( str_contains( $url, "{$home}/{$lang}/" ) ) {
+            return $url;
+        }
+
+        return str_replace( $home, "{$home}/{$lang}", $url );
     }
 
     /**
