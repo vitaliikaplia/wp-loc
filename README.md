@@ -16,13 +16,17 @@ Lightweight multilingual plugin for WordPress.
 - **Cascade delete for term translations** — deleting any translated term deletes the whole translation group
 - **Protected default category group** — default category and all its translations cannot be deleted
 - **Multilingual nav menus** — WPML-like translated menu groups, translated menu items, language-aware menu locations, auto-created menu translations, and cascade deletion for menu translation groups
-- **WP Menus Sync** — Multilingual > WP Menus Sync page with AJAX preview/apply for syncing menu structure from the default language to secondary languages
+- **Tools page** — Multilingual > Tools with tabbed utilities for WP Menus Sync and AI Translation
+- **WP Menus Sync** — AJAX preview/apply for syncing menu structure from the default language to secondary languages
+- **AI-assisted custom menu links** — optional AI translation for `custom` nav menu items during menu sync, while preserving URLs and other menu item settings
+- **AI Translation tool** — TinyMCE-based AJAX translator for formatted HTML content, with translated content inserted back into the editor without reloading the page
 - **Non-translatable post types** — work correctly with language URL prefixes (shared content across languages)
 - **URL structure** — `/ua/page-slug/`, `/en/page-slug/`, default language without prefix
 - **Admin language switcher** — in the admin bar with flags, cookie-based
 - **Frontend language switcher** — `wp_loc_get_lang_switcher()`, `wp_loc_get_language_switcher_html()`, `wp_loc_the_language_switcher()` with translated post and term archive URLs
 - **SEO** — hreflang alternate tags, canonical URLs, proper `<html lang="">`
 - **Localized options** — `blogname`, `blogdescription`, `page_on_front`, `page_for_posts` per language, including localized front page / posts page routing
+- **AI settings** — choose OpenAI / Claude / Gemini, store API keys, and enable AI translation for custom menu links during menu sync
 - **Third-party compatibility** — `icl_object_id()`, `$sitepress`, `ICL_LANGUAGE_CODE`, common multilingual filters
 - **ACF integration** — field-level translation mode (`none` / `shared` / `translatable`) for options pages with ACFML-like language-aware `options_{lang}` routing
 - **ACF nav_menu field support** — translated menu values resolve to the correct menu in the current language context
@@ -41,7 +45,8 @@ Lightweight multilingual plugin for WordPress.
 3. Go to **WP General Settings** and install the languages you need — they auto-appear in **Multilingual > Languages**
 4. Configure language slugs, display names and ordering in **Multilingual > Languages**
 5. Select translatable post types and taxonomies in **Multilingual > Settings**
-6. Use **Multilingual > WP Menus Sync** if you want to sync secondary-language menus from the default-language menu structure
+6. Configure **Multilingual > Settings** tabs, including AI provider settings if you want to use AI translation features
+7. Use **Multilingual > Tools** for WP Menus Sync and the AI Translation tool
 
 ## Usage
 
@@ -76,7 +81,14 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 - Create the source menu in the default language
 - WP-LOC auto-creates sibling menus in the other active languages
 - Menu locations are assigned from the default-language menu and resolved automatically per language on the frontend
-- Use **Multilingual > WP Menus Sync** to sync structure/order/options from the default-language menu to translated menus
+- Use **Multilingual > Tools > WP Menus Sync** to sync structure/order/options from the default-language menu to translated menus
+- If **Try to translate custom nav menu links with AI during menu sync** is enabled in **Multilingual > Settings > Content Translation**, custom menu links are translated with the selected AI engine during sync; otherwise they are duplicated 1:1 with the same title, URL, and item settings
+
+### AI tools
+
+- In **Multilingual > Settings > AI**, choose the translation engine (`OpenAI`, `Claude`, or `Gemini`) and provide the matching API key
+- In **Multilingual > Tools > AI Translation**, paste or write formatted content in the TinyMCE editor, choose a target language, and translate it via AJAX without reloading the page
+- The translated HTML is inserted back into the editor while preserving formatting
 
 ### ACF options pages
 

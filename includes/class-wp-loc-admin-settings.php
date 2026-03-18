@@ -152,9 +152,11 @@ class WP_LOC_Admin_Settings {
         if ( $current_tab === self::TAB_CONTENT ) {
             $selected = isset( $_POST['wp_loc_post_types'] ) ? array_map( 'sanitize_key', (array) $_POST['wp_loc_post_types'] ) : [];
             $selected_taxonomies = isset( $_POST['wp_loc_taxonomies'] ) ? array_map( 'sanitize_key', (array) $_POST['wp_loc_taxonomies'] ) : [];
+            $translate_custom_menu_links = isset( $_POST['wp_loc_ai_translate_custom_menu_links'] ) ? 1 : 0;
 
             update_option( self::OPTION_KEY, $selected );
             update_option( self::TAXONOMIES_OPTION_KEY, $selected_taxonomies );
+            update_option( self::AI_TRANSLATE_CUSTOM_MENU_LINKS_OPTION_KEY, $translate_custom_menu_links );
         } elseif ( $current_tab === self::TAB_SWITCHER ) {
             $show_flags = isset( $_POST['wp_loc_show_switcher_flags'] ) ? 1 : 0;
             update_option( self::SHOW_FLAGS_OPTION_KEY, $show_flags );
@@ -167,13 +169,11 @@ class WP_LOC_Admin_Settings {
             $openai_api_key = isset( $_POST['wp_loc_openai_api_key'] ) ? sanitize_text_field( trim( (string) $_POST['wp_loc_openai_api_key'] ) ) : '';
             $claude_api_key = isset( $_POST['wp_loc_claude_api_key'] ) ? sanitize_text_field( trim( (string) $_POST['wp_loc_claude_api_key'] ) ) : '';
             $gemini_api_key = isset( $_POST['wp_loc_gemini_api_key'] ) ? sanitize_text_field( trim( (string) $_POST['wp_loc_gemini_api_key'] ) ) : '';
-            $translate_custom_menu_links = isset( $_POST['wp_loc_ai_translate_custom_menu_links'] ) ? 1 : 0;
 
             update_option( self::AI_ENGINE_OPTION_KEY, $ai_engine );
             update_option( self::OPENAI_API_KEY_OPTION_KEY, $openai_api_key );
             update_option( self::CLAUDE_API_KEY_OPTION_KEY, $claude_api_key );
             update_option( self::GEMINI_API_KEY_OPTION_KEY, $gemini_api_key );
-            update_option( self::AI_TRANSLATE_CUSTOM_MENU_LINKS_OPTION_KEY, $translate_custom_menu_links );
         }
 
         wp_redirect( add_query_arg( [
@@ -264,6 +264,22 @@ class WP_LOC_Admin_Settings {
                                     <p class="description"><?php esc_html_e( 'Select which taxonomies should support multilingual translations.', 'wp-loc' ); ?></p>
                                 </td>
                             </tr>
+                            <tr>
+                                <th scope="row"><?php esc_html_e( 'Menu Sync', 'wp-loc' ); ?></th>
+                                <td>
+                                    <fieldset class="wp-loc-settings-stack">
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_ai_translate_custom_menu_links"
+                                                   value="1"
+                                                   <?php checked( $translate_custom_menu_links ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Try to translate custom nav menu links with AI during menu sync', 'wp-loc' ); ?></span>
+                                        </label>
+                                    </fieldset>
+                                    <p class="description"><?php esc_html_e( 'When enabled, WP Menus Sync will try to translate custom link titles and related text fields with the selected AI engine.', 'wp-loc' ); ?></p>
+                                </td>
+                            </tr>
                         </table>
                     </div>
                 <?php elseif ( $current_tab === self::TAB_SWITCHER ) : ?>
@@ -319,22 +335,6 @@ class WP_LOC_Admin_Settings {
                                 <th scope="row"><?php esc_html_e( 'Gemini API Key', 'wp-loc' ); ?></th>
                                 <td>
                                     <input type="password" name="wp_loc_gemini_api_key" value="<?php echo esc_attr( $gemini_api_key ); ?>" class="regular-text" autocomplete="off" spellcheck="false" />
-                                </td>
-                            </tr>
-                            <tr>
-                                <th scope="row"><?php esc_html_e( 'Menu Sync', 'wp-loc' ); ?></th>
-                                <td>
-                                    <fieldset class="wp-loc-settings-stack">
-                                        <label class="wp-loc-settings-label">
-                                            <input type="checkbox"
-                                                   name="wp_loc_ai_translate_custom_menu_links"
-                                                   value="1"
-                                                   <?php checked( $translate_custom_menu_links ); ?>
-                                            />
-                                            <span><?php esc_html_e( 'Try to translate custom nav menu links with AI during menu sync', 'wp-loc' ); ?></span>
-                                        </label>
-                                    </fieldset>
-                                    <p class="description"><?php esc_html_e( 'When enabled, WP Menus Sync will try to translate custom link titles and related text fields with the selected AI engine.', 'wp-loc' ); ?></p>
                                 </td>
                             </tr>
                         </table>
