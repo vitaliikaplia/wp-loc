@@ -30,7 +30,6 @@
     // Metabox — create single translation via AJAX
     $(document).on('click', '.wp-loc-create-single-translation', function() {
         const $btn = $(this);
-        const $li = $btn.closest('li');
         const postId = $btn.data('post-id');
         const lang = $btn.data('lang');
 
@@ -59,6 +58,47 @@
             }
         }).fail(function() {
             $btn.prop('disabled', false).text('+');
+        });
+    });
+
+    // Term edit screen — create single translation via AJAX
+    $(document).on('click', '.wp-loc-create-single-term-translation', function() {
+        const $btn = $(this);
+        const termId = $btn.data('term-id');
+        const taxonomy = $btn.data('taxonomy');
+        const lang = $btn.data('lang');
+
+        $btn.prop('disabled', true).text('…');
+
+        $.post(wpLocAdmin.ajaxUrl, {
+            action: 'wp_loc_create_term_translation',
+            nonce: wpLocAdmin.nonce,
+            term_id: termId,
+            taxonomy: taxonomy,
+            lang: lang
+        }, function(response) {
+            if (response.success) {
+                const $container = $('#wp-loc-term-translations');
+
+                $.post(wpLocAdmin.ajaxUrl, {
+                    action: 'wp_loc_refresh_term_translations',
+                    nonce: wpLocAdmin.nonce,
+                    term_id: termId,
+                    taxonomy: taxonomy
+                }, function(refreshResponse) {
+                    if (refreshResponse.success) {
+                        $container.html(refreshResponse.data.html);
+                    }
+                });
+            } else {
+                $btn.prop('disabled', false).text('+');
+                if (response.data && response.data.message) {
+                    window.alert(response.data.message);
+                }
+            }
+        }).fail(function() {
+            $btn.prop('disabled', false).text('+');
+            window.alert('Failed to create term translation.');
         });
     });
 

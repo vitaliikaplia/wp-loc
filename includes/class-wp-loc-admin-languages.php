@@ -44,10 +44,11 @@ class WP_LOC_Admin_Languages {
 
     public function enqueue_scripts( string $hook ): void {
         if ( $hook === 'toplevel_page_wp-loc' ) {
+            $admin_js_version = file_exists( WP_LOC_PATH . 'assets/js/admin.min.js' ) ? (string) filemtime( WP_LOC_PATH . 'assets/js/admin.min.js' ) : WP_LOC_VERSION;
             wp_enqueue_script( 'jquery-ui-sortable' );
             // Re-register wp-loc-admin with sortable dependency on this page
             wp_deregister_script( 'wp-loc-admin' );
-            wp_enqueue_script( 'wp-loc-admin', WP_LOC_URL . 'assets/js/admin.min.js', [ 'jquery', 'jquery-ui-sortable' ], WP_LOC_VERSION, true );
+            wp_enqueue_script( 'wp-loc-admin', WP_LOC_URL . 'assets/js/admin.min.js', [ 'jquery', 'jquery-ui-sortable' ], $admin_js_version, true );
             wp_localize_script( 'wp-loc-admin', 'wpLocAdmin', [
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
                 'nonce'   => wp_create_nonce( 'wp_loc_ajax' ),

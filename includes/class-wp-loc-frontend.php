@@ -158,6 +158,34 @@ function wp_loc_get_lang_switcher(): array {
         return $switcher;
     }
 
+    // Term archives with translations
+    if ( is_category() || is_tag() || is_tax() ) {
+        $queried_term = get_queried_object();
+
+        if ( $queried_term instanceof \WP_Term && WP_LOC_Terms::is_translatable( $queried_term->taxonomy ) ) {
+            foreach ( $active as $code => $data ) {
+                $locale = $data['locale'] ?? $code;
+                $url = home_url( $code === $default ? '/' : "/{$code}/" );
+                $translated_link = WP_LOC_Terms::get_term_url_for_language( (int) $queried_term->term_id, $queried_term->taxonomy, $code );
+
+                if ( $translated_link ) {
+                    $url = $translated_link;
+                }
+
+                $switcher[] = [
+                    'code'   => $code,
+                    'locale' => $locale,
+                    'active' => $code === $current,
+                    'url'    => $url,
+                    'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
+                    'name'   => WP_LOC_Languages::get_display_name( $code ),
+                ];
+            }
+
+            return $switcher;
+        }
+    }
+
     // Singular posts with translations
     $current_post_id = get_queried_object_id();
     $post_type = get_post_type( $current_post_id );

@@ -61,6 +61,10 @@ class WP_LOC_Compat {
             return $result;
         } );
 
+        add_filter( 'wpml_is_translated_taxonomy', function ( $is_translated, $taxonomy ) {
+            return WP_LOC_Terms::is_translatable( (string) $taxonomy );
+        }, 10, 2 );
+
         // wpml_element_trid
         add_filter( 'wpml_element_trid', function ( $value, $element_id, $element_type = 'post_post' ) {
             return WP_LOC::instance()->db->get_trid( (int) $element_id, $element_type );
@@ -136,7 +140,11 @@ class WP_LOC_Compat {
         if ( in_array( $element_type, [ 'post', 'page', 'attachment' ], true ) || post_type_exists( $element_type ) ) {
             $type_prefix = 'post_' . $element_type;
         } elseif ( taxonomy_exists( $element_type ) ) {
-            $type_prefix = 'tax_' . $element_type;
+            $translated_id = WP_LOC_Terms::get_term_translation( (int) $element_id, $element_type, $target_lang );
+
+            if ( $translated_id ) return $translated_id;
+
+            return $return_original ? $element_id : null;
         }
 
         $translated_id = $db->get_element_translation( (int) $element_id, $type_prefix, $target_lang );
@@ -182,6 +190,10 @@ class WP_LOC_Sitepress_Mock {
 
     public function get_element_trid( int $element_id, string $element_type = 'post_post' ): ?int {
         return WP_LOC::instance()->db->get_trid( $element_id, $element_type );
+    }
+
+    public function is_translated_taxonomy( string $taxonomy ): bool {
+        return WP_LOC_Terms::is_translatable( $taxonomy );
     }
 }
 

@@ -4,8 +4,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: wp-loc\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-17 23:43+0200\n"
-"PO-Revision-Date: 2026-03-17 23:44+0200\n"
+"POT-Creation-Date: 2026-03-18 01:50+0200\n"
+"PO-Revision-Date: 2026-03-18 01:50+0200\n"
 "Last-Translator: Vitalii Kaplia <vitalii.kaplia@gmail.com>\n"
 "Language-Team: Vitalii Kaplia <vitalii.kaplia@gmail.com>\n"
 "Language: ru_RU\n"
@@ -52,88 +52,97 @@ msgstr "Многоязычность"
 msgid "Languages"
 msgstr "Языки"
 
-#: includes/class-wp-loc-admin-languages.php:78
-#: includes/class-wp-loc-admin-settings.php:130
+#: includes/class-wp-loc-admin-languages.php:79
+#: includes/class-wp-loc-admin-settings.php:180
 msgid "Save"
 msgstr "Сохранить"
 
-#: includes/class-wp-loc-admin-languages.php:97
+#: includes/class-wp-loc-admin-languages.php:98
 #, php-format
 msgid "Missing slug for locale %s"
 msgstr "Отсутствует слаг для локали %s"
 
-#: includes/class-wp-loc-admin-languages.php:100
+#: includes/class-wp-loc-admin-languages.php:101
 #, php-format
 msgid "Duplicate slug \"%s\" detected."
 msgstr "Обнаружен дублирующийся слаг \"%s\"."
 
-#: includes/class-wp-loc-admin-languages.php:249
+#: includes/class-wp-loc-admin-languages.php:250
 msgid "Enabled"
 msgstr "Включён"
 
-#: includes/class-wp-loc-admin-languages.php:250
+#: includes/class-wp-loc-admin-languages.php:251
 msgid "Name"
 msgstr "Название"
 
-#: includes/class-wp-loc-admin-languages.php:251
+#: includes/class-wp-loc-admin-languages.php:252
 msgid "Locale"
 msgstr "Локаль"
 
-#: includes/class-wp-loc-admin-languages.php:252
+#: includes/class-wp-loc-admin-languages.php:253
 msgid "Slug"
 msgstr "Слаг"
 
-#: includes/class-wp-loc-admin-languages.php:253
+#: includes/class-wp-loc-admin-languages.php:254
 msgid "Display Name"
 msgstr "Отображение"
 
-#: includes/class-wp-loc-admin-languages.php:254
+#: includes/class-wp-loc-admin-languages.php:255
 msgid "Flag"
 msgstr "Флаг"
 
-#: includes/class-wp-loc-admin-languages.php:255
+#: includes/class-wp-loc-admin-languages.php:256
 msgid "Action"
 msgstr "Действие"
 
-#: includes/class-wp-loc-admin-settings.php:19
-#: includes/class-wp-loc-admin-settings.php:20
-#: includes/class-wp-loc-admin-settings.php:83 wp-loc.php:38
+#: includes/class-wp-loc-admin-settings.php:21
+#: includes/class-wp-loc-admin-settings.php:22
+#: includes/class-wp-loc-admin-settings.php:114 wp-loc.php:38
 msgid "Settings"
 msgstr "Настройки"
 
-#: includes/class-wp-loc-admin-settings.php:87
+#: includes/class-wp-loc-admin-settings.php:118
 msgid "Settings saved."
 msgstr "Настройки сохранены."
 
-#: includes/class-wp-loc-admin-settings.php:96
+#: includes/class-wp-loc-admin-settings.php:127
 msgid "Translatable Post Types"
 msgstr "Типы записей для перевода"
 
-#: includes/class-wp-loc-admin-settings.php:111
+#: includes/class-wp-loc-admin-settings.php:142
 msgid "Select which post types should support multilingual translations."
 msgstr "Выберите какие типы записей должны поддерживать многоязычные переводы."
 
-#: includes/class-wp-loc-admin-settings.php:115
+#: includes/class-wp-loc-admin-settings.php:146
+msgid "Translatable Taxonomies"
+msgstr "Переводимые таксономии"
+
+#: includes/class-wp-loc-admin-settings.php:161
+msgid "Select which taxonomies should support multilingual translations."
+msgstr "Выберите, какие таксономии должны поддерживать многоязычные переводы."
+
+#: includes/class-wp-loc-admin-settings.php:165
 msgid "Frontend Language Switcher"
 msgstr "Переключатель языка на фронтенде"
 
-#: includes/class-wp-loc-admin-settings.php:123
+#: includes/class-wp-loc-admin-settings.php:173
 msgid "Show flags in the frontend language switcher"
 msgstr "Отображать флаги в переключателе языков интерфейса"
 
-#: includes/class-wp-loc-admin-settings.php:125
+#: includes/class-wp-loc-admin-settings.php:175
 msgid ""
 "Controls whether flags are rendered by the frontend language switcher helper."
 msgstr ""
 "Определяет, отображаются ли флаги с помощью вспомогательной функции "
 "переключения языка в интерфейсе."
 
-#: includes/class-wp-loc-admin.php:205 includes/class-wp-loc-admin.php:598
+#: includes/class-wp-loc-admin.php:268 includes/class-wp-loc-admin.php:667
+#: includes/class-wp-loc-terms.php:908 includes/class-wp-loc-terms.php:979
 msgid "Translations"
 msgstr "Переводы"
 
-#: includes/class-wp-loc-admin.php:447 includes/class-wp-loc-admin.php:459
-#: includes/class-wp-loc-admin.php:468
+#: includes/class-wp-loc-admin.php:516 includes/class-wp-loc-admin.php:528
+#: includes/class-wp-loc-admin.php:537
 msgid ""
 "Creating new content is only available in the primary language of the site. "
 "Switch to the default language first."
@@ -141,8 +150,8 @@ msgstr ""
 "Создание нового контента доступно только на основном языке сайта. Сначала "
 "переключитесь на язык по умолчанию."
 
-#: includes/class-wp-loc-admin.php:448 includes/class-wp-loc-admin.php:460
-#: includes/class-wp-loc-admin.php:469
+#: includes/class-wp-loc-admin.php:517 includes/class-wp-loc-admin.php:529
+#: includes/class-wp-loc-admin.php:538
 msgid "Action not allowed"
 msgstr "Действие не разрешено"
 

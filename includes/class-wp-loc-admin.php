@@ -32,6 +32,8 @@ class WP_LOC_Admin {
         $admin_locale = self::get_admin_locale();
         $gutenberg_languages = [];
         $editing_post_id = isset( $_GET['post'] ) ? (int) $_GET['post'] : 0;
+        $admin_css_version = file_exists( WP_LOC_PATH . 'assets/css/admin.min.css' ) ? (string) filemtime( WP_LOC_PATH . 'assets/css/admin.min.css' ) : WP_LOC_VERSION;
+        $admin_js_version = file_exists( WP_LOC_PATH . 'assets/js/admin.min.js' ) ? (string) filemtime( WP_LOC_PATH . 'assets/js/admin.min.js' ) : WP_LOC_VERSION;
 
         // Add wp-data dependency on post edit screens for Gutenberg metabox refresh
         if ( $screen && $screen->is_block_editor ) {
@@ -53,8 +55,8 @@ class WP_LOC_Admin {
             }
         }
 
-        wp_enqueue_style( 'wp-loc-admin', WP_LOC_URL . 'assets/css/admin.min.css', [], WP_LOC_VERSION );
-        wp_enqueue_script( 'wp-loc-admin', WP_LOC_URL . 'assets/js/admin.min.js', $deps, WP_LOC_VERSION, true );
+        wp_enqueue_style( 'wp-loc-admin', WP_LOC_URL . 'assets/css/admin.min.css', [], $admin_css_version );
+        wp_enqueue_script( 'wp-loc-admin', WP_LOC_URL . 'assets/js/admin.min.js', $deps, $admin_js_version, true );
         wp_localize_script( 'wp-loc-admin', 'wpLocAdmin', [
             'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
             'nonce'         => wp_create_nonce( 'wp_loc_ajax' ),
@@ -154,6 +156,24 @@ class WP_LOC_Admin {
             }
         }
 
+        // If editing a term, redirect to its translation
+        if ( isset( $_GET['tag_ID'], $_GET['taxonomy'] ) ) {
+            $term_id = (int) $_GET['tag_ID'];
+            $taxonomy = sanitize_key( $_GET['taxonomy'] );
+
+            if ( WP_LOC_Terms::is_translatable( $taxonomy ) ) {
+                $translated_term_id = WP_LOC_Terms::get_term_translation( $term_id, $taxonomy, $slug );
+
+                if ( $translated_term_id && $translated_term_id !== $term_id ) {
+                    wp_redirect( WP_LOC_Terms::get_admin_edit_term_url( $translated_term_id, $taxonomy ) );
+                    exit;
+                }
+
+                wp_redirect( WP_LOC_Terms::get_admin_edit_term_url( $term_id, $taxonomy ) );
+                exit;
+            }
+        }
+
         wp_redirect( remove_query_arg( 'wp_loc_lang' ) );
         exit;
     }
@@ -163,6 +183,26 @@ class WP_LOC_Admin {
      */
     public function sync_cookie_with_post(): void {
         global $pagenow;
+
+        if ( $pagenow === 'term.php' && isset( $_GET['tag_ID'], $_GET['taxonomy'] ) ) {
+            $term_id = (int) $_GET['tag_ID'];
+            $taxonomy = sanitize_key( $_GET['taxonomy'] );
+
+            if ( WP_LOC_Terms::is_translatable( $taxonomy ) ) {
+                $lang = WP_LOC_Terms::get_term_language( $term_id, $taxonomy );
+
+                if ( $lang ) {
+                    $locale = WP_LOC_Languages::get_language_locale( $lang );
+
+                    if ( ! isset( $_COOKIE['admin_lang'] ) || $_COOKIE['admin_lang'] !== $locale ) {
+                        setcookie( 'admin_lang', $locale, time() + DAY_IN_SECONDS * 30, ADMIN_COOKIE_PATH, COOKIE_DOMAIN );
+                        $_COOKIE['admin_lang'] = $locale;
+                    }
+                }
+            }
+
+            return;
+        }
 
         if ( $pagenow !== 'post.php' || ! isset( $_GET['post'] ) ) return;
 

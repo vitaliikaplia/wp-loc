@@ -139,6 +139,7 @@ $transition-speed: .15s;
   margin: 0;
   padding: 0;
   list-style: none;
+  max-width: 320px;
 
   li {
     margin: 0;
@@ -194,6 +195,10 @@ $transition-speed: .15s;
   .wp-loc-lang-active a {
     font-weight: bold;
   }
+}
+
+#wp-loc-term-translations {
+  max-width: 320px;
 }
 
 // Status indicators in meta box

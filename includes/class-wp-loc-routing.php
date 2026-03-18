@@ -7,7 +7,7 @@ class WP_LOC_Routing {
     private static $current_lang = null;
 
     public function __construct() {
-        add_action( 'init', [ $this, 'add_rewrite_rules' ] );
+        add_filter( 'rewrite_rules_array', [ $this, 'add_rewrite_rules' ] );
         add_filter( 'query_vars', [ $this, 'register_query_vars' ] );
         add_filter( 'request', [ $this, 'handle_request' ] );
         add_action( 'template_redirect', [ $this, 'set_locale' ], 1 );
@@ -20,11 +20,27 @@ class WP_LOC_Routing {
     /**
      * Add rewrite rules for language prefixes
      */
-    public function add_rewrite_rules(): void {
+    public function add_rewrite_rules( array $rules ): array {
+        $prefixed_rules = [];
+
         foreach ( WP_LOC_Languages::get_additional_languages() as $lang ) {
-            add_rewrite_rule( "^{$lang}/?$", 'index.php?lang=' . $lang . '&is_lang_front=1', 'top' );
-            add_rewrite_rule( "^{$lang}/(.*)?$", 'index.php?pagename=$matches[1]&lang=' . $lang, 'top' );
+            $prefixed_rules[ "^{$lang}/?$" ] = 'index.php?lang=' . $lang . '&is_lang_front=1';
+
+            foreach ( $rules as $regex => $query ) {
+                if ( str_starts_with( $regex, '^(' . $lang . ')/' ) || str_starts_with( $regex, "^{$lang}/" ) ) {
+                    continue;
+                }
+
+                $prefixed_regex = $regex === '.?'
+                    ? "^{$lang}/?"
+                    : '^' . $lang . '/' . ltrim( $regex, '^' );
+
+                $separator = strpos( $query, '?' ) !== false ? '&' : '?';
+                $prefixed_rules[ $prefixed_regex ] = $query . $separator . 'lang=' . $lang;
+            }
         }
+
+        return $prefixed_rules + $rules;
     }
 
     /**
@@ -33,6 +49,7 @@ class WP_LOC_Routing {
     public function register_query_vars( array $vars ): array {
         $vars[] = 'lang';
         $vars[] = 'is_lang_front';
+        $vars[] = 'wp_loc_invalid_term_lang';
         return $vars;
     }
 
@@ -47,50 +64,114 @@ class WP_LOC_Routing {
             return $query_vars;
         }
 
+        $effective_lang = isset( $query_vars['lang'] ) && $query_vars['lang']
+            ? (string) $query_vars['lang']
+            : WP_LOC_Languages::get_default_language();
+
         // Resolve pagename with language
-        if ( ! isset( $query_vars['pagename'] ) || ! isset( $query_vars['lang'] ) ) {
-            return $query_vars;
+        if ( isset( $query_vars['pagename'], $query_vars['lang'] ) ) {
+            $slug = $query_vars['pagename'];
+            $lang_slug = $query_vars['lang'];
+
+            $active = WP_LOC_Languages::get_active_languages();
+            if ( isset( $active[ $lang_slug ] ) ) {
+                global $wpdb;
+                $table = WP_LOC::instance()->db->get_table();
+
+                // Try translatable posts first (match by slug + language)
+                $post_id = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT p.ID FROM {$wpdb->posts} p
+                     INNER JOIN {$table} t ON t.element_id = p.ID AND t.element_type = CONCAT('post_', p.post_type)
+                     WHERE p.post_name = %s
+                       AND t.language_code = %s
+                       AND p.post_status NOT IN ('trash', 'auto-draft')
+                     LIMIT 1",
+                    $slug,
+                    $lang_slug
+                ) );
+
+                // Fallback: non-translatable post types (not in icl_translations at all)
+                if ( ! $post_id ) {
+                    $post_id = $wpdb->get_var( $wpdb->prepare(
+                        "SELECT p.ID FROM {$wpdb->posts} p
+                         LEFT JOIN {$table} t ON t.element_id = p.ID AND t.element_type = CONCAT('post_', p.post_type)
+                         WHERE p.post_name = %s
+                           AND t.element_id IS NULL
+                           AND p.post_status NOT IN ('trash', 'auto-draft')
+                         LIMIT 1",
+                        $slug
+                    ) );
+                }
+
+                if ( $post_id ) {
+                    $query_vars['page_id'] = $post_id;
+                    unset( $query_vars['pagename'] );
+                }
+            }
         }
 
-        $slug = $query_vars['pagename'];
-        $lang_slug = $query_vars['lang'];
+        $query_vars = $this->resolve_translated_term_request( $query_vars, $effective_lang );
 
-        $active = WP_LOC_Languages::get_active_languages();
-        if ( ! isset( $active[ $lang_slug ] ) ) {
-            return $query_vars;
+        return $query_vars;
+    }
+
+    /**
+     * Resolve taxonomy archives by language-aware term slug/path.
+     */
+    private function resolve_translated_term_request( array $query_vars, string $lang ): array {
+        $taxonomies_to_check = [];
+
+        if ( isset( $query_vars['category_name'] ) ) {
+            $taxonomies_to_check['category'] = (string) $query_vars['category_name'];
         }
 
-        global $wpdb;
-        $table = WP_LOC::instance()->db->get_table();
-
-        // Try translatable posts first (match by slug + language)
-        $post_id = $wpdb->get_var( $wpdb->prepare(
-            "SELECT p.ID FROM {$wpdb->posts} p
-             INNER JOIN {$table} t ON t.element_id = p.ID AND t.element_type = CONCAT('post_', p.post_type)
-             WHERE p.post_name = %s
-               AND t.language_code = %s
-               AND p.post_status NOT IN ('trash', 'auto-draft')
-             LIMIT 1",
-            $slug,
-            $lang_slug
-        ) );
-
-        // Fallback: non-translatable post types (not in icl_translations at all)
-        if ( ! $post_id ) {
-            $post_id = $wpdb->get_var( $wpdb->prepare(
-                "SELECT p.ID FROM {$wpdb->posts} p
-                 LEFT JOIN {$table} t ON t.element_id = p.ID AND t.element_type = CONCAT('post_', p.post_type)
-                 WHERE p.post_name = %s
-                   AND t.element_id IS NULL
-                   AND p.post_status NOT IN ('trash', 'auto-draft')
-                 LIMIT 1",
-                $slug
-            ) );
+        if ( isset( $query_vars['tag'] ) ) {
+            $taxonomies_to_check['post_tag'] = (string) $query_vars['tag'];
         }
 
-        if ( $post_id ) {
-            $query_vars['page_id'] = $post_id;
-            unset( $query_vars['pagename'] );
+        foreach ( WP_LOC_Terms::get_translatable_taxonomies() as $taxonomy ) {
+            if ( isset( $query_vars[ $taxonomy ] ) ) {
+                $taxonomies_to_check[ $taxonomy ] = (string) $query_vars[ $taxonomy ];
+            }
+        }
+
+        if ( isset( $query_vars['taxonomy'], $query_vars['term'] ) ) {
+            $taxonomies_to_check[ (string) $query_vars['taxonomy'] ] = (string) $query_vars['term'];
+        }
+
+        foreach ( $taxonomies_to_check as $taxonomy => $path ) {
+            if ( ! WP_LOC_Terms::is_translatable( $taxonomy ) || $path === '' ) {
+                continue;
+            }
+
+            $term = WP_LOC_Terms::find_term_by_path_and_language( $path, $taxonomy, $lang );
+
+            if ( ! $term ) {
+                $query_vars['wp_loc_invalid_term_lang'] = 1;
+                continue;
+            }
+
+            if ( $taxonomy === 'category' ) {
+                $query_vars['cat'] = (int) $term->term_id;
+                unset( $query_vars['category_name'] );
+                continue;
+            }
+
+            if ( $taxonomy === 'post_tag' ) {
+                $query_vars['tag_id'] = (int) $term->term_id;
+                unset( $query_vars['tag'] );
+                continue;
+            }
+
+            $query_vars['tax_query'] = [
+                [
+                    'taxonomy' => $taxonomy,
+                    'field'    => 'term_id',
+                    'terms'    => [ (int) $term->term_id ],
+                ],
+            ];
+
+            unset( $query_vars['taxonomy'], $query_vars['term'], $query_vars[ $taxonomy ] );
         }
 
         return $query_vars;
@@ -106,6 +187,14 @@ class WP_LOC_Routing {
         $locale = WP_LOC_Languages::get_language_locale( $slug );
 
         switch_to_locale( $locale );
+
+        if ( get_query_var( 'wp_loc_invalid_term_lang' ) ) {
+            global $wp_query;
+            $wp_query->set_404();
+            status_header( 404 );
+            nocache_headers();
+            return;
+        }
 
         // Verify post language matches URL language (only for translatable post types)
         if ( is_singular() ) {
