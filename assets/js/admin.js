@@ -715,4 +715,38 @@
         }
     })();
 
+    (function initAcfFieldGroupMultilingualSetup() {
+        if (!$('body.post-type-acf-field-group').length || !$('#wp-loc-acf-field-group-setup').length) {
+            return;
+        }
+
+        const modeSelector = 'input[name="wp_loc_acf_field_group_mode"]';
+
+        const isExpertMode = function() {
+            return $(modeSelector + ':checked').val() === 'advanced';
+        };
+
+        const toggleFieldTranslationPreferences = function() {
+            const shouldShow = isExpertMode();
+
+            $('.acf-field-setting-translation_mode, .acf-field[data-name="translation_mode"]').each(function() {
+                $(this).toggle(shouldShow);
+            });
+        };
+
+        $(document).on('change', modeSelector, toggleFieldTranslationPreferences);
+        toggleFieldTranslationPreferences();
+
+        if (typeof MutationObserver !== 'undefined') {
+            const observer = new MutationObserver(function() {
+                toggleFieldTranslationPreferences();
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+    })();
+
 })(jQuery);

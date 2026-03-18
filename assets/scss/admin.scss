@@ -883,6 +883,84 @@ td.column-wp_loc_translations {
   margin-top: 12px;
 }
 
+.post-type-acf-field-group {
+  #wp-loc-acf-field-group-setup {
+    .inside {
+      margin: 0;
+      padding: 16px 18px 18px;
+    }
+  }
+}
+
+.wp-loc-acfml-setup__intro {
+  margin: 0 0 14px;
+  color: #50575e;
+}
+
+.wp-loc-acfml-setup__list {
+  display: grid;
+  gap: 10px;
+}
+
+.wp-loc-acfml-mode-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  cursor: pointer;
+  padding: 12px 14px;
+  border: 1px solid #dcdcde;
+  background: #fff;
+  box-sizing: border-box;
+
+  input {
+    margin: 2px 0 0;
+    flex: 0 0 auto;
+  }
+}
+
+.wp-loc-acfml-mode-row__content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.wp-loc-acfml-mode-row__title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1d2327;
+}
+
+.wp-loc-acfml-mode-row__description {
+  display: block;
+  color: #50575e;
+  line-height: 1.5;
+}
+
+.wp-loc-acfml-mode-row:hover {
+  border-color: #8c8f94;
+}
+
+.wp-loc-acfml-mode-row input:checked + .wp-loc-acfml-mode-row__content {
+  color: inherit;
+}
+
+.wp-loc-acfml-mode-row input:checked ~ .wp-loc-acfml-mode-row__content .wp-loc-acfml-mode-row__title {
+  color: #135e96;
+}
+
+.wp-loc-acfml-mode-row input:checked,
+.wp-loc-acfml-mode-row input:checked + .wp-loc-acfml-mode-row__content {
+  outline: 0;
+}
+
+.wp-loc-acfml-mode-row input:checked {
+  accent-color: #2271b1;
+}
+
 @media (max-width: 960px) {
   .wp-loc-menu-sync-summary {
     grid-template-columns: 1fr;

@@ -20,28 +20,33 @@ msgstr ""
 "X-Poedit-Basepath: ..\n"
 "X-Poedit-SearchPath-0: .\n"
 
-#: includes/class-wp-loc-acf.php:219
-msgid "Translation Mode"
-msgstr "Режим перекладу"
+#: includes/class-wp-loc-acf.php:380
+msgid "Translation preferences"
+msgstr "Налаштування перекладу"
 
-#: includes/class-wp-loc-acf.php:220
-msgid ""
-"Should multilingual logic be disabled, shared, or translated for this field?"
-msgstr ""
-"Чи слід для цього поля вимкнути багатомовну логіку, зробити її спільною або "
-"перекласти?"
+#: includes/class-wp-loc-acf.php:381
+msgid "What to do with field value when the post, term, or options page is translated."
+msgstr "Що робити зі значенням поля, коли перекладається запис, термін або сторінка опцій."
 
-#: includes/class-wp-loc-acf.php:224
-msgid "Do not apply multilingual logic"
-msgstr "Не застосовувати багатомовну логіку"
+#: includes/class-wp-loc-acf.php:385
+msgctxt "ACF field translation preference"
+msgid "Don't translate"
+msgstr "Не перекладати"
 
-#: includes/class-wp-loc-acf.php:225
-msgid "Shared across all languages"
-msgstr "Спільне для всіх мов"
+#: includes/class-wp-loc-acf.php:386
+msgctxt "ACF field translation preference"
+msgid "Copy"
+msgstr "Копіювати"
 
-#: includes/class-wp-loc-acf.php:226
-msgid "Translatable"
-msgstr "Перекладається"
+#: includes/class-wp-loc-acf.php:387
+msgctxt "ACF field translation preference"
+msgid "Copy once"
+msgstr "Копіювати один раз"
+
+#: includes/class-wp-loc-acf.php:388
+msgctxt "ACF field translation preference"
+msgid "Translate"
+msgstr "Перекладати"
 
 #: includes/class-wp-loc-admin-languages.php:22
 msgid "Multilingual"
@@ -552,6 +557,46 @@ msgstr ""
 #, php-format
 msgid "Creating a translation in %s."
 msgstr "Створення перекладу в %s."
+
+#: includes/class-wp-loc-acf.php:360
+msgid "Multilingual Setup"
+msgstr "Багатомовне налаштування"
+
+#: includes/class-wp-loc-acf.php:387
+msgid "Managed by the field group multilingual setup. Switch the group to Expert to change this field manually."
+msgstr "Це налаштування керується багатомовним режимом групи полів. Перемкніть групу в режим Expert, щоб змінювати це поле вручну."
+
+#: includes/class-wp-loc-acf.php:437
+msgid "Translation Option"
+msgstr "Параметр перекладу"
+
+#: includes/class-wp-loc-acf.php:369
+msgid "Select a translation option for this field group."
+msgstr "Виберіть варіант перекладу для цієї групи полів."
+
+#: includes/class-wp-loc-acf.php:374
+msgid "Same fields across languages"
+msgstr "Однакові поля для всіх мов"
+
+#: includes/class-wp-loc-acf.php:375
+msgid "Translate content while keeping the same field structure across all languages. Field order, layouts, and field types stay aligned."
+msgstr "Перекладайте контент, зберігаючи однакову структуру полів для всіх мов. Порядок полів, макети та типи полів залишаються узгодженими."
+
+#: includes/class-wp-loc-acf.php:378
+msgid "Different fields across languages"
+msgstr "Різні поля для різних мов"
+
+#: includes/class-wp-loc-acf.php:379
+msgid "Allow a different field structure per language. Field order, layouts, and even field availability can vary between translations."
+msgstr "Дозвольте різну структуру полів для кожної мови. Порядок полів, макети і навіть набір полів можуть відрізнятися між перекладами."
+
+#: includes/class-wp-loc-acf.php:382
+msgid "Expert"
+msgstr "Expert"
+
+#: includes/class-wp-loc-acf.php:383
+msgid "Manually control translation preferences for each field in the group. Best for migrated field groups or advanced setups."
+msgstr "Керуйте параметрами перекладу вручну для кожного поля в групі. Найкраще підходить для мігрованих груп полів або складніших сценаріїв."
 
 #~ msgid ""
 #~ "Display locations are mapped from the default-language menu automatically."
