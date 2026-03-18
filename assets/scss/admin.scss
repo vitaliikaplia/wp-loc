@@ -256,6 +256,11 @@ $transition-speed: .15s;
 .wp-loc-t-draft     .wp-loc-pencil { color: $color-warning; }
 .wp-loc-t-missing                 { opacity: .35; }
 
+.column-wp_loc_translations {
+  width: 1%;
+  white-space: nowrap;
+}
+
 // ===========================================
 // Languages List Table (Settings > Languages)
 // ===========================================
@@ -285,6 +290,10 @@ $transition-speed: .15s;
   .wp-loc-delete-link {
     color: $color-danger;
   }
+
+  .wp-loc-default-language-toggle {
+    cursor: not-allowed;
+  }
 }
 
 // ===========================================
@@ -297,5 +306,101 @@ $transition-speed: .15s;
 
   code {
     color: $color-muted;
+  }
+}
+
+.wp-loc-disabled-select {
+  opacity: .6;
+}
+
+.wp-loc-hide-term-bulk {
+  .wp-list-table thead .check-column input[type="checkbox"],
+  .wp-list-table tfoot .check-column input[type="checkbox"] {
+    display: none !important;
+  }
+}
+
+.wp-loc-protected-term-row {
+  .check-column input[type="checkbox"],
+  .check-column label {
+    display: none !important;
+  }
+}
+
+.wp-loc-hide-term-delete-link {
+  #delete-link {
+    display: none !important;
+  }
+}
+
+.wp-loc-nav-menu-controls {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-left: 18px;
+}
+
+.wp-loc-nav-menu-translations {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: 560px;
+
+  strong {
+    font-size: 12px;
+    color: #50575e;
+  }
+}
+
+.wp-loc-nav-menu-translations-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  .wp-loc-t {
+    margin: 0;
+    opacity: .35;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  .sep {
+    display: none;
+  }
+
+  a.current {
+    opacity: 1;
+
+    .wp-loc-flag {
+      opacity: 1;
+    }
+
+    &:hover {
+      .wp-loc-flag {
+        opacity: 1;
+      }
+
+      .wp-loc-pencil {
+        opacity: 0;
+      }
+    }
+  }
+}
+
+.wp-loc-nav-menu-message {
+  width: 100%;
+  font-size: 12px;
+  color: #646970;
+  margin-top: -6px;
+}
+
+@media (max-width: 960px) {
+  .wp-loc-nav-menu-controls {
+    margin: 12px 0 0;
   }
 }

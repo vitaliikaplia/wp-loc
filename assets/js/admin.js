@@ -197,14 +197,149 @@
         });
     }
 
+    // Nav menus — inject multilingual controls and keep quick search language-aware
+    (function initNavMenus() {
+        const dataNode = document.getElementById('wp-loc-nav-menu-data');
+        const form = document.getElementById('update-nav-menu');
+
+        if (!dataNode || !form) {
+            return;
+        }
+
+        const fields = {
+            wp_loc_nav_menu_lang: dataNode.dataset.lang || '',
+            wp_loc_nav_menu_trid: dataNode.dataset.trid || '',
+            wp_loc_translation_of: dataNode.dataset.translationOf || ''
+        };
+
+        const ensureFields = function(targetForm) {
+            if (!targetForm) {
+                return;
+            }
+
+            Object.entries(fields).forEach(function(entry) {
+                const name = entry[0];
+                const value = entry[1];
+                let input = targetForm.querySelector('input[name="' + name + '"]');
+
+                if (!input) {
+                    input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = name;
+                    targetForm.appendChild(input);
+                }
+
+                input.value = value;
+            });
+        };
+
+        ensureFields(form);
+        ensureFields(document.getElementById('nav-menu-meta'));
+
+        if ($ && !window.wpLocNavMenuQuickSearchLangBound) {
+            window.wpLocNavMenuQuickSearchLangBound = true;
+
+            $.ajaxPrefilter(function(options, originalOptions) {
+                const ajaxUrl = (typeof window.ajaxurl === 'string') ? window.ajaxurl : '';
+                const requestUrl = typeof options.url === 'string' ? options.url : '';
+                const data = originalOptions && originalOptions.data;
+                const isQuickSearchObject = data && typeof data === 'object' && data.action === 'menu-quick-search';
+                const isQuickSearchString = typeof data === 'string' && data.indexOf('action=menu-quick-search') !== -1;
+
+                if (!requestUrl || !ajaxUrl || requestUrl.indexOf(ajaxUrl) !== 0) {
+                    return;
+                }
+
+                if (!isQuickSearchObject && !isQuickSearchString) {
+                    return;
+                }
+
+                const currentMenuInput = document.getElementById('menu');
+                const currentMenuId = currentMenuInput ? currentMenuInput.value : '';
+                const currentLang = fields.wp_loc_nav_menu_lang || '';
+
+                if (typeof options.data === 'string') {
+                    const params = new URLSearchParams(options.data);
+
+                    if (currentLang && !params.has('wp_loc_nav_menu_lang')) {
+                        params.set('wp_loc_nav_menu_lang', currentLang);
+                    }
+
+                    if (currentLang && !params.has('lang')) {
+                        params.set('lang', currentLang);
+                    }
+
+                    if (currentMenuId && !params.has('menu')) {
+                        params.set('menu', currentMenuId);
+                    }
+
+                    options.data = params.toString();
+                    return;
+                }
+
+                options.data = Object.assign({}, options.data || {}, {
+                    menu: currentMenuId || (options.data && options.data.menu) || '',
+                    wp_loc_nav_menu_lang: currentLang || (options.data && options.data.wp_loc_nav_menu_lang) || '',
+                    lang: currentLang || (options.data && options.data.lang) || ''
+                });
+            });
+        }
+
+        if (dataNode.dataset.sourceName) {
+            const menuName = document.getElementById('menu-name');
+            if (menuName && !menuName.value) {
+                menuName.value = dataNode.dataset.sourceNameLocalized || '';
+            }
+        }
+
+        const publishingAction = form.querySelector('.major-publishing-actions .publishing-action');
+        if (!publishingAction || form.querySelector('.wp-loc-nav-menu-controls')) {
+            return;
+        }
+
+        const showTranslations = dataNode.dataset.showTranslations === '1';
+        const translationsHtml = dataNode.dataset.translationsHtml || '';
+        const messageHtml = dataNode.dataset.messageHtml || '';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'wp-loc-nav-menu-controls';
+
+        wrapper.innerHTML =
+            (showTranslations
+                ? '<div class="wp-loc-nav-menu-translations">' +
+                    '<strong>' + (dataNode.dataset.translationsLabel || '') + '</strong>' +
+                    '<div class="wp-loc-nav-menu-translations-links">' + translationsHtml + '</div>' +
+                  '</div>'
+                : '') +
+            messageHtml;
+
+        publishingAction.before(wrapper);
+    })();
+
     // Reading Settings — disable page selects for non-default languages
-    if (window.wpLocDisablePageSelects) {
+    if (wpLocAdmin.disablePageSelectsMessage) {
         const selects = document.querySelectorAll('#page_on_front, #page_for_posts');
         selects.forEach(function(el) {
             el.disabled = true;
-            el.style.opacity = '0.6';
-            el.title = window.wpLocDisablePageSelects;
+            el.classList.add('wp-loc-disabled-select');
+            el.title = wpLocAdmin.disablePageSelectsMessage;
         });
+    }
+
+    // Protected category terms — hide bulk checkboxes via classes
+    if (Array.isArray(wpLocAdmin.protectedCategoryTermIds) && wpLocAdmin.protectedCategoryTermIds.length) {
+        document.body.classList.add('wp-loc-hide-term-bulk');
+
+        wpLocAdmin.protectedCategoryTermIds.forEach(function(termId) {
+            const row = document.getElementById('tag-' + termId);
+            if (row) {
+                row.classList.add('wp-loc-protected-term-row');
+            }
+        });
+    }
+
+    // Protected term edit screen — hide delete link
+    if (wpLocAdmin.hideProtectedTermDeleteLink) {
+        document.body.classList.add('wp-loc-hide-term-delete-link');
     }
 
 })(jQuery);
