@@ -31,6 +31,9 @@ class WP_LOC_Admin {
         $admin_lang = self::get_admin_lang();
         $admin_locale = self::get_admin_locale();
         $gutenberg_languages = [];
+        $protected_category_term_ids = [];
+        $hide_protected_term_delete_link = false;
+        $disable_page_selects_message = '';
         $editing_post_id = isset( $_GET['post'] ) ? (int) $_GET['post'] : 0;
         $admin_css_version = file_exists( WP_LOC_PATH . 'assets/css/admin.min.css' ) ? (string) filemtime( WP_LOC_PATH . 'assets/css/admin.min.css' ) : WP_LOC_VERSION;
         $admin_js_version = file_exists( WP_LOC_PATH . 'assets/js/admin.min.js' ) ? (string) filemtime( WP_LOC_PATH . 'assets/js/admin.min.js' ) : WP_LOC_VERSION;
@@ -55,6 +58,29 @@ class WP_LOC_Admin {
             }
         }
 
+        if ( $screen && $screen->id === 'options-reading' && $admin_lang !== WP_LOC_Languages::get_default_language() ) {
+            $disable_page_selects_message = __( 'Auto-resolved from default language translation', 'wp-loc' );
+        }
+
+        if ( $screen && $screen->base === 'edit-tags' && ( $screen->taxonomy ?? '' ) === 'category' ) {
+            foreach ( get_terms( [
+                'taxonomy'   => 'category',
+                'hide_empty' => false,
+                'number'     => 0,
+                'lang'       => 'all',
+            ] ) as $term ) {
+                if ( $term instanceof \WP_Term && WP_LOC_Terms::is_protected_term( (int) $term->term_id, 'category' ) ) {
+                    $protected_category_term_ids[] = (int) $term->term_id;
+                }
+            }
+        }
+
+        if ( $screen && $screen->base === 'term' && isset( $_GET['tag_ID'], $_GET['taxonomy'] ) ) {
+            $term_id = (int) $_GET['tag_ID'];
+            $taxonomy = sanitize_key( $_GET['taxonomy'] );
+            $hide_protected_term_delete_link = WP_LOC_Terms::is_protected_term( $term_id, $taxonomy );
+        }
+
         wp_enqueue_style( 'wp-loc-admin', WP_LOC_URL . 'assets/css/admin.min.css', [], $admin_css_version );
         wp_enqueue_script( 'wp-loc-admin', WP_LOC_URL . 'assets/js/admin.min.js', $deps, $admin_js_version, true );
         wp_localize_script( 'wp-loc-admin', 'wpLocAdmin', [
@@ -64,6 +90,9 @@ class WP_LOC_Admin {
             'adminLangName' => WP_LOC_Languages::get_display_name( $admin_lang ),
             'adminLangFlag' => WP_LOC_Languages::get_flag_url( $admin_locale ),
             'gutenbergLanguages' => $gutenberg_languages,
+            'disablePageSelectsMessage' => $disable_page_selects_message,
+            'protectedCategoryTermIds' => $protected_category_term_ids,
+            'hideProtectedTermDeleteLink' => $hide_protected_term_delete_link,
         ] );
     }
 
@@ -170,6 +199,50 @@ class WP_LOC_Admin {
                 }
 
                 wp_redirect( WP_LOC_Terms::get_admin_edit_term_url( $term_id, $taxonomy ) );
+                exit;
+            }
+        }
+
+        // If on nav-menus.php, redirect to the menu translation in the selected admin language.
+        global $pagenow;
+        if ( $pagenow === 'nav-menus.php' ) {
+            $menu_id = isset( $_GET['menu'] ) ? (int) $_GET['menu'] : 0;
+
+            if ( ! $menu_id ) {
+                $recently_edited = (int) get_user_option( 'nav_menu_recently_edited' );
+                if ( $recently_edited && is_nav_menu( $recently_edited ) ) {
+                    $menu_id = $recently_edited;
+                }
+            }
+
+            if ( $menu_id && is_nav_menu( $menu_id ) ) {
+                $term_taxonomy_id = WP_LOC_Terms::get_term_taxonomy_id( $menu_id, 'nav_menu' );
+                $element_type = WP_LOC_DB::tax_element_type( 'nav_menu' );
+                $target_menu_id = 0;
+
+                if ( $term_taxonomy_id ) {
+                    $translated_term_taxonomy_id = WP_LOC::instance()->db->get_element_translation( $term_taxonomy_id, $element_type, $slug );
+
+                    if ( $translated_term_taxonomy_id ) {
+                        $target_menu_id = (int) WP_LOC_Terms::get_term_id_from_taxonomy_id( $translated_term_taxonomy_id, 'nav_menu' );
+                    }
+                }
+
+                if ( $target_menu_id ) {
+                    wp_redirect( admin_url( 'nav-menus.php?menu=' . $target_menu_id ) );
+                    exit;
+                }
+
+                wp_redirect( add_query_arg(
+                    [
+                        'action'                => 'edit',
+                        'menu'                  => 0,
+                        'wp_loc_menu_lang'      => $slug,
+                        'wp_loc_nav_menu_trid'  => $term_taxonomy_id ? WP_LOC::instance()->db->get_trid( $term_taxonomy_id, $element_type ) : null,
+                        'wp_loc_translation_of' => $menu_id,
+                    ],
+                    admin_url( 'nav-menus.php' )
+                ) );
                 exit;
             }
         }
@@ -531,13 +604,27 @@ class WP_LOC_Admin {
             );
         } );
 
-        // Block creating new menus
-        if ( $pagenow === 'nav-menus.php' && isset( $_REQUEST['action'] ) && $_REQUEST['action'] === 'create-nav-menu' ) {
-            wp_die(
-                __( 'Creating new content is only available in the primary language of the site. Switch to the default language first.', 'wp-loc' ),
-                __( 'Action not allowed', 'wp-loc' ),
-                [ 'back_link' => true ]
-            );
+        // Block creating new menus in non-default language, but allow creating a translation.
+        if ( $pagenow === 'nav-menus.php' ) {
+            $is_create_submit = isset( $_REQUEST['action'] ) && $_REQUEST['action'] === 'create-nav-menu';
+            $is_create_screen = isset( $_REQUEST['action'] ) && $_REQUEST['action'] === 'edit' && isset( $_REQUEST['menu'] ) && (int) $_REQUEST['menu'] === 0;
+            $has_any_menus = ! empty( wp_get_nav_menus() );
+
+            if ( ! $has_any_menus ) {
+                return;
+            }
+
+            if ( ( $is_create_submit || $is_create_screen ) && isset( $_REQUEST['wp_loc_translation_of'] ) ) {
+                return;
+            }
+
+            if ( $is_create_submit || $is_create_screen ) {
+                wp_die(
+                    __( 'Creating new content is only available in the primary language of the site. Switch to the default language first.', 'wp-loc' ),
+                    __( 'Action not allowed', 'wp-loc' ),
+                    [ 'back_link' => true ]
+                );
+            }
         }
     }
 
@@ -701,11 +788,6 @@ class WP_LOC_Admin {
             echo implode( '', $items );
         }, 10, 2 );
 
-        // Dynamic column width
-        $width = count( $other_langs ) * 34 + 10;
-        add_action( 'admin_head', function () use ( $width ) {
-            echo '<style>.column-wp_loc_translations { width: ' . (int) $width . 'px; }</style>';
-        } );
     }
 
     /**

@@ -4,8 +4,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: wp-loc\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-18 01:50+0200\n"
-"PO-Revision-Date: 2026-03-18 01:50+0200\n"
+"POT-Creation-Date: 2026-03-18 06:07+0200\n"
+"PO-Revision-Date: 2026-03-18 06:07+0200\n"
 "Last-Translator: Vitalii Kaplia <vitalii.kaplia@gmail.com>\n"
 "Language-Team: Vitalii Kaplia <vitalii.kaplia@gmail.com>\n"
 "Language: uk\n"
@@ -16,7 +16,7 @@ msgstr ""
 "n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2);\n"
 "X-Generator: Poedit 3.9\n"
 "X-Poedit-SourceCharset: UTF-8\n"
-"X-Poedit-KeywordsList: __;_e;esc_html_e\n"
+"X-Poedit-KeywordsList: __;_e;esc_html_e;esc_attr__\n"
 "X-Poedit-Basepath: ..\n"
 "X-Poedit-SearchPath-0: .\n"
 
@@ -136,13 +136,22 @@ msgstr ""
 "Визначає, чи відображаються прапорці у допоміжному модулі перемикання мови "
 "інтерфейсу."
 
-#: includes/class-wp-loc-admin.php:268 includes/class-wp-loc-admin.php:667
-#: includes/class-wp-loc-terms.php:908 includes/class-wp-loc-terms.php:979
+#: includes/class-wp-loc-admin.php:62
+msgid "Auto-resolved from default language translation"
+msgstr "Автоматично визначено з перекладу основної мови"
+
+#: includes/class-wp-loc-admin.php:341 includes/class-wp-loc-admin.php:754
+#: includes/class-wp-loc-terms.php:1141 includes/class-wp-loc-terms.php:1201
 msgid "Translations"
 msgstr "Переклади"
 
-#: includes/class-wp-loc-admin.php:516 includes/class-wp-loc-admin.php:528
-#: includes/class-wp-loc-admin.php:537
+#: includes/class-wp-loc-admin.php:416 includes/class-wp-loc-admin.php:782
+#: includes/class-wp-loc-terms.php:1179 includes/class-wp-loc-terms.php:1238
+msgid "Edit translation"
+msgstr "Редагувати переклад"
+
+#: includes/class-wp-loc-admin.php:589 includes/class-wp-loc-admin.php:601
+#: includes/class-wp-loc-admin.php:623
 msgid ""
 "Creating new content is only available in the primary language of the site. "
 "Switch to the default language first."
@@ -150,14 +159,25 @@ msgstr ""
 "Створення нового контенту доступне лише в основній мові сайту. Спочатку "
 "перемкніться на мову за замовчуванням."
 
-#: includes/class-wp-loc-admin.php:517 includes/class-wp-loc-admin.php:529
-#: includes/class-wp-loc-admin.php:538
+#: includes/class-wp-loc-admin.php:590 includes/class-wp-loc-admin.php:602
+#: includes/class-wp-loc-admin.php:624
 msgid "Action not allowed"
 msgstr "Дія не дозволена"
 
-#: includes/class-wp-loc-options.php:197
-msgid "Auto-resolved from default language translation"
-msgstr "Автоматично визначено з перекладу основної мови"
+#: includes/class-wp-loc-menus.php:816
+#, php-format
+msgid "Creating %1$s translation of \"%2$s\"."
+msgstr "Створення %1$s перекладу \"%2$s\"."
+
+#: includes/class-wp-loc-menus.php:835
+msgid "Translations:"
+msgstr "Переклади:"
+
+#~ msgid ""
+#~ "Display locations are mapped from the default-language menu automatically."
+#~ msgstr ""
+#~ "Місця відображення визначаються автоматично на основі меню мови за "
+#~ "замовчуванням."
 
 #~ msgid "Languages saved."
 #~ msgstr "Мови збережено."
@@ -171,11 +191,5 @@ msgstr "Автоматично визначено з перекладу осно
 #~ msgid "Save the post first to manage translations."
 #~ msgstr "Спочатку збережіть запис, щоб керувати перекладами."
 
-#~ msgid "Create translations"
-#~ msgstr "Створити переклади"
-
 #~ msgid "Is this field shared or translatable between languages?"
 #~ msgstr "Це поле спільне чи перекладається для різних мов?"
-
-#~ msgid "Edit translation"
-#~ msgstr "Редагувати переклад"

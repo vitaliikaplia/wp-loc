@@ -195,12 +195,5 @@ class WP_LOC_Options {
                 return $value;
             } );
         }
-
-        // Disable page selects for non-default languages (auto-resolved via translations)
-        if ( $screen->id === 'options-reading' ) {
-            add_action( 'admin_enqueue_scripts', function () {
-                wp_add_inline_script( 'wp-loc-admin', 'window.wpLocDisablePageSelects = ' . wp_json_encode( __( 'Auto-resolved from default language translation', 'wp-loc' ) ) . ';', 'before' );
-            } );
-        }
     }
 }
