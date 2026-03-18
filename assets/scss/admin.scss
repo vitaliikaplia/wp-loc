@@ -118,6 +118,48 @@ $transition-speed: .15s;
   }
 }
 
+.wp-loc-has-gutenberg-title-translate {
+  position: relative;
+  padding-right: 44px;
+  min-height: 40px;
+}
+
+.wp-loc-gutenberg-title-translate {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #50575e;
+  cursor: pointer;
+
+  .dashicons {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+  }
+
+  &:hover,
+  &:focus {
+    color: $color-wp-blue;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
 // ===========================================
 // Translation Meta Box (post editor sidebar)
 // ===========================================
@@ -881,6 +923,145 @@ td.column-wp_loc_translations {
 
 .wp-loc-ai-translate-feedback {
   margin-top: 12px;
+}
+
+.wp-loc-ai-key-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wp-loc-ai-model-row {
+  margin-top: 10px;
+
+  .wp-loc-ai-model-select {
+    min-width: 320px;
+    max-width: 100%;
+  }
+}
+
+.wp-loc-ai-key-status {
+  font-weight: 500;
+  color: #50575e;
+
+  &.is-success {
+    color: #1f6f43;
+  }
+
+  &.is-error {
+    color: #b32d2e;
+  }
+}
+
+.wp-loc-title-translate-open {
+  overflow: hidden;
+}
+
+.wp-loc-title-translate-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.wp-loc-title-translate-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.wp-loc-title-translate-modal__dialog {
+  position: relative;
+  max-width: 520px;
+  margin: 8vh auto 0;
+  background: #fff;
+  border: 1px solid #c3c4c7;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  padding: 24px;
+
+  h2 {
+    margin: 0 28px 8px 0;
+  }
+}
+
+.wp-loc-title-translate-modal__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: 0;
+  background: transparent;
+  color: #646970;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+
+  &:hover,
+  &:focus {
+    color: #1d2327;
+  }
+}
+
+.wp-loc-title-translate-modal__description {
+  margin: 0 0 16px;
+}
+
+.wp-loc-title-translate-modal__targets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.wp-loc-title-translate-target {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #c3c4c7;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+
+  img {
+    width: 24px;
+    height: auto;
+    border: 1px solid #dcdcde;
+    flex-shrink: 0;
+  }
+
+  &:hover,
+  &:focus {
+    border-color: #2271b1;
+    color: #0a4b78;
+  }
+}
+
+.wp-loc-title-translate-modal__status {
+  min-height: 20px;
+  margin-top: 14px;
+  font-weight: 500;
+  color: #50575e;
+
+  &.is-success {
+    color: #1f6f43;
+  }
+
+  &.is-error {
+    color: #b32d2e;
+  }
+}
+
+.wp-loc-title-translate-modal.is-loading {
+  .wp-loc-title-translate-target,
+  .wp-loc-title-translate-modal__close {
+    pointer-events: none;
+    opacity: 0.6;
+  }
 }
 
 .post-type-acf-field-group {

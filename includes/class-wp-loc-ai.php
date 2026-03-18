@@ -4,6 +4,33 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class WP_LOC_AI {
 
+    public static function test_provider( string $provider, string $api_key, ?string $model = null ) {
+        $provider = sanitize_key( $provider );
+        $api_key = trim( $api_key );
+        $model = is_string( $model ) ? trim( $model ) : null;
+
+        if ( $api_key === '' ) {
+            return new WP_Error( 'wp_loc_ai_missing_api_key', __( 'API key is empty.', 'wp-loc' ) );
+        }
+
+        $prompt = 'Reply with OK only.';
+
+        $response = match ( $provider ) {
+            'claude' => self::get_claude_response( $prompt, null, $api_key, $model ),
+            'gemini' => self::get_gemini_response( $prompt, null, $api_key, $model ),
+            default  => self::get_openai_response( $prompt, null, $api_key, $model ),
+        };
+
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+
+        return [
+            'provider' => $provider,
+            'message'  => __( 'Connection successful.', 'wp-loc' ),
+        ];
+    }
+
     public static function get_target_language_name( string $lang ): string {
         $normalized = sanitize_key( $lang );
         $locale = WP_LOC_Languages::get_language_locale( $normalized );
@@ -132,28 +159,27 @@ class WP_LOC_AI {
         return $normalized_source === $normalized_result;
     }
 
-    public static function get_openai_response( string $prompt, ?string $system = null ) {
-        $api_key = WP_LOC_Admin_Settings::get_openai_api_key();
-        $model = 'gpt-4o-mini';
+
+    public static function get_openai_response( string $prompt, ?string $system = null, ?string $api_key_override = null, ?string $model_override = null ) {
+        $api_key = $api_key_override ?: WP_LOC_Admin_Settings::get_openai_api_key();
+        $model = $model_override ?: WP_LOC_Admin_Settings::get_openai_model();
 
         if ( ! $api_key || ! $prompt ) {
             return new WP_Error( 'wp_loc_ai_openai_config', __( 'OpenAI is not configured.', 'wp-loc' ) );
         }
 
-        $messages = [];
-        if ( $system ) {
-            $messages[] = [ 'role' => 'system', 'content' => $system ];
-        }
-        $messages[] = [ 'role' => 'user', 'content' => $prompt ];
-
         $payload = [
-            'model' => $model,
-            'messages' => $messages,
-            'max_tokens' => 2048,
+            'model'             => $model,
+            'input'             => $prompt,
+            'max_output_tokens' => 2048,
         ];
 
+        if ( $system ) {
+            $payload['instructions'] = $system;
+        }
+
         $response = wp_remote_post(
-            'https://api.openai.com/v1/chat/completions',
+            'https://api.openai.com/v1/responses',
             [
                 'headers' => [
                     'Content-Type'  => 'application/json',
@@ -177,12 +203,20 @@ class WP_LOC_AI {
             return new WP_Error( 'wp_loc_ai_openai_http', $message, [ 'status' => $code, 'body' => $body ] );
         }
 
-        return $data['choices'][0]['message']['content'] ?? new WP_Error( 'wp_loc_ai_openai_payload', __( 'OpenAI returned an empty response.', 'wp-loc' ) );
+        if ( ! empty( $data['output'][0]['content'] ) && is_array( $data['output'][0]['content'] ) ) {
+            foreach ( $data['output'][0]['content'] as $content_part ) {
+                if ( isset( $content_part['type'], $content_part['text'] ) && $content_part['type'] === 'output_text' ) {
+                    return $content_part['text'];
+                }
+            }
+        }
+
+        return new WP_Error( 'wp_loc_ai_openai_payload', __( 'OpenAI returned an empty response.', 'wp-loc' ) );
     }
 
-    public static function get_claude_response( string $prompt, ?string $system = null ) {
-        $api_key = WP_LOC_Admin_Settings::get_claude_api_key();
-        $model = 'claude-3-5-sonnet-latest';
+    public static function get_claude_response( string $prompt, ?string $system = null, ?string $api_key_override = null, ?string $model_override = null ) {
+        $api_key = $api_key_override ?: WP_LOC_Admin_Settings::get_claude_api_key();
+        $model = $model_override ?: WP_LOC_Admin_Settings::get_claude_model();
 
         if ( ! $api_key || ! $prompt ) {
             return new WP_Error( 'wp_loc_ai_claude_config', __( 'Claude is not configured.', 'wp-loc' ) );
@@ -232,9 +266,9 @@ class WP_LOC_AI {
         return $data['content'][0]['text'] ?? new WP_Error( 'wp_loc_ai_claude_payload', __( 'Claude returned an empty response.', 'wp-loc' ) );
     }
 
-    public static function get_gemini_response( string $prompt, ?string $system = null ) {
-        $api_key = WP_LOC_Admin_Settings::get_gemini_api_key();
-        $model = 'gemini-1.5-flash';
+    public static function get_gemini_response( string $prompt, ?string $system = null, ?string $api_key_override = null, ?string $model_override = null ) {
+        $api_key = $api_key_override ?: WP_LOC_Admin_Settings::get_gemini_api_key();
+        $model = $model_override ?: WP_LOC_Admin_Settings::get_gemini_model();
 
         if ( ! $api_key || ! $prompt ) {
             return new WP_Error( 'wp_loc_ai_gemini_config', __( 'Gemini is not configured.', 'wp-loc' ) );

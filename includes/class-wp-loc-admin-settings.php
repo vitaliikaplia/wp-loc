@@ -9,8 +9,11 @@ class WP_LOC_Admin_Settings {
     const SHOW_FLAGS_OPTION_KEY = 'wp_loc_show_switcher_flags';
     const AI_ENGINE_OPTION_KEY = 'wp_loc_ai_engine';
     const OPENAI_API_KEY_OPTION_KEY = 'wp_loc_openai_api_key';
+    const OPENAI_MODEL_OPTION_KEY = 'wp_loc_openai_model';
     const CLAUDE_API_KEY_OPTION_KEY = 'wp_loc_claude_api_key';
+    const CLAUDE_MODEL_OPTION_KEY = 'wp_loc_claude_model';
     const GEMINI_API_KEY_OPTION_KEY = 'wp_loc_gemini_api_key';
+    const GEMINI_MODEL_OPTION_KEY = 'wp_loc_gemini_model';
     const AI_TRANSLATE_CUSTOM_MENU_LINKS_OPTION_KEY = 'wp_loc_ai_translate_custom_menu_links';
     const TAB_CONTENT = 'content';
     const TAB_SWITCHER = 'switcher';
@@ -19,6 +22,7 @@ class WP_LOC_Admin_Settings {
     public function __construct() {
         add_action( 'admin_menu', [ $this, 'add_menu' ], 20 );
         add_action( 'admin_init', [ $this, 'handle_save' ] );
+        add_action( 'wp_ajax_wp_loc_test_ai_key', [ $this, 'ajax_test_ai_key' ] );
         add_filter( 'wp_loc_translatable_post_types', [ $this, 'filter_post_types' ] );
         add_filter( 'wp_loc_translatable_taxonomies', [ $this, 'filter_taxonomies' ] );
     }
@@ -130,12 +134,61 @@ class WP_LOC_Admin_Settings {
         return (string) get_option( self::OPENAI_API_KEY_OPTION_KEY, '' );
     }
 
+    public static function get_openai_model(): string {
+        $models = self::get_openai_models();
+        $model = (string) get_option( self::OPENAI_MODEL_OPTION_KEY, 'gpt-5.4-mini' );
+
+        return array_key_exists( $model, $models ) ? $model : 'gpt-5.4-mini';
+    }
+
     public static function get_claude_api_key(): string {
         return (string) get_option( self::CLAUDE_API_KEY_OPTION_KEY, '' );
     }
 
+    public static function get_claude_model(): string {
+        $models = self::get_claude_models();
+        $model = (string) get_option( self::CLAUDE_MODEL_OPTION_KEY, 'claude-sonnet-4-6' );
+
+        return array_key_exists( $model, $models ) ? $model : 'claude-sonnet-4-6';
+    }
+
     public static function get_gemini_api_key(): string {
         return (string) get_option( self::GEMINI_API_KEY_OPTION_KEY, '' );
+    }
+
+    public static function get_gemini_model(): string {
+        $models = self::get_gemini_models();
+        $model = (string) get_option( self::GEMINI_MODEL_OPTION_KEY, 'gemini-2.5-flash' );
+
+        return array_key_exists( $model, $models ) ? $model : 'gemini-2.5-flash';
+    }
+
+    public static function get_openai_models(): array {
+        return [
+            'gpt-4o-mini' => __( 'GPT-4o mini', 'wp-loc' ),
+            'gpt-4o'      => __( 'GPT-4o', 'wp-loc' ),
+            'gpt-5.4-nano' => __( 'GPT-5.4 Nano, fastest and cheapest', 'wp-loc' ),
+            'gpt-5.4-mini' => __( 'GPT-5.4 Mini, balanced default', 'wp-loc' ),
+            'gpt-5.4'      => __( 'GPT-5.4, highest quality', 'wp-loc' ),
+        ];
+    }
+
+    public static function get_claude_models(): array {
+        return [
+            'claude-haiku-4-5'   => __( 'Claude Haiku 4.5, fastest and cheapest', 'wp-loc' ),
+            'claude-sonnet-4-5'  => __( 'Claude Sonnet 4.5, balanced', 'wp-loc' ),
+            'claude-sonnet-4-6'  => __( 'Claude Sonnet 4.6, stronger quality', 'wp-loc' ),
+            'claude-opus-4-6'    => __( 'Claude Opus 4.6, highest quality', 'wp-loc' ),
+        ];
+    }
+
+    public static function get_gemini_models(): array {
+        return [
+            'gemini-2.5-flash-lite' => __( 'Gemini 2.5 Flash-Lite, fastest and cheapest', 'wp-loc' ),
+            'gemini-2.5-flash'      => __( 'Gemini 2.5 Flash, balanced default', 'wp-loc' ),
+            'gemini-3-flash-preview'=> __( 'Gemini 3 Flash Preview, stronger frontier option', 'wp-loc' ),
+            'gemini-2.5-pro'        => __( 'Gemini 2.5 Pro, highest quality', 'wp-loc' ),
+        ];
     }
 
     public static function should_ai_translate_custom_menu_links(): bool {
@@ -167,13 +220,31 @@ class WP_LOC_Admin_Settings {
             }
 
             $openai_api_key = isset( $_POST['wp_loc_openai_api_key'] ) ? sanitize_text_field( trim( (string) $_POST['wp_loc_openai_api_key'] ) ) : '';
+            $openai_model = isset( $_POST['wp_loc_openai_model'] ) ? sanitize_text_field( trim( (string) $_POST['wp_loc_openai_model'] ) ) : 'gpt-5.4-mini';
             $claude_api_key = isset( $_POST['wp_loc_claude_api_key'] ) ? sanitize_text_field( trim( (string) $_POST['wp_loc_claude_api_key'] ) ) : '';
+            $claude_model = isset( $_POST['wp_loc_claude_model'] ) ? sanitize_text_field( trim( (string) $_POST['wp_loc_claude_model'] ) ) : 'claude-sonnet-4-6';
             $gemini_api_key = isset( $_POST['wp_loc_gemini_api_key'] ) ? sanitize_text_field( trim( (string) $_POST['wp_loc_gemini_api_key'] ) ) : '';
+            $gemini_model = isset( $_POST['wp_loc_gemini_model'] ) ? sanitize_text_field( trim( (string) $_POST['wp_loc_gemini_model'] ) ) : 'gemini-2.5-flash';
+
+            if ( ! array_key_exists( $openai_model, self::get_openai_models() ) ) {
+                $openai_model = 'gpt-5.4-mini';
+            }
+
+            if ( ! array_key_exists( $claude_model, self::get_claude_models() ) ) {
+                $claude_model = 'claude-sonnet-4-6';
+            }
+
+            if ( ! array_key_exists( $gemini_model, self::get_gemini_models() ) ) {
+                $gemini_model = 'gemini-2.5-flash';
+            }
 
             update_option( self::AI_ENGINE_OPTION_KEY, $ai_engine );
             update_option( self::OPENAI_API_KEY_OPTION_KEY, $openai_api_key );
+            update_option( self::OPENAI_MODEL_OPTION_KEY, $openai_model );
             update_option( self::CLAUDE_API_KEY_OPTION_KEY, $claude_api_key );
+            update_option( self::CLAUDE_MODEL_OPTION_KEY, $claude_model );
             update_option( self::GEMINI_API_KEY_OPTION_KEY, $gemini_api_key );
+            update_option( self::GEMINI_MODEL_OPTION_KEY, $gemini_model );
         }
 
         wp_redirect( add_query_arg( [
@@ -197,8 +268,11 @@ class WP_LOC_Admin_Settings {
         $show_flags = self::show_switcher_flags();
         $ai_engine = self::get_ai_engine();
         $openai_api_key = self::get_openai_api_key();
+        $openai_model = self::get_openai_model();
         $claude_api_key = self::get_claude_api_key();
+        $claude_model = self::get_claude_model();
         $gemini_api_key = self::get_gemini_api_key();
+        $gemini_model = self::get_gemini_model();
         $translate_custom_menu_links = self::should_ai_translate_custom_menu_links();
         $current_tab = $this->get_current_tab();
         $ai_engines = [
@@ -206,6 +280,9 @@ class WP_LOC_Admin_Settings {
             'claude' => __( 'Claude', 'wp-loc' ),
             'gemini' => __( 'Gemini', 'wp-loc' ),
         ];
+        $openai_models = self::get_openai_models();
+        $claude_models = self::get_claude_models();
+        $gemini_models = self::get_gemini_models();
 
         ?>
         <div class="wrap wp-loc-settings-page">
@@ -322,19 +399,61 @@ class WP_LOC_Admin_Settings {
                             <tr>
                                 <th scope="row"><?php esc_html_e( 'OpenAI API Key', 'wp-loc' ); ?></th>
                                 <td>
-                                    <input type="password" name="wp_loc_openai_api_key" value="<?php echo esc_attr( $openai_api_key ); ?>" class="regular-text" autocomplete="off" spellcheck="false" />
+                                    <div class="wp-loc-ai-key-row">
+                                        <input type="password" name="wp_loc_openai_api_key" value="<?php echo esc_attr( $openai_api_key ); ?>" class="regular-text" autocomplete="off" spellcheck="false" />
+                                        <button type="button" class="button wp-loc-ai-key-test" data-provider="openai"><?php esc_html_e( 'Test', 'wp-loc' ); ?></button>
+                                        <span class="wp-loc-ai-key-status" aria-live="polite"></span>
+                                    </div>
+                                    <div class="wp-loc-ai-model-row">
+                                        <label class="screen-reader-text" for="wp-loc-openai-model"><?php esc_html_e( 'Model', 'wp-loc' ); ?></label>
+                                        <select id="wp-loc-openai-model" name="wp_loc_openai_model" class="wp-loc-ai-model-select">
+                                            <?php foreach ( $openai_models as $model_key => $model_label ) : ?>
+                                                <option value="<?php echo esc_attr( $model_key ); ?>" <?php selected( $openai_model, $model_key ); ?>>
+                                                    <?php echo esc_html( $model_label ); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
                                 </td>
                             </tr>
                             <tr>
                                 <th scope="row"><?php esc_html_e( 'Claude API Key', 'wp-loc' ); ?></th>
                                 <td>
-                                    <input type="password" name="wp_loc_claude_api_key" value="<?php echo esc_attr( $claude_api_key ); ?>" class="regular-text" autocomplete="off" spellcheck="false" />
+                                    <div class="wp-loc-ai-key-row">
+                                        <input type="password" name="wp_loc_claude_api_key" value="<?php echo esc_attr( $claude_api_key ); ?>" class="regular-text" autocomplete="off" spellcheck="false" />
+                                        <button type="button" class="button wp-loc-ai-key-test" data-provider="claude"><?php esc_html_e( 'Test', 'wp-loc' ); ?></button>
+                                        <span class="wp-loc-ai-key-status" aria-live="polite"></span>
+                                    </div>
+                                    <div class="wp-loc-ai-model-row">
+                                        <label class="screen-reader-text" for="wp-loc-claude-model"><?php esc_html_e( 'Model', 'wp-loc' ); ?></label>
+                                        <select id="wp-loc-claude-model" name="wp_loc_claude_model" class="wp-loc-ai-model-select">
+                                            <?php foreach ( $claude_models as $model_key => $model_label ) : ?>
+                                                <option value="<?php echo esc_attr( $model_key ); ?>" <?php selected( $claude_model, $model_key ); ?>>
+                                                    <?php echo esc_html( $model_label ); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
                                 </td>
                             </tr>
                             <tr>
                                 <th scope="row"><?php esc_html_e( 'Gemini API Key', 'wp-loc' ); ?></th>
                                 <td>
-                                    <input type="password" name="wp_loc_gemini_api_key" value="<?php echo esc_attr( $gemini_api_key ); ?>" class="regular-text" autocomplete="off" spellcheck="false" />
+                                    <div class="wp-loc-ai-key-row">
+                                        <input type="password" name="wp_loc_gemini_api_key" value="<?php echo esc_attr( $gemini_api_key ); ?>" class="regular-text" autocomplete="off" spellcheck="false" />
+                                        <button type="button" class="button wp-loc-ai-key-test" data-provider="gemini"><?php esc_html_e( 'Test', 'wp-loc' ); ?></button>
+                                        <span class="wp-loc-ai-key-status" aria-live="polite"></span>
+                                    </div>
+                                    <div class="wp-loc-ai-model-row">
+                                        <label class="screen-reader-text" for="wp-loc-gemini-model"><?php esc_html_e( 'Model', 'wp-loc' ); ?></label>
+                                        <select id="wp-loc-gemini-model" name="wp_loc_gemini_model" class="wp-loc-ai-model-select">
+                                            <?php foreach ( $gemini_models as $model_key => $model_label ) : ?>
+                                                <option value="<?php echo esc_attr( $model_key ); ?>" <?php selected( $gemini_model, $model_key ); ?>>
+                                                    <?php echo esc_html( $model_label ); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
                                 </td>
                             </tr>
                         </table>
@@ -345,5 +464,29 @@ class WP_LOC_Admin_Settings {
             </form>
         </div>
         <?php
+    }
+
+    public function ajax_test_ai_key(): void {
+        check_ajax_referer( 'wp_loc_ajax', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', 'wp-loc' ) ], 403 );
+        }
+
+        $provider = isset( $_POST['provider'] ) ? sanitize_key( (string) $_POST['provider'] ) : '';
+        $api_key = isset( $_POST['api_key'] ) ? sanitize_text_field( trim( (string) $_POST['api_key'] ) ) : '';
+        $model = isset( $_POST['model'] ) ? sanitize_text_field( trim( (string) $_POST['model'] ) ) : '';
+
+        if ( ! in_array( $provider, [ 'openai', 'claude', 'gemini' ], true ) ) {
+            wp_send_json_error( [ 'message' => __( 'Unknown AI provider.', 'wp-loc' ) ], 400 );
+        }
+
+        $result = WP_LOC_AI::test_provider( $provider, $api_key, $model );
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( [ 'message' => $result->get_error_message() ], 400 );
+        }
+
+        wp_send_json_success( $result );
     }
 }

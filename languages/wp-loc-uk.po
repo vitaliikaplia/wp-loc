@@ -4,8 +4,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: wp-loc\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-18 15:27+0200\n"
-"PO-Revision-Date: 2026-03-18 15:31+0200\n"
+"POT-Creation-Date: 2026-03-19 00:10+0200\n"
+"PO-Revision-Date: 2026-03-19 00:10+0200\n"
 "Last-Translator: Vitalii Kaplia <vitalii.kaplia@gmail.com>\n"
 "Language-Team: Vitalii Kaplia <vitalii.kaplia@gmail.com>\n"
 "Language: uk\n"
@@ -20,33 +20,65 @@ msgstr ""
 "X-Poedit-Basepath: ..\n"
 "X-Poedit-SearchPath-0: .\n"
 
-#: includes/class-wp-loc-acf.php:380
+#: includes/class-wp-loc-acf.php:382
+msgid "Multilingual Setup"
+msgstr "Багатомовне налаштування"
+
+#: includes/class-wp-loc-acf.php:398 includes/class-wp-loc-acf.php:879
+msgid "Same fields across languages"
+msgstr "Однакові поля для всіх мов"
+
+#: includes/class-wp-loc-acf.php:399
+msgid ""
+"Translate content while keeping the same field structure across all "
+"languages. Field order, layouts, and field types stay aligned."
+msgstr ""
+"Перекладайте контент, зберігаючи однакову структуру полів для всіх мов. "
+"Порядок полів, макети та типи полів залишаються узгодженими."
+
+#: includes/class-wp-loc-acf.php:402 includes/class-wp-loc-acf.php:880
+msgid "Different fields across languages"
+msgstr "Різні поля для різних мов"
+
+#: includes/class-wp-loc-acf.php:403
+msgid ""
+"Allow a different field structure per language. Field order, layouts, and "
+"even field availability can vary between translations."
+msgstr ""
+"Дозвольте різну структуру полів для кожної мови. Порядок полів, макети і "
+"навіть набір полів можуть відрізнятися між перекладами."
+
+#: includes/class-wp-loc-acf.php:406 includes/class-wp-loc-acf.php:881
+msgid "Expert"
+msgstr "Expert"
+
+#: includes/class-wp-loc-acf.php:407
+msgid ""
+"Manually control translation preferences for each field in the group. Best "
+"for migrated field groups or advanced setups."
+msgstr ""
+"Керуйте параметрами перекладу вручну для кожного поля в групі. Найкраще "
+"підходить для мігрованих груп полів або складніших сценаріїв."
+
+#: includes/class-wp-loc-acf.php:413
+msgid "Select a translation option for this field group."
+msgstr "Виберіть варіант перекладу для цієї групи полів."
+
+#: includes/class-wp-loc-acf.php:460
 msgid "Translation preferences"
 msgstr "Налаштування перекладу"
 
-#: includes/class-wp-loc-acf.php:381
-msgid "What to do with field value when the post, term, or options page is translated."
-msgstr "Що робити зі значенням поля, коли перекладається запис, термін або сторінка опцій."
+#: includes/class-wp-loc-acf.php:461
+msgid ""
+"What to do with field value when the post, term, or options page is "
+"translated."
+msgstr ""
+"Що робити зі значенням поля, коли перекладається запис, термін або сторінка "
+"опцій."
 
-#: includes/class-wp-loc-acf.php:385
-msgctxt "ACF field translation preference"
-msgid "Don't translate"
-msgstr "Не перекладати"
-
-#: includes/class-wp-loc-acf.php:386
-msgctxt "ACF field translation preference"
-msgid "Copy"
-msgstr "Копіювати"
-
-#: includes/class-wp-loc-acf.php:387
-msgctxt "ACF field translation preference"
-msgid "Copy once"
-msgstr "Копіювати один раз"
-
-#: includes/class-wp-loc-acf.php:388
-msgctxt "ACF field translation preference"
-msgid "Translate"
-msgstr "Перекладати"
+#: includes/class-wp-loc-acf.php:478
+msgid "Translation Option"
+msgstr "Параметр перекладу"
 
 #: includes/class-wp-loc-admin-languages.php:22
 msgid "Multilingual"
@@ -54,108 +86,33 @@ msgstr "Багатомовність"
 
 #: includes/class-wp-loc-admin-languages.php:37
 #: includes/class-wp-loc-admin-languages.php:38
-#: includes/class-wp-loc-admin-languages.php:63 wp-loc.php:37
+#: includes/class-wp-loc-admin-languages.php:75 wp-loc.php:37
 msgid "Languages"
 msgstr "Мови"
 
-#: includes/class-wp-loc-admin-languages.php:66
-msgid "Languages saved."
-msgstr "Мови збережено."
-
-#: includes/class-wp-loc-admin-languages.php:70
-#, php-format
-msgid "Language \"%s\" deleted."
-msgstr "Мову \"%s\" видалено."
-
-#: includes/class-wp-loc-admin-languages.php:79
-#: includes/class-wp-loc-admin-settings.php:180
-msgid "Save"
-msgstr "Зберегти"
-
-#: includes/class-wp-loc-admin-languages.php:98
-#, php-format
-msgid "Missing slug for locale %s"
-msgstr "Відсутній слаг для локалі %s"
-
-#: includes/class-wp-loc-admin-languages.php:101
-#, php-format
-msgid "Duplicate slug \"%s\" detected."
-msgstr "Виявлено дублікат слагу \"%s\"."
-
-#: includes/class-wp-loc-admin-languages.php:250
-msgid "Enabled"
-msgstr "Увімкнено"
-
-#: includes/class-wp-loc-admin-languages.php:251
-msgid "Name"
-msgstr "Назва"
-
-#: includes/class-wp-loc-admin-languages.php:252
-msgid "Locale"
-msgstr "Локаль"
-
-#: includes/class-wp-loc-admin-languages.php:253
-msgid "Slug"
-msgstr "Слаг"
-
-#: includes/class-wp-loc-admin-languages.php:254
-msgid "Display Name"
-msgstr "Відображення"
-
-#: includes/class-wp-loc-admin-languages.php:255
-msgid "Flag"
-msgstr "Прапор"
-
-#: includes/class-wp-loc-admin-languages.php:256
-msgid "Action"
-msgstr "Дія"
-
-#: includes/class-wp-loc-admin-languages.php:348
-msgid "Delete"
-msgstr "Видалити"
-
-#: includes/class-wp-loc-admin-settings.php:21
-#: includes/class-wp-loc-admin-settings.php:22
-#: includes/class-wp-loc-admin-settings.php:114 wp-loc.php:38
-msgid "Settings"
-msgstr "Налаштування"
-
-#: includes/class-wp-loc-admin-settings.php:118
-msgid "Settings saved."
-msgstr "Налаштування збережено."
-
-#: includes/class-wp-loc-admin-settings.php:127
-msgid "Translatable Post Types"
-msgstr "Типи записів для перекладу"
-
-#: includes/class-wp-loc-admin-settings.php:142
-msgid "Select which post types should support multilingual translations."
-msgstr "Оберіть які типи записів мають підтримувати багатомовні переклади."
-
-#: includes/class-wp-loc-admin-settings.php:146
-msgid "Translatable Taxonomies"
-msgstr "Таксономії, що підлягають перекладу"
-
-#: includes/class-wp-loc-admin-settings.php:161
-msgid "Select which taxonomies should support multilingual translations."
-msgstr "Виберіть, які таксономії повинні підтримувати багатомовні переклади."
-
-#: includes/class-wp-loc-admin-settings.php:165
-msgid "Frontend Language Switcher"
-msgstr "Перемикач мови на фронтенді"
-
-#: includes/class-wp-loc-admin-settings.php:173
-msgid "Show flags in the frontend language switcher"
-msgstr "Показувати прапорці в перемикачі мови інтерфейсу"
-
-#: includes/class-wp-loc-admin-settings.php:175
+#: includes/class-wp-loc-admin-languages.php:56
+#: includes/class-wp-loc-admin.php:125
 msgid ""
-"Controls whether flags are rendered by the frontend language switcher helper."
-msgstr ""
-"Визначає, чи відображаються прапорці у допоміжному модулі перемикання мови "
-"інтерфейсу."
+"Delete this language? Its language files will also be removed from WordPress."
+msgstr "Видалити цю мову? Її мовні файли також буде видалено з WordPress."
 
-#: includes/class-wp-loc-admin-languages.php:71
+#: includes/class-wp-loc-admin-languages.php:57
+msgid "Slug is required."
+msgstr "Слаг є обов’язковим."
+
+#: includes/class-wp-loc-admin-languages.php:58
+msgid "Each language slug must be unique."
+msgstr "Слаг кожної мови має бути унікальним."
+
+#: includes/class-wp-loc-admin-languages.php:59
+msgid "Display name is required."
+msgstr "Назва для відображення є обов’язковою."
+
+#: includes/class-wp-loc-admin-languages.php:60
+msgid "Each display name must be unique."
+msgstr "Назва для відображення кожної мови має бути унікальною."
+
+#: includes/class-wp-loc-admin-languages.php:76
 msgid ""
 "Manage site languages, URL slugs, display labels, and ordering for the "
 "multilingual interface."
@@ -163,7 +120,172 @@ msgstr ""
 "Керуйте мовами сайту, URL-слугами, назвами для відображення та порядком у "
 "багатомовному інтерфейсі."
 
-#: includes/class-wp-loc-admin-settings.php:115
+#: includes/class-wp-loc-admin-languages.php:79
+msgid "Languages saved."
+msgstr "Мови збережено."
+
+#: includes/class-wp-loc-admin-languages.php:83
+#, php-format
+msgid "Language \"%s\" deleted."
+msgstr "Мову \"%s\" видалено."
+
+#: includes/class-wp-loc-admin-languages.php:89
+msgid "Configured languages"
+msgstr "Налаштовані мови"
+
+#: includes/class-wp-loc-admin-languages.php:93
+msgid "Enabled languages"
+msgstr "Увімкнені мови"
+
+#: includes/class-wp-loc-admin-languages.php:97
+msgid "Default language"
+msgstr "Мова за замовчуванням"
+
+#: includes/class-wp-loc-admin-languages.php:110
+#: includes/class-wp-loc-admin-settings.php:463
+msgid "Save"
+msgstr "Зберегти"
+
+#: includes/class-wp-loc-admin-languages.php:131
+#, php-format
+msgid "Missing slug for locale %s"
+msgstr "Відсутній слаг для локалі %s"
+
+#: includes/class-wp-loc-admin-languages.php:134
+#, php-format
+msgid "Duplicate slug \"%s\" detected."
+msgstr "Виявлено дублікат слагу \"%s\"."
+
+#: includes/class-wp-loc-admin-languages.php:140
+#, php-format
+msgid "Missing display name for locale %s"
+msgstr "Відсутнє ім'я для локалі %s"
+
+#: includes/class-wp-loc-admin-languages.php:148
+#, php-format
+msgid "Duplicate display name \"%s\" detected."
+msgstr "Виявлено повторення імені для відображення «%s»."
+
+#: includes/class-wp-loc-admin-languages.php:295
+msgid "Enabled"
+msgstr "Увімкнено"
+
+#: includes/class-wp-loc-admin-languages.php:296
+msgid "Name"
+msgstr "Назва"
+
+#: includes/class-wp-loc-admin-languages.php:297
+msgid "Locale"
+msgstr "Локаль"
+
+#: includes/class-wp-loc-admin-languages.php:298
+msgid "Slug"
+msgstr "Слаг"
+
+#: includes/class-wp-loc-admin-languages.php:299
+msgid "Display Name"
+msgstr "Відображення"
+
+#: includes/class-wp-loc-admin-languages.php:300
+msgid "Flag"
+msgstr "Прапор"
+
+#: includes/class-wp-loc-admin-languages.php:301
+msgid "Action"
+msgstr "Дія"
+
+#: includes/class-wp-loc-admin-languages.php:362
+msgid "Default"
+msgstr "За замовчуванням"
+
+#: includes/class-wp-loc-admin-languages.php:398
+msgid "Delete"
+msgstr "Видалити"
+
+#: includes/class-wp-loc-admin-settings.php:33
+#: includes/class-wp-loc-admin-settings.php:34
+#: includes/class-wp-loc-admin-settings.php:289 wp-loc.php:38
+msgid "Settings"
+msgstr "Налаштування"
+
+#: includes/class-wp-loc-admin-settings.php:60
+msgid "Content Translation"
+msgstr "Переклад контенту"
+
+#: includes/class-wp-loc-admin-settings.php:61
+msgid "Frontend Language Switcher"
+msgstr "Перемикач мови на фронтенді"
+
+#: includes/class-wp-loc-admin-settings.php:62
+#: includes/class-wp-loc-menu-sync.php:250
+msgid "AI"
+msgstr "ШІ"
+
+#: includes/class-wp-loc-admin-settings.php:168
+msgid "GPT-4o mini"
+msgstr "GPT-4o mini"
+
+#: includes/class-wp-loc-admin-settings.php:169
+msgid "GPT-4o"
+msgstr "GPT-4o"
+
+#: includes/class-wp-loc-admin-settings.php:170
+msgid "GPT-5.4 Nano, fastest and cheapest"
+msgstr "GPT-5.4 Nano, найшвидша й найдешевша"
+
+#: includes/class-wp-loc-admin-settings.php:171
+msgid "GPT-5.4 Mini, balanced default"
+msgstr "GPT-5.4 Mini, збалансована типова"
+
+#: includes/class-wp-loc-admin-settings.php:172
+msgid "GPT-5.4, highest quality"
+msgstr "GPT-5.4, найвища якість"
+
+#: includes/class-wp-loc-admin-settings.php:178
+msgid "Claude Haiku 4.5, fastest and cheapest"
+msgstr "Claude Haiku 4.5, найшвидша й найдешевша"
+
+#: includes/class-wp-loc-admin-settings.php:179
+msgid "Claude Sonnet 4.5, balanced"
+msgstr "Claude Sonnet 4.5, збалансована"
+
+#: includes/class-wp-loc-admin-settings.php:180
+msgid "Claude Sonnet 4.6, stronger quality"
+msgstr "Claude Sonnet 4.6, вища якість"
+
+#: includes/class-wp-loc-admin-settings.php:181
+msgid "Claude Opus 4.6, highest quality"
+msgstr "Claude Opus 4.6, найвища якість"
+
+#: includes/class-wp-loc-admin-settings.php:187
+msgid "Gemini 2.5 Flash-Lite, fastest and cheapest"
+msgstr "Gemini 2.5 Flash-Lite, найшвидша й найдешевша"
+
+#: includes/class-wp-loc-admin-settings.php:188
+msgid "Gemini 2.5 Flash, balanced default"
+msgstr "Gemini 2.5 Flash, збалансована типова"
+
+#: includes/class-wp-loc-admin-settings.php:189
+msgid "Gemini 3 Flash Preview, stronger frontier option"
+msgstr "Gemini 3 Flash Preview, сильніший frontier-варіант"
+
+#: includes/class-wp-loc-admin-settings.php:190
+msgid "Gemini 2.5 Pro, highest quality"
+msgstr "Gemini 2.5 Pro, найвища якість"
+
+#: includes/class-wp-loc-admin-settings.php:279
+msgid "OpenAI"
+msgstr "OpenAI"
+
+#: includes/class-wp-loc-admin-settings.php:280
+msgid "Claude"
+msgstr "Claude"
+
+#: includes/class-wp-loc-admin-settings.php:281
+msgid "Gemini"
+msgstr "Gemini"
+
+#: includes/class-wp-loc-admin-settings.php:290
 msgid ""
 "Configure which content types participate in multilingual behavior and how "
 "the frontend language switcher is displayed."
@@ -171,216 +293,199 @@ msgstr ""
 "Налаштуйте, які типи контенту беруть участь у багатомовній логіці та як "
 "відображається перемикач мов на фронтенді."
 
-#: includes/class-wp-loc-admin-settings.php:127
-msgid "Content Translation"
-msgstr "Переклад контенту"
+#: includes/class-wp-loc-admin-settings.php:295
+msgid "Settings saved."
+msgstr "Налаштування збережено."
 
-#: includes/class-wp-loc-admin-settings.php:174
-msgid "Flags"
-msgstr "Прапорці"
+#: includes/class-wp-loc-admin-settings.php:307
+msgid "Translatable Post Types"
+msgstr "Типи записів для перекладу"
 
-#: includes/class-wp-loc-admin-settings.php:151
-msgid "OpenAI"
-msgstr "OpenAI"
+#: includes/class-wp-loc-admin-settings.php:322
+msgid "Select which post types should support multilingual translations."
+msgstr "Оберіть які типи записів мають підтримувати багатомовні переклади."
 
-#: includes/class-wp-loc-admin-settings.php:152
-msgid "Claude"
-msgstr "Claude"
+#: includes/class-wp-loc-admin-settings.php:326
+msgid "Translatable Taxonomies"
+msgstr "Таксономії, що підлягають перекладу"
 
-#: includes/class-wp-loc-admin-settings.php:153
-msgid "Gemini"
-msgstr "Gemini"
+#: includes/class-wp-loc-admin-settings.php:341
+msgid "Select which taxonomies should support multilingual translations."
+msgstr "Виберіть, які таксономії повинні підтримувати багатомовні переклади."
 
-#: includes/class-wp-loc-admin-settings.php:237
-#: includes/class-wp-loc-menu-sync.php:227
-msgid "AI"
-msgstr "ШІ"
-
-#: includes/class-wp-loc-admin-settings.php:240
-msgid "Translation Engine"
-msgstr "Рушій перекладу"
-
-#: includes/class-wp-loc-admin-settings.php:249
-msgid "Select which AI engine should be used for automatic translation."
-msgstr "Оберіть, який ШІ-рушій слід використовувати для автоматичного перекладу."
-
-#: includes/class-wp-loc-admin-settings.php:253
-msgid "OpenAI API Key"
-msgstr "OpenAI API Key"
-
-#: includes/class-wp-loc-admin-settings.php:259
-msgid "Claude API Key"
-msgstr "Claude API Key"
-
-#: includes/class-wp-loc-admin-settings.php:265
-msgid "Gemini API Key"
-msgstr "Gemini API Key"
-
-#: includes/class-wp-loc-admin-settings.php:269
+#: includes/class-wp-loc-admin-settings.php:345
 msgid "Menu Sync"
 msgstr "Синхронізація меню"
 
-#: includes/class-wp-loc-admin-settings.php:276
+#: includes/class-wp-loc-admin-settings.php:354
 msgid "Try to translate custom nav menu links with AI during menu sync"
-msgstr "Намагатися перекладати довільні посилання в меню за допомогою ШІ під час синхронізації меню"
+msgstr ""
+"Намагатися перекладати довільні посилання в меню за допомогою ШІ під час "
+"синхронізації меню"
 
-#: includes/class-wp-loc-admin-settings.php:278
-msgid "When enabled, WP Menus Sync will try to translate custom link titles and related text fields with the selected AI engine."
-msgstr "Якщо ввімкнено, Синхронізація меню WP намагатиметься перекладати назви довільних посилань і пов’язані текстові поля за допомогою вибраного ШІ-рушія."
+#: includes/class-wp-loc-admin-settings.php:357
+msgid ""
+"When enabled, WP Menus Sync will try to translate custom link titles and "
+"related text fields with the selected AI engine."
+msgstr ""
+"Якщо ввімкнено, Синхронізація меню WP намагатиметься перекладати назви "
+"довільних посилань і пов’язані текстові поля за допомогою вибраного ШІ-рушія."
 
-#: includes/class-wp-loc-menu-sync.php:19 includes/class-wp-loc-menu-sync.php:20
-#: includes/class-wp-loc-menu-sync.php:362
-msgid "Tools"
-msgstr "Інструменти"
+#: includes/class-wp-loc-admin-settings.php:366
+msgid "Flags"
+msgstr "Прапорці"
 
-#: includes/class-wp-loc-menu-sync.php:364
-msgid "Utilities for maintaining multilingual data and synchronizing translated content."
-msgstr "Інструменти для підтримки багатомовних даних і синхронізації перекладеного контенту."
+#: includes/class-wp-loc-admin-settings.php:375
+msgid "Show flags in the frontend language switcher"
+msgstr "Показувати прапорці в перемикачі мови інтерфейсу"
 
-#: includes/class-wp-loc-menu-sync.php:48
-msgid "AI Translation"
-msgstr "ШІ переклад"
+#: includes/class-wp-loc-admin-settings.php:378
+msgid ""
+"Controls whether flags are rendered by the frontend language switcher helper."
+msgstr ""
+"Визначає, чи відображаються прапорці у допоміжному модулі перемикання мови "
+"інтерфейсу."
 
-#: includes/class-wp-loc-menus.php:586
-msgid "Translate custom links with AI (%d)"
-msgstr "Перекласти довільні посилання за допомогою ШІ (%d)"
+#: includes/class-wp-loc-admin-settings.php:387
+msgid "Translation Engine"
+msgstr "Рушій перекладу"
 
-#: includes/class-wp-loc-menu-sync.php:95 assets/js/admin.js:588
-msgid "Enter text to translate first."
-msgstr "Спочатку введіть текст для перекладу."
+#: includes/class-wp-loc-admin-settings.php:396
+msgid "Select which AI engine should be used for automatic translation."
+msgstr ""
+"Оберіть, який ШІ-рушій слід використовувати для автоматичного перекладу."
 
-#: includes/class-wp-loc-menu-sync.php:99 assets/js/admin.js:589
-msgid "Select a target language."
-msgstr "Оберіть цільову мову."
+#: includes/class-wp-loc-admin-settings.php:400
+msgid "OpenAI API Key"
+msgstr "OpenAI API Key"
 
-#: includes/class-wp-loc-menu-sync.php:105 assets/js/admin.js:585
-msgid "Translation failed."
-msgstr "Переклад не вдався."
+#: includes/class-wp-loc-admin-settings.php:404
+#: includes/class-wp-loc-admin-settings.php:424
+#: includes/class-wp-loc-admin-settings.php:444
+#: includes/class-wp-loc-admin.php:117
+msgid "Test"
+msgstr "Тест"
 
-#: includes/class-wp-loc-menu-sync.php:110 assets/js/admin.js:587
-msgid "Translation inserted into the editor."
-msgstr "Переклад вставлено в редактор."
+#: includes/class-wp-loc-admin-settings.php:408
+#: includes/class-wp-loc-admin-settings.php:428
+#: includes/class-wp-loc-admin-settings.php:448
+msgid "Model"
+msgstr "Модель"
 
-#: includes/class-wp-loc-menu-sync.php:298 includes/class-wp-loc-menu-sync.php:312
-msgid "Translate"
-msgstr "Перекласти"
+#: includes/class-wp-loc-admin-settings.php:420
+msgid "Claude API Key"
+msgstr "Claude API Key"
 
-#: includes/class-wp-loc-menu-sync.php:303
-msgid "Translate to"
-msgstr "Перекласти на"
+#: includes/class-wp-loc-admin-settings.php:440
+msgid "Gemini API Key"
+msgstr "Gemini API Key"
 
-#: includes/class-wp-loc-menu-sync.php:305
-msgid "Select language"
-msgstr "Оберіть мову"
+#: includes/class-wp-loc-admin-settings.php:473
+#: includes/class-wp-loc-admin.php:710
+msgid "You do not have permission to do that."
+msgstr "У вас немає дозволу на цю дію."
 
-#: includes/class-wp-loc-menu-sync.php:313
-msgid "Cancel"
-msgstr "Скасувати"
+#: includes/class-wp-loc-admin-settings.php:481
+msgid "Unknown AI provider."
+msgstr "Невідомий AI-провайдер."
 
-#: includes/class-wp-loc-menu-sync.php:461
-msgid "Paste or write formatted content in the editor, then translate it into the selected language and insert the translated version back into the editor."
-msgstr "Вставте або напишіть форматований контент у редакторі, потім перекладіть його на вибрану мову й вставте переклад назад у редактор."
-
-#: includes/class-wp-loc-ai.php:73
-msgid "OpenAI is not configured."
-msgstr "OpenAI не налаштовано."
-
-#: includes/class-wp-loc-ai.php:113
-msgid "OpenAI returned an empty response."
-msgstr "OpenAI повернув порожню відповідь."
-
-#: includes/class-wp-loc-ai.php:121
-msgid "Claude is not configured."
-msgstr "Claude не налаштовано."
-
-#: includes/class-wp-loc-ai.php:165
-msgid "Claude returned an empty response."
-msgstr "Claude повернув порожню відповідь."
-
-#: includes/class-wp-loc-ai.php:173
-msgid "Gemini is not configured."
-msgstr "Gemini не налаштовано."
-
-#: includes/class-wp-loc-ai.php:215
-msgid "Gemini returned an empty response."
-msgstr "Gemini повернув порожню відповідь."
-
-#: includes/class-wp-loc-admin-languages.php:76
-msgid "Configured languages"
-msgstr "Налаштовані мови"
-
-#: includes/class-wp-loc-admin-languages.php:80 includes/class-wp-loc-admin-languages.php:252
-msgid "Enabled languages"
-msgstr "Увімкнені мови"
-
-#: includes/class-wp-loc-admin-languages.php:84
-msgid "Default language"
-msgstr "Мова за замовчуванням"
-
-#: includes/class-wp-loc-admin-languages.php:345
-msgid "Default"
-msgstr "За замовчуванням"
-
-#: includes/class-wp-loc-admin.php:100 includes/class-wp-loc-admin-languages.php:53
-msgid "Delete this language? Its language files will also be removed from WordPress."
-msgstr "Видалити цю мову? Її мовні файли також буде видалено з WordPress."
-
-#: includes/class-wp-loc-admin-languages.php:54
-msgid "Slug is required."
-msgstr "Слаг є обов’язковим."
-
-#: includes/class-wp-loc-admin-languages.php:55
-msgid "Each language slug must be unique."
-msgstr "Слаг кожної мови має бути унікальним."
-
-#: includes/class-wp-loc-admin-languages.php:56
-msgid "Display name is required."
-msgstr "Назва для відображення є обов’язковою."
-
-#: includes/class-wp-loc-admin-languages.php:57
-msgid "Each display name must be unique."
-msgstr "Назва для відображення кожної мови має бути унікальною."
-
-#: includes/class-wp-loc-admin.php:62
+#: includes/class-wp-loc-admin.php:76
 msgid "Auto-resolved from default language translation"
 msgstr "Автоматично визначено з перекладу мови за замовчуванням"
 
-#: includes/class-wp-loc-admin.php:97
+#: includes/class-wp-loc-admin.php:112
 msgid "Request failed."
 msgstr "Запит не вдався."
 
-#: includes/class-wp-loc-admin.php:98
+#: includes/class-wp-loc-admin.php:113
 msgid "Translating..."
 msgstr "Перекладаємо..."
 
-#: includes/class-wp-loc-admin.php:99
+#: includes/class-wp-loc-admin.php:114
 msgid "Preview refreshed."
 msgstr "Попередній перегляд оновлено."
 
-#: includes/class-wp-loc-admin.php:100
+#: includes/class-wp-loc-admin.php:115
 msgid "Menu sync complete."
 msgstr "Синхронізація меню завершена."
 
-#: includes/class-wp-loc-admin.php:346 includes/class-wp-loc-admin.php:759
+#: includes/class-wp-loc-admin.php:116
+msgid "Testing..."
+msgstr "Перевіряємо..."
+
+#: includes/class-wp-loc-admin.php:118 includes/class-wp-loc-ai.php:13
+msgid "API key is empty."
+msgstr "API-ключ порожній."
+
+#: includes/class-wp-loc-admin.php:119 includes/class-wp-loc-admin.php:156
+#: includes/class-wp-loc-admin.php:216
+msgid "Translate title"
+msgstr "Перекласти заголовок"
+
+#: includes/class-wp-loc-admin.php:120 includes/class-wp-loc-admin.php:217
+msgid "Choose target language"
+msgstr "Оберіть цільову мову"
+
+#: includes/class-wp-loc-admin.php:121 includes/class-wp-loc-admin.php:720
+msgid "There is no title to translate."
+msgstr "Немає заголовка для перекладу."
+
+#: includes/class-wp-loc-admin.php:122
+msgid "There are no available translation targets for this post."
+msgstr "Для цього запису немає доступних цілей перекладу."
+
+#: includes/class-wp-loc-admin.php:123 includes/class-wp-loc-admin.php:785
+msgid "Title translated successfully."
+msgstr "Заголовок успішно перекладено."
+
+#: includes/class-wp-loc-admin.php:124 includes/class-wp-loc-admin.php:215
+msgid "Close"
+msgstr "Закрити"
+
+#: includes/class-wp-loc-admin.php:467 includes/class-wp-loc-admin.php:975
 #: includes/class-wp-loc-terms.php:1141 includes/class-wp-loc-terms.php:1201
 msgid "Translations"
 msgstr "Переклади"
 
-#: includes/class-wp-loc-admin.php:361
+#: includes/class-wp-loc-admin.php:482
 msgid "Save the post first to manage translations."
 msgstr "Спочатку збережіть запис, щоб керувати перекладами."
 
-#: includes/class-wp-loc-admin.php:376 includes/class-wp-loc-admin.php:397
+#: includes/class-wp-loc-admin.php:497 includes/class-wp-loc-admin.php:518
 msgid "Create translations"
 msgstr "Створити переклади"
 
-#: includes/class-wp-loc-admin.php:421 includes/class-wp-loc-admin.php:787
+#: includes/class-wp-loc-admin.php:542 includes/class-wp-loc-admin.php:1003
 #: includes/class-wp-loc-terms.php:1179 includes/class-wp-loc-terms.php:1238
 msgid "Edit translation"
 msgstr "Редагувати переклад"
 
-#: includes/class-wp-loc-admin.php:594 includes/class-wp-loc-admin.php:606
-#: includes/class-wp-loc-admin.php:628
+#: includes/class-wp-loc-admin.php:706
+msgid "Missing required parameters."
+msgstr "Відсутні обов'язкові параметри."
+
+#: includes/class-wp-loc-admin.php:715
+msgid "Post not found."
+msgstr "Запис не знайдено."
+
+#: includes/class-wp-loc-admin.php:728
+msgid "Source post language was not found."
+msgstr "Не вдалося визначити мову вихідного запису."
+
+#: includes/class-wp-loc-admin.php:736 includes/class-wp-loc-admin.php:745
+msgid "Translation post was not found for the selected language."
+msgstr "Не знайдено перекладений запис для вибраної мови."
+
+#: includes/class-wp-loc-admin.php:740
+msgid "You do not have permission to edit the translation post."
+msgstr "У вас немає дозволу редагувати перекладений запис."
+
+#: includes/class-wp-loc-admin.php:752
+msgid "Title translation failed."
+msgstr "Не вдалося перекласти заголовок."
+
+#: includes/class-wp-loc-admin.php:810 includes/class-wp-loc-admin.php:822
+#: includes/class-wp-loc-admin.php:844
 msgid ""
 "Creating new content is only available in the primary language of the site. "
 "Switch to the default language first."
@@ -388,17 +493,54 @@ msgstr ""
 "Створення нового контенту доступне лише в основній мові сайту. Спочатку "
 "перемкніться на мову за замовчуванням."
 
-#: includes/class-wp-loc-admin.php:595 includes/class-wp-loc-admin.php:607
-#: includes/class-wp-loc-admin.php:629
+#: includes/class-wp-loc-admin.php:811 includes/class-wp-loc-admin.php:823
+#: includes/class-wp-loc-admin.php:845
 msgid "Action not allowed"
 msgstr "Дія не дозволена"
 
-#: includes/class-wp-loc-menu-sync.php:18
-#: includes/class-wp-loc-menu-sync.php:19
-msgid "Menus Sync"
-msgstr "Синхронізація меню"
+#: includes/class-wp-loc-ai.php:30
+msgid "Connection successful."
+msgstr "З'єднання успішне."
 
-#: includes/class-wp-loc-menu-sync.php:42
+#: includes/class-wp-loc-ai.php:168
+msgid "OpenAI is not configured."
+msgstr "OpenAI не налаштовано."
+
+#: includes/class-wp-loc-ai.php:214
+msgid "OpenAI returned an empty response."
+msgstr "OpenAI повернув порожню відповідь."
+
+#: includes/class-wp-loc-ai.php:222
+msgid "Claude is not configured."
+msgstr "Claude не налаштовано."
+
+#: includes/class-wp-loc-ai.php:266
+msgid "Claude returned an empty response."
+msgstr "Claude повернув порожню відповідь."
+
+#: includes/class-wp-loc-ai.php:274
+msgid "Gemini is not configured."
+msgstr "Gemini не налаштовано."
+
+#: includes/class-wp-loc-ai.php:316
+msgid "Gemini returned an empty response."
+msgstr "Gemini повернув порожню відповідь."
+
+#: includes/class-wp-loc-menu-sync.php:21
+#: includes/class-wp-loc-menu-sync.php:22
+#: includes/class-wp-loc-menu-sync.php:433
+msgid "Tools"
+msgstr "Інструменти"
+
+#: includes/class-wp-loc-menu-sync.php:47
+msgid "WP Menus Sync"
+msgstr "Синхронізація меню WP"
+
+#: includes/class-wp-loc-menu-sync.php:48
+msgid "AI Translation"
+msgstr "ШІ переклад"
+
+#: includes/class-wp-loc-menu-sync.php:77
 #, php-format
 msgid ""
 "Menu sync complete. Synced %1$d targets, created %2$d menus, created %3$d "
@@ -408,96 +550,128 @@ msgstr ""
 "меню, створено %3$d елементів, пропущено %4$d неперекладених пов’язаних "
 "елементів."
 
-#: includes/class-wp-loc-menu-sync.php:56
+#: includes/class-wp-loc-menu-sync.php:95
+msgid "Enter text to translate first."
+msgstr "Спочатку введіть текст для перекладу."
+
+#: includes/class-wp-loc-menu-sync.php:99
+msgid "Select a target language."
+msgstr "Оберіть цільову мову."
+
+#: includes/class-wp-loc-menu-sync.php:105
+msgid "Translation failed."
+msgstr "Переклад не вдався."
+
+#: includes/class-wp-loc-menu-sync.php:110
+msgid "Translation inserted into the editor."
+msgstr "Переклад вставлено в редактор."
+
+#: includes/class-wp-loc-menu-sync.php:118
 msgid "You are not allowed to do this."
 msgstr "Це робити заборонено."
 
-#: includes/class-wp-loc-menu-sync.php:137
+#: includes/class-wp-loc-menu-sync.php:199
 msgid "Missing translation"
 msgstr "Відсутній переклад"
 
-#: includes/class-wp-loc-menu-sync.php:143
+#: includes/class-wp-loc-menu-sync.php:205
 msgid "Needs review"
 msgstr "Потрібно переглянути"
 
-#: includes/class-wp-loc-menu-sync.php:148
+#: includes/class-wp-loc-menu-sync.php:210
 msgid "Needs sync"
 msgstr "Потрібна синхронізація"
 
-#: includes/class-wp-loc-menu-sync.php:151
+#: includes/class-wp-loc-menu-sync.php:213
 msgid "Up to date"
 msgstr "Актуально"
 
-#: includes/class-wp-loc-menu-sync.php:185
+#: includes/class-wp-loc-menu-sync.php:248
 msgid "Translation"
 msgstr "Переклад"
 
-#: includes/class-wp-loc-menu-sync.php:186
+#: includes/class-wp-loc-menu-sync.php:249
 msgid "Option"
 msgstr "Опція"
 
-#: includes/class-wp-loc-menu-sync.php:187
+#: includes/class-wp-loc-menu-sync.php:251
 msgid "Warning"
 msgstr "Увага"
 
-#: includes/class-wp-loc-menu-sync.php:188
+#: includes/class-wp-loc-menu-sync.php:252
 msgid "Structure"
 msgstr "Структура"
 
-#: includes/class-wp-loc-menu-sync.php:203
-msgid "Default menus"
-msgstr "Меню за замовчуванням"
-
-#: includes/class-wp-loc-menu-sync.php:207
-msgid "Targets needing sync"
-msgstr "Об'єкти, що потребують синхронізації"
-
-#: includes/class-wp-loc-menu-sync.php:211
-msgid "Warnings"
-msgstr "Попередження"
-
-#: includes/class-wp-loc-menu-sync.php:218
+#: includes/class-wp-loc-menu-sync.php:262
 msgid "Apply changes"
 msgstr "Застосувати зміни"
 
-#: includes/class-wp-loc-menu-sync.php:221
+#: includes/class-wp-loc-menu-sync.php:265
 msgid "Refresh"
 msgstr "Оновити"
 
-#: includes/class-wp-loc-menu-sync.php:225
+#: includes/class-wp-loc-menu-sync.php:269
 msgid "Select all"
 msgstr "Вибрати все"
 
-#: includes/class-wp-loc-menu-sync.php:226
+#: includes/class-wp-loc-menu-sync.php:270
 msgid "Deselect all"
 msgstr "Зняти виділення з усіх"
 
-#: includes/class-wp-loc-menu-sync.php:245
+#: includes/class-wp-loc-menu-sync.php:300
+msgid "Translate to"
+msgstr "Перекласти на"
+
+#: includes/class-wp-loc-menu-sync.php:302
+msgid "Select language"
+msgstr "Оберіть мову"
+
+#: includes/class-wp-loc-menu-sync.php:307
+msgid "Translate"
+msgstr "Перекласти"
+
+#: includes/class-wp-loc-menu-sync.php:328
+msgid "Default menus"
+msgstr "Меню за замовчуванням"
+
+#: includes/class-wp-loc-menu-sync.php:332
+msgid "Targets needing sync"
+msgstr "Об'єкти, що потребують синхронізації"
+
+#: includes/class-wp-loc-menu-sync.php:336
+msgid "Warnings"
+msgstr "Попередження"
+
+#: includes/class-wp-loc-menu-sync.php:355
 msgid "No menus found."
 msgstr "Меню не знайдено."
 
-#: includes/class-wp-loc-menu-sync.php:262
+#: includes/class-wp-loc-menu-sync.php:372
 #, php-format
 msgid "%s menu"
 msgstr "%s меню"
 
-#: includes/class-wp-loc-menu-sync.php:272
+#: includes/class-wp-loc-menu-sync.php:382
 msgid "Apply"
 msgstr "Застосувати"
 
-#: includes/class-wp-loc-menu-sync.php:278
+#: includes/class-wp-loc-menu-sync.php:388
 msgid "Nothing to sync for this language."
 msgstr "Для цієї мови немає даних для синхронізації."
 
-#: includes/class-wp-loc-menu-sync.php:289
+#: includes/class-wp-loc-menu-sync.php:399
 msgid "Details"
 msgstr "Деталі"
 
-#: includes/class-wp-loc-menu-sync.php:320
-msgid "WP Menus Sync"
-msgstr "Синхронізація меню WP"
+#: includes/class-wp-loc-menu-sync.php:435
+msgid ""
+"Utilities for maintaining multilingual data and synchronizing translated "
+"content."
+msgstr ""
+"Інструменти для підтримки багатомовних даних і синхронізації перекладеного "
+"контенту."
 
-#: includes/class-wp-loc-menu-sync.php:325
+#: includes/class-wp-loc-menu-sync.php:444
 #, php-format
 msgid ""
 "Menu synchronization will sync the menu structure from the default language "
@@ -506,42 +680,55 @@ msgstr ""
 "Синхронізація меню перенесе структуру меню з мови за замовчуванням %s на "
 "додаткові мови."
 
-#: includes/class-wp-loc-menus.php:533
+#: includes/class-wp-loc-menu-sync.php:453
+msgid ""
+"Paste or write formatted content in the editor, then translate it into the "
+"selected language and insert the translated version back into the editor."
+msgstr ""
+"Вставте або напишіть форматований контент у редакторі, потім перекладіть "
+"його на вибрану мову й вставте переклад назад у редактор."
+
+#: includes/class-wp-loc-menus.php:706
 #, php-format
 msgid "Add menu translation: %s"
 msgstr "Додати переклад меню: %s"
 
-#: includes/class-wp-loc-menus.php:541
+#: includes/class-wp-loc-menus.php:714
 #, php-format
 msgid "Sync menu structure and order (%d items)"
 msgstr "Синхронізувати структуру та порядок меню (%d елементів)"
 
-#: includes/class-wp-loc-menus.php:542
+#: includes/class-wp-loc-menus.php:715
 #, php-format
 msgid "Sync menu structure (%d items)"
 msgstr "Синхронізувати структуру меню (%d елементів)"
 
-#: includes/class-wp-loc-menus.php:549
+#: includes/class-wp-loc-menus.php:722
 #, php-format
 msgid "Remove outdated items (%d)"
 msgstr "Видалити застарілі елементи (%d)"
 
-#: includes/class-wp-loc-menus.php:556
+#: includes/class-wp-loc-menus.php:729
 #, php-format
 msgid "Update menu option auto_add to %s"
 msgstr "Змінити значення параметра меню auto_add на %s"
 
-#: includes/class-wp-loc-menus.php:563
+#: includes/class-wp-loc-menus.php:736
+#, php-format
+msgid "Translate custom links with AI (%d)"
+msgstr "Перекласти довільні посилання за допомогою ШІ (%d)"
+
+#: includes/class-wp-loc-menus.php:743
 #, php-format
 msgid "Skip untranslated linked items (%d)"
 msgstr "Пропустити неперекладені елементи з посиланнями (%d)"
 
-#: includes/class-wp-loc-menus.php:1198
+#: includes/class-wp-loc-menus.php:1385
 #, php-format
 msgid "Creating %1$s translation of \"%2$s\"."
 msgstr "Створення %1$s перекладу \"%2$s\"."
 
-#: includes/class-wp-loc-menus.php:1217
+#: includes/class-wp-loc-menus.php:1404
 msgid "Translations:"
 msgstr "Переклади:"
 
@@ -558,45 +745,37 @@ msgstr ""
 msgid "Creating a translation in %s."
 msgstr "Створення перекладу в %s."
 
-#: includes/class-wp-loc-acf.php:360
-msgid "Multilingual Setup"
-msgstr "Багатомовне налаштування"
+#~ msgctxt "ACF field translation preference"
+#~ msgid "Don't translate"
+#~ msgstr "Не перекладати"
 
-#: includes/class-wp-loc-acf.php:387
-msgid "Managed by the field group multilingual setup. Switch the group to Expert to change this field manually."
-msgstr "Це налаштування керується багатомовним режимом групи полів. Перемкніть групу в режим Expert, щоб змінювати це поле вручну."
+#~ msgctxt "ACF field translation preference"
+#~ msgid "Copy"
+#~ msgstr "Копіювати"
 
-#: includes/class-wp-loc-acf.php:437
-msgid "Translation Option"
-msgstr "Параметр перекладу"
+#~ msgctxt "ACF field translation preference"
+#~ msgid "Copy once"
+#~ msgstr "Копіювати один раз"
 
-#: includes/class-wp-loc-acf.php:369
-msgid "Select a translation option for this field group."
-msgstr "Виберіть варіант перекладу для цієї групи полів."
+#~ msgctxt "ACF field translation preference"
+#~ msgid "Translate"
+#~ msgstr "Перекладати"
 
-#: includes/class-wp-loc-acf.php:374
-msgid "Same fields across languages"
-msgstr "Однакові поля для всіх мов"
+#~ msgid "Cancel"
+#~ msgstr "Скасувати"
 
-#: includes/class-wp-loc-acf.php:375
-msgid "Translate content while keeping the same field structure across all languages. Field order, layouts, and field types stay aligned."
-msgstr "Перекладайте контент, зберігаючи однакову структуру полів для всіх мов. Порядок полів, макети та типи полів залишаються узгодженими."
+#~ msgid "Menus Sync"
+#~ msgstr "Синхронізація меню"
 
-#: includes/class-wp-loc-acf.php:378
-msgid "Different fields across languages"
-msgstr "Різні поля для різних мов"
+#~ msgid ""
+#~ "Managed by the field group multilingual setup. Switch the group to Expert "
+#~ "to change this field manually."
+#~ msgstr ""
+#~ "Це налаштування керується багатомовним режимом групи полів. Перемкніть "
+#~ "групу в режим Expert, щоб змінювати це поле вручну."
 
-#: includes/class-wp-loc-acf.php:379
-msgid "Allow a different field structure per language. Field order, layouts, and even field availability can vary between translations."
-msgstr "Дозвольте різну структуру полів для кожної мови. Порядок полів, макети і навіть набір полів можуть відрізнятися між перекладами."
-
-#: includes/class-wp-loc-acf.php:382
-msgid "Expert"
-msgstr "Expert"
-
-#: includes/class-wp-loc-acf.php:383
-msgid "Manually control translation preferences for each field in the group. Best for migrated field groups or advanced setups."
-msgstr "Керуйте параметрами перекладу вручну для кожного поля в групі. Найкраще підходить для мігрованих груп полів або складніших сценаріїв."
+#~ msgid "Choose a different target language."
+#~ msgstr "Оберіть іншу цільову мову."
 
 #~ msgid ""
 #~ "Display locations are mapped from the default-language menu automatically."

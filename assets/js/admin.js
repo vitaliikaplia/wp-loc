@@ -749,4 +749,311 @@
         }
     })();
 
+    (function initAiKeyTests() {
+        const page = document.querySelector('.wp-loc-settings-page');
+        if (!page || !window.wpLocAdmin) {
+            return;
+        }
+
+        const i18n = Object.assign({
+            testing: 'Testing...',
+            test: 'Test',
+            apiKeyEmpty: 'API key is empty.',
+            requestFailed: 'Request failed.'
+        }, wpLocAdmin.i18n || {});
+
+        const setStatus = function(container, message, type) {
+            if (!container) {
+                return;
+            }
+
+            container.className = 'wp-loc-ai-key-status';
+
+            if (type) {
+                container.classList.add('is-' + type);
+            }
+
+            container.textContent = message || '';
+        };
+
+        $(document).on('click', '.wp-loc-ai-key-test', function() {
+            const button = this;
+            const provider = button.getAttribute('data-provider') || '';
+            const row = button.closest('.wp-loc-ai-key-row');
+            const cell = row ? row.parentElement : null;
+            const input = row ? row.querySelector('input[type="password"], input[type="text"]') : null;
+            const modelSelect = cell ? cell.querySelector('.wp-loc-ai-model-select') : null;
+            const status = row ? row.querySelector('.wp-loc-ai-key-status') : null;
+            const apiKey = input ? String(input.value || '').trim() : '';
+            const model = modelSelect ? String(modelSelect.value || '').trim() : '';
+
+            if (!apiKey) {
+                setStatus(status, i18n.apiKeyEmpty, 'error');
+                return;
+            }
+
+            button.disabled = true;
+            button.textContent = i18n.testing;
+            setStatus(status, '', '');
+
+            $.post(wpLocAdmin.ajaxUrl, {
+                action: 'wp_loc_test_ai_key',
+                nonce: wpLocAdmin.nonce,
+                provider: provider,
+                api_key: apiKey,
+                model: model
+            }).done(function(response) {
+                if (!response || !response.success) {
+                    const message = response && response.data && response.data.message ? response.data.message : i18n.requestFailed;
+                    setStatus(status, message, 'error');
+                    return;
+                }
+
+                setStatus(status, response.data.message || 'OK', 'success');
+            }).fail(function(xhr) {
+                const message = xhr && xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                    ? xhr.responseJSON.data.message
+                    : i18n.requestFailed;
+                setStatus(status, message, 'error');
+            }).always(function() {
+                button.disabled = false;
+                button.textContent = i18n.test;
+            });
+        });
+    })();
+
+    (function initTitleTranslateModal() {
+        if (!window.wpLocAdmin) {
+            return;
+        }
+
+        const ensureModal = function() {
+            let modal = document.querySelector('.wp-loc-title-translate-modal');
+            if (modal) {
+                return modal;
+            }
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'wp-loc-title-translate-modal';
+            wrapper.hidden = true;
+            wrapper.innerHTML =
+                '<div class="wp-loc-title-translate-modal__backdrop"></div>' +
+                '<div class="wp-loc-title-translate-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="wp-loc-title-translate-modal-title">' +
+                    '<button type="button" class="wp-loc-title-translate-modal__close" aria-label="' + (wpLocAdmin.i18n && wpLocAdmin.i18n.closeLabel ? wpLocAdmin.i18n.closeLabel : 'Close') + '">×</button>' +
+                    '<h2 id="wp-loc-title-translate-modal-title">' + (wpLocAdmin.i18n && wpLocAdmin.i18n.translateTitle ? wpLocAdmin.i18n.translateTitle : 'Translate title') + '</h2>' +
+                    '<p class="wp-loc-title-translate-modal__description">' + (wpLocAdmin.i18n && wpLocAdmin.i18n.chooseTargetLanguage ? wpLocAdmin.i18n.chooseTargetLanguage : 'Choose target language') + '</p>' +
+                    '<div class="wp-loc-title-translate-modal__targets"></div>' +
+                    '<div class="wp-loc-title-translate-modal__status" aria-live="polite"></div>' +
+                '</div>';
+
+            document.body.appendChild(wrapper);
+            return wrapper;
+        };
+
+        const modal = ensureModal();
+
+        const targetsWrap = modal.querySelector('.wp-loc-title-translate-modal__targets');
+        const statusWrap = modal.querySelector('.wp-loc-title-translate-modal__status');
+        const closeSelectors = '.wp-loc-title-translate-modal__close, .wp-loc-title-translate-modal__backdrop';
+        const i18n = Object.assign({
+            translating: 'Translating...',
+            translateTitle: 'Translate title',
+            chooseTargetLanguage: 'Choose target language',
+            noTitleToTranslate: 'There is no title to translate.',
+            noAvailableTranslationTargets: 'There are no available translation targets for this post.',
+            titleTranslateSuccess: 'Title translated successfully.',
+            requestFailed: 'Request failed.'
+        }, wpLocAdmin.i18n || {});
+
+        let currentPostId = 0;
+        let currentTitle = '';
+        let currentTargets = [];
+        let currentSource = 'list';
+
+        const setStatus = function(message, type) {
+            if (!statusWrap) {
+                return;
+            }
+
+            statusWrap.className = 'wp-loc-title-translate-modal__status';
+            if (type) {
+                statusWrap.classList.add('is-' + type);
+            }
+            statusWrap.textContent = message || '';
+        };
+
+        const closeModal = function() {
+            modal.hidden = true;
+            document.body.classList.remove('wp-loc-title-translate-open');
+            currentPostId = 0;
+            currentTitle = '';
+            currentTargets = [];
+            currentSource = 'list';
+            if (targetsWrap) {
+                targetsWrap.innerHTML = '';
+            }
+            setStatus('', '');
+        };
+
+        const openModal = function(postId, title, targets, source) {
+            currentPostId = postId;
+            currentTitle = title;
+            currentTargets = Array.isArray(targets) ? targets : [];
+            currentSource = source || 'list';
+            if (targetsWrap) {
+                targetsWrap.innerHTML = '';
+            }
+            setStatus('', '');
+
+            if (!currentTargets.length) {
+                setStatus(i18n.noAvailableTranslationTargets, 'error');
+            } else if (targetsWrap) {
+                currentTargets.forEach(function(target) {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'wp-loc-title-translate-target';
+                    button.setAttribute('data-lang', target.lang || '');
+                    button.innerHTML =
+                        '<img src="' + (target.flag || '') + '" alt="" />' +
+                        '<span>' + (target.name || target.lang || '') + '</span>';
+                    targetsWrap.appendChild(button);
+                });
+            }
+
+            modal.hidden = false;
+            document.body.classList.add('wp-loc-title-translate-open');
+        };
+
+        $(document).on('click', '.wp-loc-translate-post-title', function(event) {
+            event.preventDefault();
+
+            const postId = parseInt(this.getAttribute('data-post-id') || '0', 10);
+            const title = String(this.getAttribute('data-current-title') || '').trim();
+            const rawTargets = this.getAttribute('data-targets') || '[]';
+            let targets = [];
+
+            try {
+                targets = JSON.parse(rawTargets);
+            } catch (error) {
+                targets = [];
+            }
+
+            if (!title) {
+                window.alert(i18n.noTitleToTranslate);
+                return;
+            }
+
+            openModal(postId, title, targets, 'list');
+        });
+
+        const renderGutenbergButton = function() {
+            const config = wpLocAdmin.gutenbergTitleTranslate;
+            if (!config || !config.postId || !Array.isArray(config.targets) || !config.targets.length) {
+                return;
+            }
+
+            const titleWrapper = document.querySelector('.edit-post-visual-editor__post-title-wrapper, .editor-post-title');
+            if (!titleWrapper || titleWrapper.querySelector('.wp-loc-gutenberg-title-translate')) {
+                return;
+            }
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'wp-loc-gutenberg-title-translate';
+            button.setAttribute('aria-label', i18n.translateTitle);
+            button.setAttribute('title', i18n.translateTitle);
+            button.innerHTML = '<span class="dashicons dashicons-translation" aria-hidden="true"></span>';
+
+            titleWrapper.classList.add('wp-loc-has-gutenberg-title-translate');
+            titleWrapper.appendChild(button);
+        };
+
+        if (typeof wp !== 'undefined' && wp.data && wp.data.subscribe && wpLocAdmin.gutenbergTitleTranslate) {
+            renderGutenbergButton();
+            wp.data.subscribe(function() {
+                renderGutenbergButton();
+            });
+        }
+
+        $(document).on('click', '.wp-loc-gutenberg-title-translate', function(event) {
+            event.preventDefault();
+
+            const config = wpLocAdmin.gutenbergTitleTranslate || {};
+            const editor = typeof wp !== 'undefined' && wp.data ? wp.data.select('core/editor') : null;
+            const title = editor && typeof editor.getEditedPostAttribute === 'function'
+                ? String(editor.getEditedPostAttribute('title') || '').trim()
+                : '';
+
+            if (!title) {
+                window.alert(i18n.noTitleToTranslate);
+                return;
+            }
+
+            openModal(parseInt(config.postId || '0', 10), title, config.targets || [], 'gutenberg');
+        });
+
+        $(document).on('click', closeSelectors, function() {
+            closeModal();
+        });
+
+        $(document).on('keydown', function(event) {
+            if (event.key === 'Escape' && !modal.hidden) {
+                closeModal();
+            }
+        });
+
+        $(document).on('click', '.wp-loc-title-translate-target', function() {
+            const button = this;
+            const targetLang = button.getAttribute('data-lang') || '';
+
+            if (!currentPostId || !currentTitle.trim()) {
+                setStatus(i18n.noTitleToTranslate, 'error');
+                return;
+            }
+
+            modal.classList.add('is-loading');
+            setStatus(i18n.translating, '');
+
+            $.post(wpLocAdmin.ajaxUrl, {
+                action: 'wp_loc_translate_post_title',
+                nonce: wpLocAdmin.nonce,
+                post_id: currentPostId,
+                target_lang: targetLang
+            }).done(function(response) {
+                if (!response || !response.success) {
+                    const message = response && response.data && response.data.message ? response.data.message : i18n.requestFailed;
+                    setStatus(message, 'error');
+                    return;
+                }
+
+                setStatus(response.data.message || i18n.titleTranslateSuccess, 'success');
+                if (currentSource === 'gutenberg') {
+                    const config = wpLocAdmin.gutenbergTitleTranslate || {};
+                    const currentLang = String(config.currentLang || '');
+
+                    if (response.data && response.data.target_lang === currentLang && typeof wp !== 'undefined' && wp.data && wp.data.dispatch) {
+                        wp.data.dispatch('core/editor').editPost({
+                            title: response.data.new_title || currentTitle
+                        });
+                    }
+
+                    window.setTimeout(function() {
+                        closeModal();
+                    }, 1000);
+                } else {
+                    window.setTimeout(function() {
+                        window.location.reload();
+                    }, 2000);
+                }
+            }).fail(function(xhr) {
+                const message = xhr && xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                    ? xhr.responseJSON.data.message
+                    : i18n.requestFailed;
+                setStatus(message, 'error');
+            }).always(function() {
+                modal.classList.remove('is-loading');
+            });
+        });
+    })();
+
 })(jQuery);
