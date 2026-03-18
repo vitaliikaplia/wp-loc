@@ -1258,8 +1258,10 @@ class WP_LOC_Terms {
         <tr class="form-field">
             <th scope="row"><?php esc_html_e( 'Translations', 'wp-loc' ); ?></th>
             <td>
-                <div id="wp-loc-term-translations">
-                    <?php echo $this->get_term_translation_controls_html( $term, $taxonomy ); ?>
+                <div id="wp-loc-term-translations" class="postbox">
+                    <div class="inside">
+                        <?php echo $this->get_term_translation_controls_html( $term, $taxonomy ); ?>
+                    </div>
                 </div>
             </td>
         </tr>

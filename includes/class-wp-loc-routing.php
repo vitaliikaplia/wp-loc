@@ -14,10 +14,10 @@ class WP_LOC_Routing {
         add_filter( 'redirect_canonical', [ $this, 'prevent_lang_front_redirect' ], 10, 2 );
         add_filter( 'wp_unique_post_slug', [ $this, 'allow_duplicate_slugs' ], 99, 6 );
 
+        add_filter( 'home_url', [ $this, 'filter_home_url' ], 10, 4 );
         add_filter( 'page_link', [ $this, 'add_lang_prefix_to_link' ], 10, 2 );
         add_filter( 'post_link', [ $this, 'add_lang_prefix_to_link' ], 10, 2 );
         add_filter( 'post_type_link', [ $this, 'add_lang_prefix_to_link' ], 10, 2 );
-
         add_action( 'init', [ $this, 'maybe_flush_rewrite_rules' ] );
     }
 
@@ -280,7 +280,36 @@ class WP_LOC_Routing {
     }
 
     /**
-     * Add language prefix to post/page permalinks for non-default languages
+     * Add current language prefix to home_url() on frontend.
+     */
+    public function filter_home_url( $url, $path, $scheme, $blog_id ) {
+        if ( is_admin() ) {
+            return $url;
+        }
+
+        $current = self::get_current_lang();
+        $default = WP_LOC_Languages::get_default_language();
+
+        if ( $current === $default ) {
+            return $url;
+        }
+
+        $raw_home = set_url_scheme( get_option( 'home' ), $scheme );
+
+        // Avoid double-prefixing
+        $prefixed = rtrim( $raw_home, '/' ) . '/' . $current;
+        if ( str_starts_with( $url, $prefixed . '/' ) || $url === $prefixed ) {
+            return $url;
+        }
+
+        return str_replace( $raw_home, $prefixed, $url );
+    }
+
+    /**
+     * Add language prefix to post/page permalinks for non-default languages.
+     *
+     * Since home_url() already adds the current language prefix,
+     * we strip it first and then add the correct one for the post's language.
      */
     public function add_lang_prefix_to_link( $url, $post_id ) {
         if ( $post_id instanceof \WP_Post ) {
@@ -293,23 +322,31 @@ class WP_LOC_Routing {
         }
 
         $element_type = WP_LOC_DB::post_element_type( $post_type );
-        $lang = WP_LOC::instance()->db->get_element_language( (int) $post_id, $element_type );
+        $post_lang = WP_LOC::instance()->db->get_element_language( (int) $post_id, $element_type );
 
-        if ( ! $lang ) {
+        if ( ! $post_lang ) {
             return $url;
         }
 
-        $default = WP_LOC_Languages::get_default_language();
-        if ( $lang === $default ) {
+        $default  = WP_LOC_Languages::get_default_language();
+        $raw_home = set_url_scheme( get_option( 'home' ) );
+
+        // Strip any existing language prefix (injected by home_url filter)
+        foreach ( WP_LOC_Languages::get_additional_languages() as $lang_code ) {
+            $prefixed = rtrim( $raw_home, '/' ) . '/' . $lang_code;
+            if ( str_starts_with( $url, $prefixed . '/' ) || $url === $prefixed ) {
+                $url = str_replace( $prefixed, rtrim( $raw_home, '/' ), $url );
+                break;
+            }
+        }
+
+        // Default language posts get no prefix
+        if ( $post_lang === $default ) {
             return $url;
         }
 
-        $home = home_url();
-        if ( str_contains( $url, "{$home}/{$lang}/" ) ) {
-            return $url;
-        }
-
-        return str_replace( $home, "{$home}/{$lang}", $url );
+        // Add the correct prefix for the post's language
+        return str_replace( rtrim( $raw_home, '/' ), rtrim( $raw_home, '/' ) . '/' . $post_lang, $url );
     }
 
     /**

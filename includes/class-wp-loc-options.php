@@ -17,9 +17,6 @@ class WP_LOC_Options {
         add_action( 'wpml_multilingual_options', [ $this, 'register_option' ] );
         add_action( 'wp_loc_multilingual_options', [ $this, 'register_option' ] );
 
-        // Frontend: load localized option values
-        add_filter( 'pre_option', [ $this, 'filter_pre_option' ], 10, 3 );
-
         // Admin: save localized option values
         add_action( 'updated_option', [ $this, 'save_localized_option' ], 10, 3 );
 
@@ -36,15 +33,23 @@ class WP_LOC_Options {
         $defaults = apply_filters( 'wp_loc_default_multilingual_options', $defaults );
 
         foreach ( $defaults as $option ) {
-            self::$multilingual_options[ $option ] = true;
+            $this->register_option( $option );
         }
     }
 
     /**
-     * Register an option as multilingual
+     * Register an option as multilingual and hook its pre_option filter
      */
     public function register_option( string $option_name ): void {
+        if ( isset( self::$multilingual_options[ $option_name ] ) ) {
+            return;
+        }
+
         self::$multilingual_options[ $option_name ] = true;
+
+        add_filter( "pre_option_{$option_name}", function ( $pre_option, $option, $default ) {
+            return $this->filter_pre_option( $pre_option, $option, $default );
+        }, 10, 3 );
     }
 
     /**

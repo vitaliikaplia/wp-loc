@@ -139,7 +139,6 @@ $transition-speed: .15s;
   margin: 0;
   padding: 0;
   list-style: none;
-  max-width: 320px;
 
   li {
     margin: 0;
@@ -148,6 +147,10 @@ $transition-speed: .15s;
     display: flex;
     align-items: center;
     gap: 8px;
+
+    &:last-child {
+      border-bottom: none;
+    }
   }
 
   .wp-loc-flag-small {
@@ -198,7 +201,12 @@ $transition-speed: .15s;
 }
 
 #wp-loc-term-translations {
-  max-width: 320px;
+  max-width: 540px;
+
+  .inside {
+    padding: 6px 12px;
+    margin: 0;
+  }
 }
 
 // Status indicators in meta box

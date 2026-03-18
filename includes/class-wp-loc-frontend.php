@@ -118,6 +118,9 @@ function wp_loc_get_lang_switcher(): array {
     $default = WP_LOC_Languages::get_default_language();
     $db = WP_LOC::instance()->db;
 
+    // Use raw home URL to avoid the home_url language prefix filter
+    $home = set_url_scheme( get_option( 'home' ) );
+
     $switcher = [];
 
     // Front page
@@ -130,7 +133,7 @@ function wp_loc_get_lang_switcher(): array {
                 'code'   => $code,
                 'locale' => $locale,
                 'active' => $code === $current,
-                'url'    => home_url( $prefix . '/' ),
+                'url'    => $home . $prefix . '/',
                 'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
                 'name'   => WP_LOC_Languages::get_display_name( $code ),
             ];
@@ -145,7 +148,7 @@ function wp_loc_get_lang_switcher(): array {
         if ( $queried_term instanceof \WP_Term && WP_LOC_Terms::is_translatable( $queried_term->taxonomy ) ) {
             foreach ( $active as $code => $data ) {
                 $locale = $data['locale'] ?? $code;
-                $url = home_url( $code === $default ? '/' : "/{$code}/" );
+                $url = $home . ( $code === $default ? '/' : "/{$code}/" );
                 $translated_link = WP_LOC_Terms::get_term_url_for_language( (int) $queried_term->term_id, $queried_term->taxonomy, $code );
 
                 if ( $translated_link ) {
@@ -187,7 +190,7 @@ function wp_loc_get_lang_switcher(): array {
 
         foreach ( $active as $code => $data ) {
             $locale = $data['locale'] ?? $code;
-            $url = $urls[ $code ] ?? home_url( $code === $default ? '/' : "/{$code}/" );
+            $url = $urls[ $code ] ?? $home . ( $code === $default ? '/' : "/{$code}/" );
 
             $switcher[] = [
                 'code'   => $code,
@@ -213,7 +216,7 @@ function wp_loc_get_lang_switcher(): array {
         $locale = $data['locale'] ?? $code;
         $prefix = ( $code === $default ) ? '' : '/' . $code;
         $full_path = trim( $prefix . '/' . $clean_path, '/' );
-        $url = home_url( $full_path ? '/' . $full_path . '/' : '/' );
+        $url = $home . ( $full_path ? '/' . $full_path . '/' : '/' );
 
         $switcher[] = [
             'code'   => $code,
