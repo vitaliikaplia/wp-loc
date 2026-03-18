@@ -506,9 +506,43 @@ td.column-wp_loc_translations {
 // Settings Page (Settings > Post Types)
 // ===========================================
 
+.wp-loc-settings-page {
+  .description {
+    max-width: 900px;
+  }
+}
+
+.wp-loc-settings-section {
+  margin-top: 28px;
+
+  &:first-of-type {
+    margin-top: 22px;
+  }
+
+  h2 {
+    margin: 0 0 4px;
+    padding: 0;
+    font-size: 20px;
+    line-height: 1.4;
+  }
+
+  .form-table {
+    margin-top: 10px;
+  }
+}
+
+.wp-loc-settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
 .wp-loc-settings-label {
-  display: block;
-  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
 
   code {
     color: $color-muted;
@@ -618,6 +652,10 @@ td.column-wp_loc_translations {
 .wp-loc-menu-sync-page {
   .description {
     max-width: 840px;
+  }
+
+  .nav-tab-wrapper {
+    margin: 18px 0 18px;
   }
 
   &.is-busy {
@@ -808,6 +846,41 @@ td.column-wp_loc_translations {
 .wp-loc-menu-sync-empty {
   margin: 0;
   color: #50575e;
+}
+
+.wp-loc-ai-translate-tool {
+  position: relative;
+}
+
+.wp-loc-tools-page {
+  .nav-tab-wrapper {
+    margin-bottom: 18px;
+  }
+}
+
+.wp-loc-ai-translate-editor {
+  margin-top: 12px;
+
+  .wp-editor-wrap {
+    margin: 0;
+  }
+}
+
+.wp-loc-ai-translate-actions {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.wp-loc-ai-target-lang {
+  min-width: 220px;
+}
+
+.wp-loc-ai-translate-feedback {
+  margin-top: 12px;
 }
 
 @media (max-width: 960px) {

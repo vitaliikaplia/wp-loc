@@ -95,6 +95,7 @@ class WP_LOC_Admin {
             'hideProtectedTermDeleteLink' => $hide_protected_term_delete_link,
             'i18n' => [
                 'requestFailed' => __( 'Request failed.', 'wp-loc' ),
+                'translating' => __( 'Translating...', 'wp-loc' ),
                 'previewRefreshed' => __( 'Preview refreshed.', 'wp-loc' ),
                 'menuSyncComplete' => __( 'Menu sync complete.', 'wp-loc' ),
                 'confirmDeleteLanguage' => __( 'Delete this language? Its language files will also be removed from WordPress.', 'wp-loc' ),

@@ -22,6 +22,7 @@ class WP_LOC {
     public $timber;
     public $menus;
     public $menu_sync;
+    public $ai;
 
     public static function instance() {
         if ( self::$instance === null ) {
@@ -51,6 +52,7 @@ class WP_LOC {
             'class-wp-loc-terms',
             'class-wp-loc-timber',
             'class-wp-loc-menus',
+            'class-wp-loc-ai',
             'class-wp-loc-menu-sync',
         ];
 
@@ -77,6 +79,7 @@ class WP_LOC {
         $this->terms           = new WP_LOC_Terms();
         $this->timber          = new WP_LOC_Timber();
         $this->menus           = new WP_LOC_Menus();
+        $this->ai              = new WP_LOC_AI();
 
         if ( is_admin() ) {
             $this->admin           = new WP_LOC_Admin();

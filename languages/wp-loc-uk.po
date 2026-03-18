@@ -158,6 +158,148 @@ msgstr ""
 "Керуйте мовами сайту, URL-слугами, назвами для відображення та порядком у "
 "багатомовному інтерфейсі."
 
+#: includes/class-wp-loc-admin-settings.php:115
+msgid ""
+"Configure which content types participate in multilingual behavior and how "
+"the frontend language switcher is displayed."
+msgstr ""
+"Налаштуйте, які типи контенту беруть участь у багатомовній логіці та як "
+"відображається перемикач мов на фронтенді."
+
+#: includes/class-wp-loc-admin-settings.php:127
+msgid "Content Translation"
+msgstr "Переклад контенту"
+
+#: includes/class-wp-loc-admin-settings.php:174
+msgid "Flags"
+msgstr "Прапорці"
+
+#: includes/class-wp-loc-admin-settings.php:151
+msgid "OpenAI"
+msgstr "OpenAI"
+
+#: includes/class-wp-loc-admin-settings.php:152
+msgid "Claude"
+msgstr "Claude"
+
+#: includes/class-wp-loc-admin-settings.php:153
+msgid "Gemini"
+msgstr "Gemini"
+
+#: includes/class-wp-loc-admin-settings.php:237
+#: includes/class-wp-loc-menu-sync.php:227
+msgid "AI"
+msgstr "ШІ"
+
+#: includes/class-wp-loc-admin-settings.php:240
+msgid "Translation Engine"
+msgstr "Рушій перекладу"
+
+#: includes/class-wp-loc-admin-settings.php:249
+msgid "Select which AI engine should be used for automatic translation."
+msgstr "Оберіть, який ШІ-рушій слід використовувати для автоматичного перекладу."
+
+#: includes/class-wp-loc-admin-settings.php:253
+msgid "OpenAI API Key"
+msgstr "OpenAI API Key"
+
+#: includes/class-wp-loc-admin-settings.php:259
+msgid "Claude API Key"
+msgstr "Claude API Key"
+
+#: includes/class-wp-loc-admin-settings.php:265
+msgid "Gemini API Key"
+msgstr "Gemini API Key"
+
+#: includes/class-wp-loc-admin-settings.php:269
+msgid "Menu Sync"
+msgstr "Синхронізація меню"
+
+#: includes/class-wp-loc-admin-settings.php:276
+msgid "Try to translate custom nav menu links with AI during menu sync"
+msgstr "Намагатися перекладати довільні посилання в меню за допомогою ШІ під час синхронізації меню"
+
+#: includes/class-wp-loc-admin-settings.php:278
+msgid "When enabled, WP Menus Sync will try to translate custom link titles and related text fields with the selected AI engine."
+msgstr "Якщо ввімкнено, Синхронізація меню WP намагатиметься перекладати назви довільних посилань і пов’язані текстові поля за допомогою вибраного ШІ-рушія."
+
+#: includes/class-wp-loc-menu-sync.php:19 includes/class-wp-loc-menu-sync.php:20
+#: includes/class-wp-loc-menu-sync.php:362
+msgid "Tools"
+msgstr "Інструменти"
+
+#: includes/class-wp-loc-menu-sync.php:364
+msgid "Utilities for maintaining multilingual data and synchronizing translated content."
+msgstr "Інструменти для підтримки багатомовних даних і синхронізації перекладеного контенту."
+
+#: includes/class-wp-loc-menu-sync.php:48
+msgid "AI Translation"
+msgstr "ШІ переклад"
+
+#: includes/class-wp-loc-menus.php:586
+msgid "Translate custom links with AI (%d)"
+msgstr "Перекласти довільні посилання за допомогою ШІ (%d)"
+
+#: includes/class-wp-loc-menu-sync.php:95 assets/js/admin.js:588
+msgid "Enter text to translate first."
+msgstr "Спочатку введіть текст для перекладу."
+
+#: includes/class-wp-loc-menu-sync.php:99 assets/js/admin.js:589
+msgid "Select a target language."
+msgstr "Оберіть цільову мову."
+
+#: includes/class-wp-loc-menu-sync.php:105 assets/js/admin.js:585
+msgid "Translation failed."
+msgstr "Переклад не вдався."
+
+#: includes/class-wp-loc-menu-sync.php:110 assets/js/admin.js:587
+msgid "Translation inserted into the editor."
+msgstr "Переклад вставлено в редактор."
+
+#: includes/class-wp-loc-menu-sync.php:298 includes/class-wp-loc-menu-sync.php:312
+msgid "Translate"
+msgstr "Перекласти"
+
+#: includes/class-wp-loc-menu-sync.php:303
+msgid "Translate to"
+msgstr "Перекласти на"
+
+#: includes/class-wp-loc-menu-sync.php:305
+msgid "Select language"
+msgstr "Оберіть мову"
+
+#: includes/class-wp-loc-menu-sync.php:313
+msgid "Cancel"
+msgstr "Скасувати"
+
+#: includes/class-wp-loc-menu-sync.php:461
+msgid "Paste or write formatted content in the editor, then translate it into the selected language and insert the translated version back into the editor."
+msgstr "Вставте або напишіть форматований контент у редакторі, потім перекладіть його на вибрану мову й вставте переклад назад у редактор."
+
+#: includes/class-wp-loc-ai.php:73
+msgid "OpenAI is not configured."
+msgstr "OpenAI не налаштовано."
+
+#: includes/class-wp-loc-ai.php:113
+msgid "OpenAI returned an empty response."
+msgstr "OpenAI повернув порожню відповідь."
+
+#: includes/class-wp-loc-ai.php:121
+msgid "Claude is not configured."
+msgstr "Claude не налаштовано."
+
+#: includes/class-wp-loc-ai.php:165
+msgid "Claude returned an empty response."
+msgstr "Claude повернув порожню відповідь."
+
+#: includes/class-wp-loc-ai.php:173
+msgid "Gemini is not configured."
+msgstr "Gemini не налаштовано."
+
+#: includes/class-wp-loc-ai.php:215
+msgid "Gemini returned an empty response."
+msgstr "Gemini повернув порожню відповідь."
+
 #: includes/class-wp-loc-admin-languages.php:76
 msgid "Configured languages"
 msgstr "Налаштовані мови"
@@ -203,10 +345,14 @@ msgid "Request failed."
 msgstr "Запит не вдався."
 
 #: includes/class-wp-loc-admin.php:98
+msgid "Translating..."
+msgstr "Перекладаємо..."
+
+#: includes/class-wp-loc-admin.php:99
 msgid "Preview refreshed."
 msgstr "Попередній перегляд оновлено."
 
-#: includes/class-wp-loc-admin.php:99
+#: includes/class-wp-loc-admin.php:100
 msgid "Menu sync complete."
 msgstr "Синхронізація меню завершена."
 
