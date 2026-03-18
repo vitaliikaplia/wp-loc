@@ -858,17 +858,24 @@
         const i18n = Object.assign({
             translating: 'Translating...',
             translateTitle: 'Translate title',
+            translateTermName: 'Translate term name',
             chooseTargetLanguage: 'Choose target language',
             noTitleToTranslate: 'There is no title to translate.',
+            noTermNameToTranslate: 'There is no term name to translate.',
             noAvailableTranslationTargets: 'There are no available translation targets for this post.',
+            noAvailableTermTranslationTargets: 'There are no available translation targets for this term.',
             titleTranslateSuccess: 'Title translated successfully.',
+            termNameTranslateSuccess: 'Term name translated successfully.',
             requestFailed: 'Request failed.'
         }, wpLocAdmin.i18n || {});
 
         let currentPostId = 0;
+        let currentTermId = 0;
+        let currentTaxonomy = '';
         let currentTitle = '';
         let currentTargets = [];
         let currentSource = 'list';
+        let currentEntityType = 'post';
 
         const setStatus = function(message, type) {
             if (!statusWrap) {
@@ -886,27 +893,43 @@
             modal.hidden = true;
             document.body.classList.remove('wp-loc-title-translate-open');
             currentPostId = 0;
+            currentTermId = 0;
+            currentTaxonomy = '';
             currentTitle = '';
             currentTargets = [];
             currentSource = 'list';
+            currentEntityType = 'post';
             if (targetsWrap) {
                 targetsWrap.innerHTML = '';
             }
             setStatus('', '');
         };
 
-        const openModal = function(postId, title, targets, source) {
-            currentPostId = postId;
-            currentTitle = title;
-            currentTargets = Array.isArray(targets) ? targets : [];
-            currentSource = source || 'list';
+        const titleNode = modal.querySelector('#wp-loc-title-translate-modal-title');
+
+        const openModal = function(config) {
+            currentPostId = parseInt(config.postId || '0', 10);
+            currentTermId = parseInt(config.termId || '0', 10);
+            currentTaxonomy = config.taxonomy || '';
+            currentTitle = config.title || '';
+            currentTargets = Array.isArray(config.targets) ? config.targets : [];
+            currentSource = config.source || 'list';
+            currentEntityType = config.entityType || 'post';
             if (targetsWrap) {
                 targetsWrap.innerHTML = '';
             }
             setStatus('', '');
+            if (titleNode) {
+                titleNode.textContent = config.modalTitle || i18n.translateTitle;
+            }
 
             if (!currentTargets.length) {
-                setStatus(i18n.noAvailableTranslationTargets, 'error');
+                setStatus(
+                    currentEntityType === 'term'
+                        ? (i18n.noAvailableTermTranslationTargets || i18n.noAvailableTranslationTargets)
+                        : i18n.noAvailableTranslationTargets,
+                    'error'
+                );
             } else if (targetsWrap) {
                 currentTargets.forEach(function(target) {
                     const button = document.createElement('button');
@@ -943,7 +966,45 @@
                 return;
             }
 
-            openModal(postId, title, targets, 'list');
+            openModal({
+                postId: postId,
+                title: title,
+                targets: targets,
+                source: 'list',
+                entityType: 'post',
+                modalTitle: i18n.translateTitle
+            });
+        });
+
+        $(document).on('click', '.wp-loc-translate-term-name', function(event) {
+            event.preventDefault();
+
+            const termId = parseInt(this.getAttribute('data-term-id') || '0', 10);
+            const taxonomy = String(this.getAttribute('data-taxonomy') || '');
+            const title = String(this.getAttribute('data-current-title') || '').trim();
+            const rawTargets = this.getAttribute('data-targets') || '[]';
+            let targets = [];
+
+            try {
+                targets = JSON.parse(rawTargets);
+            } catch (error) {
+                targets = [];
+            }
+
+            if (!title) {
+                window.alert(i18n.noTermNameToTranslate || i18n.noTitleToTranslate);
+                return;
+            }
+
+            openModal({
+                termId: termId,
+                taxonomy: taxonomy,
+                title: title,
+                targets: targets,
+                source: 'list',
+                entityType: 'term',
+                modalTitle: i18n.translateTermName || i18n.translateTitle
+            });
         });
 
         const renderGutenbergButton = function() {
@@ -989,7 +1050,14 @@
                 return;
             }
 
-            openModal(parseInt(config.postId || '0', 10), title, config.targets || [], 'gutenberg');
+            openModal({
+                postId: parseInt(config.postId || '0', 10),
+                title: title,
+                targets: config.targets || [],
+                source: 'gutenberg',
+                entityType: 'post',
+                modalTitle: i18n.translateTitle
+            });
         });
 
         $(document).on('click', closeSelectors, function() {
@@ -1006,19 +1074,30 @@
             const button = this;
             const targetLang = button.getAttribute('data-lang') || '';
 
-            if (!currentPostId || !currentTitle.trim()) {
-                setStatus(i18n.noTitleToTranslate, 'error');
+            if ((currentEntityType === 'post' && !currentPostId) || (currentEntityType === 'term' && !currentTermId) || !currentTitle.trim()) {
+                setStatus(currentEntityType === 'term' ? (i18n.noTermNameToTranslate || i18n.noTitleToTranslate) : i18n.noTitleToTranslate, 'error');
                 return;
             }
 
             modal.classList.add('is-loading');
             setStatus(i18n.translating, '');
 
-            $.post(wpLocAdmin.ajaxUrl, {
-                action: 'wp_loc_translate_post_title',
+            const payload = {
                 nonce: wpLocAdmin.nonce,
-                post_id: currentPostId,
                 target_lang: targetLang
+            };
+
+            if (currentEntityType === 'term') {
+                payload.action = 'wp_loc_translate_term_name';
+                payload.term_id = currentTermId;
+                payload.taxonomy = currentTaxonomy;
+            } else {
+                payload.action = 'wp_loc_translate_post_title';
+                payload.post_id = currentPostId;
+            }
+
+            $.post(wpLocAdmin.ajaxUrl, {
+                ...payload
             }).done(function(response) {
                 if (!response || !response.success) {
                     const message = response && response.data && response.data.message ? response.data.message : i18n.requestFailed;
@@ -1026,8 +1105,13 @@
                     return;
                 }
 
-                setStatus(response.data.message || i18n.titleTranslateSuccess, 'success');
-                if (currentSource === 'gutenberg') {
+                setStatus(
+                    response.data.message || (currentEntityType === 'term'
+                        ? (i18n.termNameTranslateSuccess || i18n.titleTranslateSuccess)
+                        : i18n.titleTranslateSuccess),
+                    'success'
+                );
+                if (currentSource === 'gutenberg' && currentEntityType === 'post') {
                     const config = wpLocAdmin.gutenbergTitleTranslate || {};
                     const currentLang = String(config.currentLang || '');
 

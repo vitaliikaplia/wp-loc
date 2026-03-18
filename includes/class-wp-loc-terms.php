@@ -23,6 +23,7 @@ class WP_LOC_Terms {
 
         add_action( 'wp_ajax_wp_loc_create_term_translation', [ $this, 'ajax_create_term_translation' ] );
         add_action( 'wp_ajax_wp_loc_refresh_term_translations', [ $this, 'ajax_refresh_term_translations' ] );
+        add_action( 'wp_ajax_wp_loc_translate_term_name', [ $this, 'ajax_translate_term_name' ] );
         add_action( 'admin_notices', [ $this, 'render_protected_term_delete_notice' ] );
         add_action( 'current_screen', [ $this, 'register_admin_ui' ] );
         add_action( 'pre_get_posts', [ $this, 'translate_term_queries' ] );
@@ -891,10 +892,11 @@ class WP_LOC_Terms {
             return $duplicate_term;
         }
 
-        $lang = self::get_term_save_language( $taxonomy );
+        $term_id = $tt_id ? ( self::get_term_id_from_taxonomy_id( $tt_id, $taxonomy ) ?: 0 ) : 0;
+        $lang = self::get_term_save_language( $taxonomy, $term_id );
         $parent = isset( $args['parent'] ) ? (int) $args['parent'] : 0;
 
-        if ( ! self::term_slug_exists_in_language( $duplicate_term->slug, $taxonomy, $lang, $parent ) ) {
+        if ( ! self::term_slug_exists_in_language( $duplicate_term->slug, $taxonomy, $lang, $parent, $term_id ) ) {
             return null;
         }
 
@@ -995,7 +997,49 @@ class WP_LOC_Terms {
             unset( $actions['delete'] );
         }
 
+        $targets = $this->get_term_translate_targets( $term );
+
+        if ( ! empty( $targets ) ) {
+            $actions['wp_loc_translate_term_name'] = sprintf(
+                '<a href="#" class="wp-loc-translate-term-name" data-term-id="%1$d" data-taxonomy="%2$s" data-current-title="%3$s" data-targets="%4$s">%5$s</a>',
+                (int) $term->term_id,
+                esc_attr( $term->taxonomy ),
+                esc_attr( $term->name ),
+                esc_attr( wp_json_encode( $targets, JSON_UNESCAPED_UNICODE ) ),
+                esc_html__( 'Translate term name', 'wp-loc' )
+            );
+        }
+
         return $actions;
+    }
+
+    private function get_term_translate_targets( \WP_Term $term ): array {
+        if ( ! self::is_translatable( $term->taxonomy ) ) {
+            return [];
+        }
+
+        $current_lang = self::get_term_language( (int) $term->term_id, $term->taxonomy ) ?: self::get_context_language();
+        $translations = self::get_term_translations( (int) $term->term_id, $term->taxonomy );
+        $targets = [];
+
+        foreach ( WP_LOC_Languages::get_active_languages() as $slug => $data ) {
+            $target_term_id = $slug === $current_lang
+                ? (int) $term->term_id
+                : self::get_term_id_from_taxonomy_id( (int) ( $translations[ $slug ]->element_id ?? 0 ), $term->taxonomy );
+
+            if ( ! $target_term_id ) {
+                continue;
+            }
+
+            $targets[] = [
+                'lang'       => $slug,
+                'name'       => WP_LOC_Languages::get_display_name( $slug ),
+                'flag'       => WP_LOC_Languages::get_flag_url( $data['locale'] ?? $slug ),
+                'is_current' => $slug === $current_lang,
+            ];
+        }
+
+        return $targets;
     }
 
     /**
@@ -1391,6 +1435,103 @@ class WP_LOC_Terms {
 
         wp_send_json_success( [
             'html' => $this->get_term_translation_controls_html( $term, $taxonomy ),
+        ] );
+    }
+
+    public function ajax_translate_term_name(): void {
+        check_ajax_referer( 'wp_loc_ajax', 'nonce' );
+
+        $term_id = isset( $_POST['term_id'] ) ? (int) $_POST['term_id'] : 0;
+        $taxonomy = isset( $_POST['taxonomy'] ) ? sanitize_key( (string) $_POST['taxonomy'] ) : '';
+        $target_lang = isset( $_POST['target_lang'] ) ? sanitize_key( (string) $_POST['target_lang'] ) : '';
+
+        if ( ! $term_id || ! $taxonomy || ! $target_lang || ! taxonomy_exists( $taxonomy ) ) {
+            wp_send_json_error( [ 'message' => __( 'Missing required parameters.', 'wp-loc' ) ], 400 );
+        }
+
+        $taxonomy_object = get_taxonomy( $taxonomy );
+        $manage_cap = $taxonomy_object->cap->manage_terms ?? 'manage_categories';
+
+        if ( ! current_user_can( $manage_cap ) ) {
+            wp_send_json_error( [ 'message' => __( 'You do not have permission to do that.', 'wp-loc' ) ], 403 );
+        }
+
+        $term = get_term( $term_id, $taxonomy );
+        if ( ! $term instanceof \WP_Term || ! self::is_translatable( $taxonomy ) ) {
+            wp_send_json_error( [ 'message' => __( 'Term not found.', 'wp-loc' ) ], 404 );
+        }
+
+        $source_name = trim( (string) $term->name );
+        if ( $source_name === '' ) {
+            wp_send_json_error( [ 'message' => __( 'There is no term name to translate.', 'wp-loc' ) ], 400 );
+        }
+
+        $source_lang = self::get_term_language( (int) $term->term_id, $taxonomy ) ?: self::get_context_language();
+
+        $target_term_id = $source_lang === $target_lang
+            ? (int) $term->term_id
+            : (int) self::get_term_translation( (int) $term->term_id, $taxonomy, $target_lang );
+
+        if ( ! $target_term_id ) {
+            wp_send_json_error( [ 'message' => __( 'Translation term was not found for the selected language.', 'wp-loc' ) ], 404 );
+        }
+
+        global $wpdb;
+
+        $target_term_row = $wpdb->get_row( $wpdb->prepare(
+            "SELECT t.term_id, t.slug, tt.parent
+             FROM {$wpdb->terms} t
+             INNER JOIN {$wpdb->term_taxonomy} tt
+                ON tt.term_id = t.term_id
+               AND tt.taxonomy = %s
+             WHERE t.term_id = %d
+             LIMIT 1",
+            $taxonomy,
+            $target_term_id
+        ) );
+
+        if ( ! $target_term_row ) {
+            wp_send_json_error( [ 'message' => __( 'Translation term was not found for the selected language.', 'wp-loc' ) ], 404 );
+        }
+
+        $translated_name = trim( wp_strip_all_tags( WP_LOC_AI::translate_content( $source_name, WP_LOC_AI::get_target_language_name( $target_lang ) ) ) );
+
+        if ( $translated_name === '' ) {
+            wp_send_json_error( [ 'message' => __( 'Term name translation failed.', 'wp-loc' ) ], 500 );
+        }
+
+        $translated_slug = self::generate_unique_slug_for_language(
+            $translated_name,
+            $taxonomy,
+            $target_lang,
+            isset( $target_term_row->parent ) ? (int) $target_term_row->parent : 0,
+            $target_term_id
+        );
+
+        $result = $wpdb->update(
+            $wpdb->terms,
+            [
+                'name' => $translated_name,
+                'slug' => $translated_slug,
+            ],
+            [ 'term_id' => $target_term_id ],
+            [ '%s', '%s' ],
+            [ '%d' ]
+        );
+
+        if ( $result === false ) {
+            wp_send_json_error( [
+                'message' => __( 'Term name translation failed.', 'wp-loc' ),
+            ], 500 );
+        }
+
+        clean_term_cache( $target_term_id, $taxonomy );
+
+        wp_send_json_success( [
+            'message'     => __( 'Term name translated successfully.', 'wp-loc' ),
+            'new_title'   => $translated_name,
+            'new_slug'    => $translated_slug,
+            'target_lang' => $target_lang,
         ] );
     }
 
