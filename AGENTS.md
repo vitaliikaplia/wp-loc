@@ -21,7 +21,7 @@ includes/
   class-wp-loc-content.php          → Auto-create translation drafts for new posts, sync shared post props and multilingual taxonomy assignments
   class-wp-loc-frontend.php         → Lang switcher, hreflang, canonical, html lang attr, non-translatable post type support
   class-wp-loc-menus.php            → WPML-like multilingual nav menus, menu translation groups, menu item cloning, menu assignment mapping
-  class-wp-loc-menu-sync.php        → Multilingual > Tools page (tabs for WP Menus Sync and AI Translation)
+  class-wp-loc-menu-sync.php        → Multilingual > Tools page (tabs for WP Menus Sync, AI Translation, Config Migration)
   class-wp-loc-options.php          → Localized WP options (blogname, page_on_front, etc.)
   class-wp-loc-compat.php           → Third-party compatibility layer (icl_object_id, $sitepress, wpml_* filters, nav_menu/object language helpers)
   class-wp-loc-acf.php              → ACF field-level translation + ACFML-like options post_id routing (`options_{lang}`)
@@ -60,6 +60,7 @@ languages/                         → .po/.mo translation files (uk, ru_RU)
 - **AI settings**: `Multilingual > Settings > AI` stores provider selection, provider API keys, and an opt-in flag for AI-assisted custom nav menu link translation during menu sync.
 - **AI translation tool**: `Multilingual > Tools > AI Translation` uses TinyMCE + AJAX to translate formatted HTML content and insert the translated result back into the editor without reloading the page.
 - **AI-assisted menu sync**: When enabled in settings, `WP Menus Sync` attempts to translate custom nav menu links (`custom` items) with AI while preserving URL/target/classes/XFN and tracking source hashes so preview can detect whether custom-link translations are up to date.
+- **Config migration tool**: `Multilingual > Tools > Config Migration` scans the active theme / parent theme / active plugins for `wpml-config.xml`, reads only `custom-types` and `taxonomies`, can generate a lightweight `wp-loc-config.xml`, and can remove theme-level `wpml-config.xml` after migration.
 - **Assets**: SCSS compiled via Prepros (external tool, no npm). All CSS/JS extracted from PHP into `assets/` — no inline styles or scripts.
 - **AJAX operations**: Language sort order auto-saves on drag. Single translation creation via `+` button in metabox (no page reload). `WP Menus Sync` preview/apply and `AI Translation` both run via AJAX.
 

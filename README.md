@@ -16,10 +16,11 @@ Lightweight multilingual plugin for WordPress.
 - **Cascade delete for term translations** — deleting any translated term deletes the whole translation group
 - **Protected default category group** — default category and all its translations cannot be deleted
 - **Multilingual nav menus** — WPML-like translated menu groups, translated menu items, language-aware menu locations, auto-created menu translations, and cascade deletion for menu translation groups
-- **Tools page** — Multilingual > Tools with tabbed utilities for WP Menus Sync and AI Translation
+- **Tools page** — Multilingual > Tools with tabbed utilities for WP Menus Sync, AI Translation, and Config Migration
 - **WP Menus Sync** — AJAX preview/apply for syncing menu structure from the default language to secondary languages
 - **AI-assisted custom menu links** — optional AI translation for `custom` nav menu items during menu sync, while preserving URLs and other menu item settings
 - **AI Translation tool** — TinyMCE-based AJAX translator for formatted HTML content, with translated content inserted back into the editor without reloading the page
+- **Config Migration tool** — detects `wpml-config.xml`, reads only translatable post types and taxonomies, generates lightweight `wp-loc-config.xml`, and can remove theme-level `wpml-config.xml`
 - **Non-translatable post types** — work correctly with language URL prefixes (shared content across languages)
 - **URL structure** — `/ua/page-slug/`, `/en/page-slug/`, default language without prefix
 - **Admin language switcher** — in the admin bar with flags, cookie-based
@@ -46,7 +47,7 @@ Lightweight multilingual plugin for WordPress.
 4. Configure language slugs, display names and ordering in **Multilingual > Languages**
 5. Select translatable post types and taxonomies in **Multilingual > Settings**
 6. Configure **Multilingual > Settings** tabs, including AI provider settings if you want to use AI translation features
-7. Use **Multilingual > Tools** for WP Menus Sync and the AI Translation tool
+7. Use **Multilingual > Tools** for WP Menus Sync, the AI Translation tool, and Config Migration
 
 ## Usage
 
@@ -89,6 +90,14 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 - In **Multilingual > Settings > AI**, choose the translation engine (`OpenAI`, `Claude`, or `Gemini`) and provide the matching API key
 - In **Multilingual > Tools > AI Translation**, paste or write formatted content in the TinyMCE editor, choose a target language, and translate it via AJAX without reloading the page
 - The translated HTML is inserted back into the editor while preserving formatting
+
+### Config migration
+
+- In **Multilingual > Tools > Config Migration**, WP-LOC scans the active theme, parent theme, and active plugins for `wpml-config.xml`
+- WP-LOC reads only `custom-types` and `taxonomies` from WPML config files; other WPML config sections are ignored on purpose
+- You can generate a lightweight `wp-loc-config.xml` from the current WP-LOC settings
+- You can also generate `wp-loc-config.xml` from a detected `wpml-config.xml` source
+- Theme-level `wpml-config.xml` files can be removed from the same screen after migration; plugin-level files are shown as read-only
 
 ### ACF options pages
 
