@@ -24,7 +24,7 @@ includes/
   class-wp-loc-menu-sync.php        → Multilingual > Tools page (tabs for WP Menus Sync, AI Translation, Config Migration)
   class-wp-loc-options.php          → Localized WP options (blogname, page_on_front, etc.)
   class-wp-loc-compat.php           → Third-party compatibility layer (icl_object_id, $sitepress, wpml_* filters, nav_menu/object language helpers)
-  class-wp-loc-acf.php              → ACF field-level translation + ACFML-like options post_id routing (`options_{lang}`)
+  class-wp-loc-acf.php              → ACF field/group translation compatibility (DB, local JSON, PHP-registered groups) + ACFML-like options post_id routing (`options_{lang}`)
   class-wp-loc-media.php            → Media attachment language assignment
   class-wp-loc-terms.php            → Taxonomy/term translations, term admin UI, term routing, duplicate slugs per language
   class-wp-loc-timber.php           → Timber/Twig integration for switcher helpers
@@ -56,6 +56,7 @@ languages/                         → .po/.mo translation files (uk, ru_RU)
 - **Frontend term URLs**: Taxonomy archives must resolve by translated term slug/path, wrong-language term URLs should 404, and the frontend language switcher must return translated term archive URLs.
 - **Posts page / front page routing**: Localized `page_on_front` and `page_for_posts` must resolve correctly per language without canonical redirects back to the default language. Theme integrations that previously depended on `ICL_LANGUAGE_CODE` may need a `wp_loc_get_current_lang()` fallback during bootstrap.
 - **ACF options architecture**: ACF options pages are routed through language-aware post IDs like `options_en` / `options_ru`, close to ACFML behavior. `shared` fields stay on the base options post ID, while `translatable` fields read/write from the translated options post ID. `get_field('options')` and `get_fields('options')` must both work with this model.
+- **ACF config compatibility**: `wp-loc` must read and export ACFML-compatible field group mode (`acfml_field_group_mode`) and field preferences (`wpml_cf_preferences`) consistently whether ACF field groups come from the DB, local JSON, or `acf_add_local_field_group()` PHP registration. Local JSON export should preserve these settings.
 - **ACF nav_menu fields**: `nav_menu` ACF fields are mapped through menu translations so option values and formatted field output resolve to the menu in the current language context.
 - **AI settings**: `Multilingual > Settings > AI` stores provider selection, provider API keys, and an opt-in flag for AI-assisted custom nav menu link translation during menu sync.
 - **AI translation tool**: `Multilingual > Tools > AI Translation` uses TinyMCE + AJAX to translate formatted HTML content and insert the translated result back into the editor without reloading the page.
@@ -111,6 +112,7 @@ Only loads when no other multilingual plugin is active (`ICL_SITEPRESS_VERSION` 
 - SCSS source: `assets/scss/admin.scss` → output: `assets/css/admin.min.css`
 - JS source: `assets/js/admin.js` → output: `assets/js/admin.min.js`
 - Translations: `languages/wp-loc-uk.po` (Ukrainian), `languages/wp-loc-ru_RU.po` (Russian). Compile with `msgfmt`.
+- `.po` headers include the full WordPress Poedit keyword list, including context-aware `_x`/`esc_html_x`/`esc_attr_x`, so Poedit can extract contextual strings correctly.
 - ACF module only loads when ACF plugin is active
 - Timber integration only loads when Timber is present
 - Admin classes only instantiate on `is_admin()`

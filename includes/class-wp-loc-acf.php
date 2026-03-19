@@ -16,6 +16,8 @@ class WP_LOC_ACF {
     private const ACFML_GROUP_MODE_ADVANCED = 'advanced';
 
     private const FIELD_GROUP_MODE_COLUMN_KEY = 'wp_loc_acf_translation_option';
+    private const FIELD_GROUP_MODES_OPTION = 'wp_loc_acf_field_group_modes';
+    private const FIELD_TRANSLATION_MODES_BY_KEY_OPTION = 'wp_loc_acf_field_translation_modes_by_key';
 
     private const ACFML_MODE_DEFAULTS = [
         'text' => [
@@ -286,6 +288,12 @@ class WP_LOC_ACF {
         return get_option( "_{$base_post_id}_{$field_name}", null );
     }
 
+    private function get_saved_field_modes_by_key(): array {
+        $field_modes = get_option( self::FIELD_TRANSLATION_MODES_BY_KEY_OPTION, [] );
+
+        return is_array( $field_modes ) ? $field_modes : [];
+    }
+
     private function get_translatable_option_value( string $language, string $field_name, string $base_post_id = 'options' ) {
         $translated_post_id = $this->get_translated_options_post_id( $language, $base_post_id );
         $value = get_option( "{$translated_post_id}_{$field_name}", false );
@@ -335,6 +343,8 @@ class WP_LOC_ACF {
         add_action( 'add_meta_boxes', [ $this, 'register_field_group_mode_meta_box' ] );
         add_action( 'acf/render_field_settings', [ $this, 'add_translation_mode_setting' ] );
         add_filter( 'acf/load_field_group', [ $this, 'inject_field_group_mode' ], 20 );
+        add_filter( 'acf/pre_update_field_group', [ $this, 'prepare_field_group_mode_for_save' ], 20 );
+        add_filter( 'acf/pre_save_json_file', [ $this, 'inject_field_group_mode_into_json_export' ], 20 );
         add_filter( 'acf/update_field', [ $this, 'sync_wpml_compat_field_settings' ], 20 );
         add_action( 'acf/update_field_group', [ $this, 'save_field_group_mode' ], 5 );
         add_filter( 'acf/pre_load_reference', [ $this, 'handle_pre_load_reference' ], 10, 3 );
@@ -442,6 +452,32 @@ class WP_LOC_ACF {
         return $field_group;
     }
 
+    public function prepare_field_group_mode_for_save( array $field_group ): array {
+        $mode = $this->get_requested_field_group_mode();
+
+        if ( ! $mode ) {
+            $mode = $this->get_field_group_mode( $field_group );
+        }
+
+        $field_group[ self::ACFML_FIELD_GROUP_MODE_KEY ] = $mode;
+
+        return $field_group;
+    }
+
+    public function inject_field_group_mode_into_json_export( array $post ): array {
+        if ( empty( $post['key'] ) || ! is_string( $post['key'] ) || ! str_starts_with( $post['key'], 'group_' ) ) {
+            return $post;
+        }
+
+        $post[ self::ACFML_FIELD_GROUP_MODE_KEY ] = $this->get_field_group_mode( $post );
+
+        if ( ! empty( $post['fields'] ) && is_array( $post['fields'] ) ) {
+            $post['fields'] = array_map( [ $this, 'normalize_field_translation_settings' ], $post['fields'] );
+        }
+
+        return $post;
+    }
+
     /**
      * Add "Translation Mode" setting to ACF field settings
      */
@@ -502,10 +538,7 @@ class WP_LOC_ACF {
 
     public function save_field_group_mode( array $field_group ): void {
         $field_group_id = (int) ( $field_group['ID'] ?? 0 );
-
-        if ( ! $field_group_id ) {
-            return;
-        }
+        $field_group_key = isset( $field_group['key'] ) && is_string( $field_group['key'] ) ? $field_group['key'] : '';
 
         $mode = $this->get_requested_field_group_mode();
 
@@ -513,7 +546,21 @@ class WP_LOC_ACF {
             $mode = $this->get_field_group_mode( $field_group );
         }
 
-        update_post_meta( $field_group_id, self::ACFML_FIELD_GROUP_MODE_KEY, $mode );
+        if ( $field_group_id ) {
+            update_post_meta( $field_group_id, self::ACFML_FIELD_GROUP_MODE_KEY, $mode );
+        }
+
+        if ( $field_group_key ) {
+            $stored_modes = get_option( self::FIELD_GROUP_MODES_OPTION, [] );
+
+            if ( ! is_array( $stored_modes ) ) {
+                $stored_modes = [];
+            }
+
+            $stored_modes[ $field_group_key ] = $mode;
+            update_option( self::FIELD_GROUP_MODES_OPTION, $stored_modes );
+        }
+
         $field_group[ self::ACFML_FIELD_GROUP_MODE_KEY ] = $mode;
 
         if ( $mode !== self::ACFML_GROUP_MODE_ADVANCED ) {
@@ -522,11 +569,7 @@ class WP_LOC_ACF {
     }
 
     public function sync_wpml_compat_field_settings( array $field ): array {
-        $mode = $this->get_translation_mode( $field );
-        $field['translation_mode'] = $mode;
-        $field['wpml_cf_preferences'] = $this->translation_mode_to_wpml_preference( $mode );
-
-        return $field;
+        return $this->normalize_field_translation_settings( $field );
     }
 
     /**
@@ -567,13 +610,19 @@ class WP_LOC_ACF {
      * Make shared fields readonly for non-default languages
      */
     public function handle_load_field( array $field ): array {
-        if ( ! is_admin() || ! isset( $field['name'] ) ) return $field;
+        if ( ! is_admin() ) return $field;
+
+        $field = $this->normalize_field_translation_settings( $field );
+
+        if ( ! isset( $field['name'] ) ) {
+            return $field;
+        }
 
         $admin_lang = wp_loc_get_admin_lang();
         $default_lang = WP_LOC_Languages::get_default_language();
 
         if ( $admin_lang === $default_lang ) return $field;
-        $translation_mode = $this->get_translation_mode( $field );
+        $translation_mode = $field['translation_mode'] ?? $this->get_translation_mode( $field );
 
         // Shared field + non-default language → readonly
         if ( $translation_mode === 'shared' ) {
@@ -772,14 +821,16 @@ class WP_LOC_ACF {
     public function save_translatable_fields_config( array $field_group ): void {
         $translatable_fields = get_option( 'wp_loc_acf_translatable_fields', [] );
         $field_modes = get_option( 'wp_loc_acf_field_translation_modes', [] );
+        $field_modes_by_key = $this->get_saved_field_modes_by_key();
 
-        $this->iterate_group_fields( $field_group, function( array $field ) use ( &$field_modes, &$translatable_fields ) {
+        $this->iterate_group_fields( $field_group, function( array $field ) use ( &$field_modes, &$field_modes_by_key, &$translatable_fields ) {
             if ( empty( $field['name'] ) ) {
                 return;
             }
 
             $mode = $this->get_translation_mode( $field );
             $field_modes[ $field['name'] ] = $mode;
+            $field_modes_by_key[ $field['key'] ] = $mode;
 
             if ( in_array( $mode, [ 'translatable', 'copy_once' ], true ) ) {
                 $translatable_fields[ $field['name'] ] = $field['key'];
@@ -790,6 +841,7 @@ class WP_LOC_ACF {
 
         update_option( 'wp_loc_acf_translatable_fields', $translatable_fields );
         update_option( 'wp_loc_acf_field_translation_modes', $field_modes );
+        update_option( self::FIELD_TRANSLATION_MODES_BY_KEY_OPTION, $field_modes_by_key );
     }
 
     /**
@@ -806,6 +858,12 @@ class WP_LOC_ACF {
             if ( $mode !== null ) {
                 return $mode;
             }
+        }
+
+        $field_modes_by_key = $this->get_saved_field_modes_by_key();
+
+        if ( ! empty( $field['key'] ) && isset( $field_modes_by_key[ $field['key'] ] ) && in_array( $field_modes_by_key[ $field['key'] ], [ 'none', 'shared', 'copy_once', 'translatable' ], true ) ) {
+            return $field_modes_by_key[ $field['key'] ];
         }
 
         if ( empty( $field['name'] ) ) {
@@ -861,6 +919,28 @@ class WP_LOC_ACF {
             return $mode;
         }
 
+        $field_group_key = isset( $field_group['key'] ) && is_string( $field_group['key'] ) ? $field_group['key'] : '';
+
+        if ( $field_group_key ) {
+            $stored_modes = get_option( self::FIELD_GROUP_MODES_OPTION, [] );
+
+            if ( is_array( $stored_modes ) ) {
+                $stored_mode = $stored_modes[ $field_group_key ] ?? null;
+
+                if ( is_string( $stored_mode ) && $this->is_valid_field_group_mode( $stored_mode ) ) {
+                    return $stored_mode;
+                }
+            }
+        }
+
+        if ( ! empty( $field_group['local_file'] ) && is_string( $field_group['local_file'] ) ) {
+            $file_mode = $this->get_field_group_mode_from_local_json_file( $field_group['local_file'] );
+
+            if ( $file_mode ) {
+                return $file_mode;
+            }
+        }
+
         $field_group_id = (int) ( $field_group['ID'] ?? 0 );
 
         if ( $field_group_id ) {
@@ -872,6 +952,22 @@ class WP_LOC_ACF {
         }
 
         return self::ACFML_GROUP_MODE_ADVANCED;
+    }
+
+    private function get_field_group_mode_from_local_json_file( string $file ): ?string {
+        if ( ! is_readable( $file ) ) {
+            return null;
+        }
+
+        $decoded = json_decode( (string) file_get_contents( $file ), true );
+
+        if ( ! is_array( $decoded ) ) {
+            return null;
+        }
+
+        $mode = $decoded[ self::ACFML_FIELD_GROUP_MODE_KEY ] ?? null;
+
+        return ( is_string( $mode ) && $this->is_valid_field_group_mode( $mode ) ) ? $mode : null;
     }
 
     private function get_field_group_mode_label( string $mode ): string {
@@ -937,6 +1033,31 @@ class WP_LOC_ACF {
         }
 
         return null;
+    }
+
+    private function normalize_field_translation_settings( array $field ): array {
+        $mode = $this->get_translation_mode( $field );
+        $field['translation_mode'] = $mode;
+        $field['wpml_cf_preferences'] = $this->translation_mode_to_wpml_preference( $mode );
+
+        if ( ! empty( $field['sub_fields'] ) && is_array( $field['sub_fields'] ) ) {
+            $field['sub_fields'] = array_map( [ $this, 'normalize_field_translation_settings' ], $field['sub_fields'] );
+        }
+
+        if ( ! empty( $field['layouts'] ) && is_array( $field['layouts'] ) ) {
+            foreach ( $field['layouts'] as $layout_index => $layout ) {
+                if ( empty( $layout['sub_fields'] ) || ! is_array( $layout['sub_fields'] ) ) {
+                    continue;
+                }
+
+                $field['layouts'][ $layout_index ]['sub_fields'] = array_map(
+                    [ $this, 'normalize_field_translation_settings' ],
+                    $layout['sub_fields']
+                );
+            }
+        }
+
+        return $field;
     }
 
     private function iterate_group_fields( array $field_group, callable $callback ): void {

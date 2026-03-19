@@ -29,7 +29,7 @@ Lightweight multilingual plugin for WordPress.
 - **Localized options** — `blogname`, `blogdescription`, `page_on_front`, `page_for_posts` per language, including localized front page / posts page routing
 - **AI settings** — choose OpenAI / Claude / Gemini, store API keys, and enable AI translation for custom menu links during menu sync
 - **Third-party compatibility** — `icl_object_id()`, `$sitepress`, `ICL_LANGUAGE_CODE`, common multilingual filters
-- **ACF integration** — field-level translation mode (`none` / `shared` / `translatable`) for options pages with ACFML-like language-aware `options_{lang}` routing
+- **ACF integration** — ACFML-like field/group translation config for DB, local JSON, and PHP-registered field groups, plus language-aware `options_{lang}` routing for options pages
 - **ACF nav_menu field support** — translated menu values resolve to the correct menu in the current language context
 - **Timber integration** — Twig functions `wp_loc_language_switcher()` and `wp_loc_languages()`
 - **Ukrainian slug** — `uk` locale → `ua` URL slug out of the box
