@@ -954,6 +954,149 @@ td.column-wp_loc_translations {
   }
 }
 
+.wp-loc-config-panel {
+  margin-top: 24px;
+  max-width: 980px;
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
+.wp-loc-config-detected-state {
+  margin: 18px 0 0;
+  color: #1d2327;
+}
+
+.wp-loc-config-panel-head {
+  margin-bottom: 16px;
+
+  h2,
+  h3 {
+    margin: 0 0 6px;
+  }
+}
+
+.wp-loc-config-list {
+  margin: 8px 0 0 18px;
+
+  li {
+    margin: 0 0 6px;
+  }
+}
+
+.wp-loc-config-empty {
+  color: #50575e;
+}
+
+.wp-loc-config-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wp-loc-config-token {
+  display: inline-block;
+}
+
+.wp-loc-config-source-list {
+  display: grid;
+  gap: 24px;
+  max-width: 980px;
+}
+
+.wp-loc-config-source {
+  border-top: 1px solid #dcdcde;
+  padding-top: 24px;
+
+  &:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+}
+
+.wp-loc-config-source-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+
+  h3 {
+    margin: 0 0 6px;
+  }
+
+  p {
+    margin: 0 0 4px;
+  }
+}
+
+.wp-loc-config-panel {
+  .form-table {
+    margin-top: 0;
+  }
+
+  .form-table th {
+    width: 180px;
+    padding-left: 0;
+  }
+
+  .form-table td {
+    padding-right: 0;
+  }
+}
+
+.wp-loc-config-source-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid #dcdcde;
+  background: #f6f7f7;
+  color: #50575e;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.wp-loc-config-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+
+  form {
+    margin: 0;
+  }
+}
+
+.wp-loc-config-delete {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #b32d2e;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.4;
+  text-decoration: none;
+
+  &:hover,
+  &:focus {
+    color: #8a2424;
+    text-decoration: underline;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    outline: 0;
+  }
+}
+
+.wp-loc-config-note {
+  color: #50575e;
+}
+
 .wp-loc-title-translate-open {
   overflow: hidden;
 }
@@ -1154,5 +1297,10 @@ td.column-wp_loc_translations {
 
   .wp-loc-menu-sync-cell-head {
     flex-direction: column;
+  }
+
+  .wp-loc-config-source-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

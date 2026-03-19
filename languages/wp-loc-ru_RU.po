@@ -778,6 +778,127 @@ msgstr ""
 msgid "Creating a translation in %s."
 msgstr "Создание перевода в %s."
 
+msgid "Config Migration"
+msgstr "Миграция конфигов"
+
+msgid "Active theme"
+msgstr "Активная тема"
+
+msgid "Parent theme"
+msgstr "Родительская тема"
+
+#, php-format
+msgid "Plugin: %s"
+msgstr "Плагин: %s"
+
+msgid "Delete this wpml-config.xml file?"
+msgstr "Удалить этот файл wpml-config.xml?"
+
+msgid "wp-loc-config.xml was written from the current wp-loc settings."
+msgstr "Файл wp-loc-config.xml записан из текущих настроек wp-loc."
+
+msgid "wp-loc-config.xml was generated from the detected wpml-config.xml file."
+msgstr "Файл wp-loc-config.xml сгенерирован из найденного wpml-config.xml."
+
+msgid "wpml-config.xml was deleted."
+msgstr "Файл wpml-config.xml удален."
+
+msgid "The selected wpml-config.xml file was not found anymore."
+msgstr "Выбранный файл wpml-config.xml больше не найден."
+
+msgid "The detected wpml-config.xml file does not contain translatable post types or taxonomies that wp-loc uses."
+msgstr "Найденный файл wpml-config.xml не содержит переводимых типов записей или таксономий, которые использует wp-loc."
+
+msgid "Current wp-loc settings do not contain translatable post types or taxonomies to write."
+msgstr "Текущие настройки wp-loc не содержат переводимых типов записей или таксономий для записи."
+
+msgid "Could not write wp-loc-config.xml."
+msgstr "Не удалось записать wp-loc-config.xml."
+
+msgid "Could not delete wpml-config.xml."
+msgstr "Не удалось удалить wpml-config.xml."
+
+msgid "This wpml-config.xml belongs to a plugin source and is shown as read-only here."
+msgstr "Этот wpml-config.xml принадлежит источнику плагина и показывается здесь только для чтения."
+
+msgid "None found."
+msgstr "Ничего не найдено."
+
+msgid "Detected config files"
+msgstr "Найденные конфиг-файлы"
+
+msgid "Detected post types"
+msgstr "Найденные типы записей"
+
+msgid "Detected taxonomies"
+msgstr "Найденные таксономии"
+
+msgid "Status:"
+msgstr "Статус:"
+
+msgid "wpml-config.xml found"
+msgstr "wpml-config.xml найден"
+
+msgid "wpml-config.xml not found"
+msgstr "wpml-config.xml не найден"
+
+msgid "Create wp-loc-config.xml from current settings"
+msgstr "Создать wp-loc-config.xml из текущих настроек"
+
+msgid "Current wp-loc config"
+msgstr "Текущий wp-loc config"
+
+msgid "This writes a lightweight wp-loc-config.xml file for the active theme based on the translatable post types and taxonomies currently enabled in wp-loc."
+msgstr "Это запишет легкий файл wp-loc-config.xml для активной темы на основе переводимых типов записей и таксономий, включенных сейчас в wp-loc."
+
+msgid "Target file"
+msgstr "Целевой файл"
+
+msgid "Post types"
+msgstr "Типы записей"
+
+msgid "Taxonomies"
+msgstr "Таксономии"
+
+msgid "Write wp-loc-config.xml"
+msgstr "Записать wp-loc-config.xml"
+
+msgid "Detected wpml-config.xml files"
+msgstr "Найденные файлы wpml-config.xml"
+
+msgid "Found wpml-config.xml files"
+msgstr "Найденные файлы wpml-config.xml"
+
+msgid "wp-loc reads only the post type and taxonomy information from WPML config files. Other WPML options are intentionally ignored here."
+msgstr "wp-loc считывает из файлов WPML config только информацию о типах записей и таксономиях. Остальные параметры WPML здесь намеренно игнорируются."
+
+msgid "No relevant wpml-config.xml files were found in the active theme or active plugins."
+msgstr "В активной теме или активных плагинах не найдено релевантных файлов wpml-config.xml."
+
+msgid "Existing wp-loc-config.xml"
+msgstr "Существующий wp-loc-config.xml"
+
+msgid "WPML file"
+msgstr "WPML файл"
+
+msgid "Theme"
+msgstr "Тема"
+
+msgid "Plugin"
+msgstr "Плагин"
+
+msgid "Generate wp-loc-config.xml"
+msgstr "Сгенерировать wp-loc-config.xml"
+
+msgid "Delete wpml-config.xml"
+msgstr "Удалить wpml-config.xml"
+
+msgid "Plugin config is shown as read-only here."
+msgstr "Конфиг плагина показывается здесь только для чтения."
+
+msgid "Detect WPML config files, extract only the post types and taxonomies relevant for wp-loc, and generate a lightweight wp-loc-config.xml file."
+msgstr "Найдите файлы WPML config, извлеките только релевантные для wp-loc типы записей и таксономии и сгенерируйте легкий файл wp-loc-config.xml."
+
 #~ msgctxt "ACF field translation preference"
 #~ msgid "Don't translate"
 #~ msgstr "Не переводить"

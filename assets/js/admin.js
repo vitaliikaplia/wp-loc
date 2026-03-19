@@ -5,10 +5,11 @@
 (function($) {
     'use strict';
 
+    const i18n = wpLocAdmin && wpLocAdmin.i18n ? wpLocAdmin.i18n : {};
+
     // Languages page — sortable table rows with auto-save
     if ($('.wp-loc-languages-table').length) {
         const $tbody = $('.wp-loc-languages-table tbody');
-        const i18n = wpLocAdmin && wpLocAdmin.i18n ? wpLocAdmin.i18n : {};
         $tbody.sortable({
             handle: '.lang-drag-handle',
             update: function() {
@@ -89,17 +90,27 @@
                 firstInvalidField.trigger('focus');
             }
         });
-
-        $(document).on('click', '.wp-loc-delete-link', function(event) {
-            const message = i18n.confirmDeleteLanguage
-                ? i18n.confirmDeleteLanguage
-                : 'Delete this language?';
-
-            if (!window.confirm(message)) {
-                event.preventDefault();
-            }
-        });
     }
+
+    $(document).on('click', '.wp-loc-delete-link', function(event) {
+        const message = i18n.confirmDeleteLanguage
+            ? i18n.confirmDeleteLanguage
+            : 'Delete this language?';
+
+        if (!window.confirm(message)) {
+            event.preventDefault();
+        }
+    });
+
+    $(document).on('click', '.wp-loc-config-delete', function(event) {
+        const message = i18n.confirmDeleteWpmlConfig
+            ? i18n.confirmDeleteWpmlConfig
+            : 'Delete this wpml-config.xml file?';
+
+        if (!window.confirm(message)) {
+            event.preventDefault();
+        }
+    });
 
     // Metabox — create single translation via AJAX
     $(document).on('click', '.wp-loc-create-single-translation', function() {
