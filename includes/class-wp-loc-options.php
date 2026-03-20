@@ -9,6 +9,16 @@ class WP_LOC_Options {
      */
     private static $multilingual_options = [];
 
+    private static function is_valid_localized_page_option_value( string $option, $value ): bool {
+        if ( ! in_array( $option, [ 'page_on_front', 'page_for_posts' ], true ) ) {
+            return true;
+        }
+
+        $page_id = (int) $value;
+
+        return $page_id > 0 && get_post_type( $page_id ) === 'page';
+    }
+
     public function __construct() {
         // Register built-in multilingual options
         add_action( 'init', [ $this, 'register_defaults' ], 5 );
@@ -92,7 +102,7 @@ class WP_LOC_Options {
             $localized_key
         ) );
 
-        if ( $value !== null ) {
+        if ( $value !== null && self::is_valid_localized_page_option_value( $option, maybe_unserialize( $value ) ) ) {
             return maybe_unserialize( $value );
         }
 
@@ -122,7 +132,8 @@ class WP_LOC_Options {
      * Save localized option when admin language differs from default
      */
     public function save_localized_option( string $option, $old_value, $value ): void {
-        if ( ! is_admin() ) return;
+        $is_page_option = in_array( $option, [ 'page_on_front', 'page_for_posts' ], true );
+        if ( ! is_admin() && ! $is_page_option ) return;
         if ( ! self::is_multilingual( $option ) ) return;
 
         // Prevent recursion
@@ -132,7 +143,10 @@ class WP_LOC_Options {
         $admin_lang = wp_loc_get_admin_lang();
         $default_lang = WP_LOC_Languages::get_default_language();
 
-        if ( $admin_lang === $default_lang ) return;
+        if ( $admin_lang === $default_lang ) {
+            $this->sync_localized_page_option_translations( $option, $value );
+            return;
+        }
 
         $localized_key = $option . '_' . $admin_lang;
 
@@ -142,6 +156,37 @@ class WP_LOC_Options {
         // Restore original value for default language
         update_option( $option, $old_value );
         unset( $saving[ $option ] );
+    }
+
+    private function sync_localized_page_option_translations( string $option, $value ): void {
+        if ( ! in_array( $option, [ 'page_on_front', 'page_for_posts' ], true ) ) {
+            return;
+        }
+
+        $page_id = (int) $value;
+        $default_lang = WP_LOC_Languages::get_default_language();
+
+        foreach ( array_keys( WP_LOC_Languages::get_active_languages() ) as $lang ) {
+            $localized_key = $option . '_' . $lang;
+
+            if ( $lang === $default_lang ) {
+                delete_option( $localized_key );
+                continue;
+            }
+
+            if ( $page_id <= 0 ) {
+                delete_option( $localized_key );
+                continue;
+            }
+
+            $translated_id = WP_LOC::instance()->db->get_element_translation( $page_id, WP_LOC_DB::post_element_type( 'page' ), $lang );
+
+            if ( $translated_id && get_post_type( $translated_id ) === 'page' ) {
+                update_option( $localized_key, $translated_id );
+            } else {
+                delete_option( $localized_key );
+            }
+        }
     }
 
     /**
@@ -176,7 +221,7 @@ class WP_LOC_Options {
 
                 unset( $filtering[ $option ] );
 
-                if ( $localized !== false && $localized !== '' ) {
+                if ( $localized !== false && $localized !== '' && self::is_valid_localized_page_option_value( $option, $localized ) ) {
                     return $localized;
                 }
 
