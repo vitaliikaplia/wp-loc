@@ -394,6 +394,148 @@ class WP_LOC_ACF {
         return null;
     }
 
+    private function get_term_context( $post_id ): ?array {
+        if ( ! function_exists( 'acf_decode_post_id' ) ) {
+            return null;
+        }
+
+        $decoded = acf_decode_post_id( $post_id );
+
+        if ( empty( $decoded['type'] ) || $decoded['type'] !== 'term' || empty( $decoded['id'] ) ) {
+            return null;
+        }
+
+        $term = get_term( (int) $decoded['id'] );
+
+        if ( ! $term instanceof \WP_Term || ! WP_LOC_Terms::is_translatable( $term->taxonomy ) ) {
+            return null;
+        }
+
+        return [
+            'term_id'  => (int) $term->term_id,
+            'taxonomy' => (string) $term->taxonomy,
+            'post_id'  => $term->taxonomy . '_' . (int) $term->term_id,
+        ];
+    }
+
+    private function get_term_acf_post_id( int $term_id, string $taxonomy ): string {
+        return $taxonomy . '_' . $term_id;
+    }
+
+    private function get_term_translation_targets( int $term_id, string $taxonomy ): array {
+        $translations = WP_LOC_Terms::get_term_translations( $term_id, $taxonomy );
+        $targets = [];
+
+        foreach ( $translations as $translation ) {
+            $target_id = WP_LOC_Terms::get_term_id_from_taxonomy_id( (int) ( $translation->element_id ?? 0 ), $taxonomy );
+
+            if ( $target_id && $target_id !== $term_id ) {
+                $targets[] = (int) $target_id;
+            }
+        }
+
+        return $targets;
+    }
+
+    private function sync_shared_term_field_value( int $term_id, string $taxonomy, array $field, $value ): void {
+        if ( empty( $field['key'] ) || ! function_exists( 'acf_update_value' ) ) {
+            return;
+        }
+
+        static $syncing = [];
+
+        $source_key = $taxonomy . ':' . $term_id . ':' . $field['key'];
+
+        if ( isset( $syncing[ $source_key ] ) ) {
+            return;
+        }
+
+        $syncing[ $source_key ] = true;
+
+        foreach ( $this->get_term_translation_targets( $term_id, $taxonomy ) as $target_id ) {
+            $target_key = $taxonomy . ':' . $target_id . ':' . $field['key'];
+
+            if ( isset( $syncing[ $target_key ] ) ) {
+                continue;
+            }
+
+            $syncing[ $target_key ] = true;
+            acf_update_value( $value, $this->get_term_acf_post_id( $target_id, $taxonomy ), $field );
+            unset( $syncing[ $target_key ] );
+        }
+
+        unset( $syncing[ $source_key ] );
+    }
+
+    private function sync_copy_once_term_field_value( int $term_id, string $taxonomy, array $field, $value ): void {
+        if ( empty( $field['key'] ) || empty( $field['name'] ) || ! function_exists( 'acf_update_value' ) ) {
+            return;
+        }
+
+        static $syncing = [];
+
+        $source_key = $taxonomy . ':' . $term_id . ':' . $field['key'] . ':copy_once';
+
+        if ( isset( $syncing[ $source_key ] ) ) {
+            return;
+        }
+
+        $syncing[ $source_key ] = true;
+
+        foreach ( $this->get_term_translation_targets( $term_id, $taxonomy ) as $target_id ) {
+            $target_key = $taxonomy . ':' . $target_id . ':' . $field['key'] . ':copy_once';
+
+            if ( isset( $syncing[ $target_key ] ) || metadata_exists( 'term', $target_id, $field['name'] ) ) {
+                continue;
+            }
+
+            $syncing[ $target_key ] = true;
+            acf_update_value( $value, $this->get_term_acf_post_id( $target_id, $taxonomy ), $field );
+            unset( $syncing[ $target_key ] );
+        }
+
+        unset( $syncing[ $source_key ] );
+    }
+
+    private function get_term_copy_once_source_id( int $term_id, string $taxonomy, array $field ): ?int {
+        if ( empty( $field['name'] ) ) {
+            return null;
+        }
+
+        if ( metadata_exists( 'term', $term_id, $field['name'] ) ) {
+            return null;
+        }
+
+        $translations = WP_LOC_Terms::get_term_translations( $term_id, $taxonomy );
+        $current_lang = WP_LOC_Terms::get_term_language( $term_id, $taxonomy );
+
+        if ( ! $current_lang || empty( $translations[ $current_lang ] ) ) {
+            return null;
+        }
+
+        $source_lang = $translations[ $current_lang ]->source_language_code ?? null;
+
+        if ( ! $source_lang || empty( $translations[ $source_lang ]->element_id ) ) {
+            return null;
+        }
+
+        return WP_LOC_Terms::get_term_id_from_taxonomy_id( (int) $translations[ $source_lang ]->element_id, $taxonomy );
+    }
+
+    private function build_term_meta( int $term_id ): array {
+        $all_meta = get_term_meta( $term_id );
+        $meta = [];
+
+        foreach ( $all_meta as $key => $value ) {
+            if ( isset( $all_meta[ "_{$key}" ] ) ) {
+                $meta[ $key ] = $value[0] ?? '';
+                $meta[ "_{$key}" ] = $all_meta[ "_{$key}" ][0] ?? '';
+            }
+        }
+
+        return $meta;
+    }
+
     private function get_translatable_post_types_for_acf(): array {
         static $cached = null;
 
@@ -757,6 +899,18 @@ class WP_LOC_ACF {
 
         $translation_mode = $this->get_translation_mode( $field );
 
+        $term_context = $this->get_term_context( $post_id );
+
+        if ( $term_context ) {
+            if ( in_array( $translation_mode, [ 'none', 'shared' ], true ) ) {
+                $this->sync_shared_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $field, $value );
+            } elseif ( $translation_mode === 'copy_once' ) {
+                $this->sync_copy_once_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $field, $value );
+            }
+
+            return $value;
+        }
+
         if ( ! $this->is_options_post_id( $post_id ) ) {
             $post_entity_id = $this->get_post_entity_id( $post_id );
 
@@ -840,6 +994,24 @@ class WP_LOC_ACF {
      * Load language-specific value for translatable ACF options fields
      */
     public function handle_pre_load_reference( $reference, string $field_name, $post_id ) {
+        $term_context = $this->get_term_context( $post_id );
+
+        if ( $reference === null && $term_context ) {
+            $source_term_id = $this->get_term_copy_once_source_id(
+                $term_context['term_id'],
+                $term_context['taxonomy'],
+                [ 'name' => $field_name ]
+            );
+
+            if ( $source_term_id ) {
+                $base_reference = get_term_meta( $source_term_id, "_{$field_name}", true );
+
+                if ( is_string( $base_reference ) && $base_reference !== '' ) {
+                    return $base_reference;
+                }
+            }
+        }
+
         if ( $reference !== null || ! $this->is_translated_options_post_id( $post_id ) ) {
             return $reference;
         }
@@ -868,6 +1040,36 @@ class WP_LOC_ACF {
 
                 return get_post_meta( $source_post_id, $field['name'], true );
             }
+        }
+
+        $term_context = $this->get_term_context( $post_id );
+
+        if ( $term_context ) {
+            $translation_mode = $this->get_translation_mode( $field );
+
+            if ( in_array( $translation_mode, [ 'none', 'shared' ], true ) ) {
+                $translations = WP_LOC_Terms::get_term_translations( $term_context['term_id'], $term_context['taxonomy'] );
+                $current_lang = WP_LOC_Terms::get_term_language( $term_context['term_id'], $term_context['taxonomy'] );
+
+                if ( $current_lang && ! empty( $translations[ $current_lang ]->source_language_code ) ) {
+                    $default_lang = WP_LOC_Languages::get_default_language();
+                    $shared_term_id = WP_LOC_Terms::get_term_translation( $term_context['term_id'], $term_context['taxonomy'], $default_lang ) ?: $term_context['term_id'];
+
+                    if ( $shared_term_id !== $term_context['term_id'] ) {
+                        return get_term_meta( $shared_term_id, $field['name'], true );
+                    }
+                }
+            }
+
+            if ( $translation_mode === 'copy_once' ) {
+                $source_term_id = $this->get_term_copy_once_source_id( $term_context['term_id'], $term_context['taxonomy'], $field );
+
+                if ( $source_term_id ) {
+                    return get_term_meta( $source_term_id, $field['name'], true );
+                }
+            }
+
+            return $null;
         }
 
         if ( ! $this->is_options_post_id( $post_id ) || ! isset( $field['name'] ) ) {
@@ -920,6 +1122,54 @@ class WP_LOC_ACF {
      * Inject localized ACF options meta so get_fields('options') sees translatable fields.
      */
     public function handle_pre_load_meta( $null, $post_id ) {
+        $term_context = $this->get_term_context( $post_id );
+
+        if ( $term_context ) {
+            $meta = $this->build_term_meta( $term_context['term_id'] );
+            $field_modes = get_option( 'wp_loc_acf_field_translation_modes', [] );
+
+            foreach ( $field_modes as $field_name => $mode ) {
+                if ( $mode === 'copy_once' && ! metadata_exists( 'term', $term_context['term_id'], $field_name ) ) {
+                    $source_term_id = $this->get_term_copy_once_source_id(
+                        $term_context['term_id'],
+                        $term_context['taxonomy'],
+                        [ 'name' => $field_name ]
+                    );
+
+                    if ( $source_term_id ) {
+                        $source_meta = $this->build_term_meta( $source_term_id );
+
+                        if ( array_key_exists( $field_name, $source_meta ) ) {
+                            $meta[ $field_name ] = $source_meta[ $field_name ];
+                        }
+
+                        if ( array_key_exists( "_{$field_name}", $source_meta ) ) {
+                            $meta[ "_{$field_name}" ] = $source_meta[ "_{$field_name}" ];
+                        }
+                    }
+                }
+
+                if ( in_array( $mode, [ 'none', 'shared' ], true ) && ! metadata_exists( 'term', $term_context['term_id'], $field_name ) ) {
+                    $default_lang = WP_LOC_Languages::get_default_language();
+                    $shared_term_id = WP_LOC_Terms::get_term_translation( $term_context['term_id'], $term_context['taxonomy'], $default_lang ) ?: $term_context['term_id'];
+
+                    if ( $shared_term_id && $shared_term_id !== $term_context['term_id'] ) {
+                        $shared_meta = $this->build_term_meta( $shared_term_id );
+
+                        if ( array_key_exists( $field_name, $shared_meta ) ) {
+                            $meta[ $field_name ] = $shared_meta[ $field_name ];
+                        }
+
+                        if ( array_key_exists( "_{$field_name}", $shared_meta ) ) {
+                            $meta[ "_{$field_name}" ] = $shared_meta[ "_{$field_name}" ];
+                        }
+                    }
+                }
+            }
+
+            return $meta;
+        }
+
         $post_entity_id = $this->get_post_entity_id( $post_id );
 
         if ( $post_entity_id ) {

@@ -152,6 +152,14 @@ class WP_LOC_Terms {
     }
 
     /**
+     * Build a frontend URL from the raw home option without reapplying the current-language home_url() filter.
+     */
+    private static function build_raw_frontend_url( string $path = '/', ?string $scheme = null ): string {
+        $raw_home = set_url_scheme( get_option( 'home' ), $scheme );
+        return rtrim( $raw_home, '/' ) . '/' . ltrim( $path, '/' );
+    }
+
+    /**
      * Get term translations keyed by language for a term_id.
      *
      * @return array<string,\stdClass>
@@ -428,7 +436,7 @@ class WP_LOC_Terms {
 
         if ( ! $translated_term_id ) {
             $default = WP_LOC_Languages::get_default_language();
-            return home_url( $target_lang === $default ? '/' : "/{$target_lang}/" );
+            return self::build_raw_frontend_url( $target_lang === $default ? '/' : "/{$target_lang}/" );
         }
 
         self::$adjusting_term = true;
@@ -1790,10 +1798,6 @@ class WP_LOC_Terms {
             return '';
         }
 
-        if ( $lang === $default ) {
-            return $termlink;
-        }
-
         $path = parse_url( $termlink, PHP_URL_PATH );
         if ( ! $path ) {
             return $termlink;
@@ -1801,10 +1805,21 @@ class WP_LOC_Terms {
 
         $normalized_path = '/' . ltrim( $path, '/' );
 
-        if ( ! str_starts_with( $normalized_path, '/' . $lang . '/' ) ) {
+        foreach ( WP_LOC_Languages::get_additional_languages() as $lang_code ) {
+            $lang_prefix = '/' . $lang_code . '/';
+
+            if ( str_starts_with( $normalized_path, $lang_prefix ) ) {
+                $normalized_path = '/' . ltrim( substr( $normalized_path, strlen( $lang_prefix ) ), '/' );
+                break;
+            }
+        }
+
+        if ( $lang !== $default && ! str_starts_with( $normalized_path, '/' . $lang . '/' ) ) {
             $normalized_path = '/' . $lang . $normalized_path;
         }
 
-        return home_url( trailingslashit( ltrim( $normalized_path, '/' ) ) );
+        $url_scheme = wp_parse_url( $termlink, PHP_URL_SCHEME );
+
+        return self::build_raw_frontend_url( trailingslashit( ltrim( $normalized_path, '/' ) ), $url_scheme ?: null );
     }
 }
