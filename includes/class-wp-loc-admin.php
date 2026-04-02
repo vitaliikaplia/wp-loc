@@ -36,6 +36,7 @@ class WP_LOC_Admin {
         $admin_locale = self::get_admin_locale();
         $gutenberg_languages = [];
         $gutenberg_title_translate = null;
+        $classic_title_translate = null;
         $protected_category_term_ids = [];
         $hide_protected_term_delete_link = false;
         $disable_page_selects_message = '';
@@ -44,6 +45,24 @@ class WP_LOC_Admin {
         $admin_js_version = file_exists( WP_LOC_PATH . 'assets/js/admin.min.js' ) ? (string) filemtime( WP_LOC_PATH . 'assets/js/admin.min.js' ) : WP_LOC_VERSION;
 
         // Add wp-data dependency on post edit screens for Gutenberg metabox refresh
+        if ( $screen && $editing_post_id && get_post( $editing_post_id ) ) {
+            $editing_post = get_post( $editing_post_id );
+
+            if ( $editing_post instanceof \WP_Post && WP_LOC_Admin_Settings::is_translatable( $editing_post->post_type ) ) {
+                $title_translate_config = [
+                    'postId'      => $editing_post->ID,
+                    'currentLang' => WP_LOC::instance()->db->get_element_language( $editing_post->ID, WP_LOC_DB::post_element_type( $editing_post->post_type ) ),
+                    'targets'     => $this->get_title_translate_targets( $editing_post ),
+                ];
+
+                if ( $screen->is_block_editor ) {
+                    $gutenberg_title_translate = $title_translate_config;
+                } elseif ( in_array( $screen->base, [ 'post', 'post-new' ], true ) ) {
+                    $classic_title_translate = $title_translate_config;
+                }
+            }
+        }
+
         if ( $screen && $screen->is_block_editor ) {
             $deps[] = 'wp-data';
             if ( $editing_post_id && get_post( $editing_post_id ) ) {
@@ -59,14 +78,6 @@ class WP_LOC_Admin {
                         'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
                         'url'    => $slug === $admin_lang ? '' : add_query_arg( 'wp_loc_lang', $slug, $base_url ),
                         'active' => $slug === $admin_lang,
-                    ];
-                }
-
-                if ( $editing_post instanceof \WP_Post && WP_LOC_Admin_Settings::is_translatable( $editing_post->post_type ) ) {
-                    $gutenberg_title_translate = [
-                        'postId'      => $editing_post->ID,
-                        'currentLang' => WP_LOC::instance()->db->get_element_language( $editing_post->ID, WP_LOC_DB::post_element_type( $editing_post->post_type ) ),
-                        'targets'     => $this->get_title_translate_targets( $editing_post ),
                     ];
                 }
             }
@@ -105,6 +116,7 @@ class WP_LOC_Admin {
             'adminLangFlag' => WP_LOC_Languages::get_flag_url( $admin_locale ),
             'gutenbergLanguages' => $gutenberg_languages,
             'gutenbergTitleTranslate' => $gutenberg_title_translate,
+            'classicTitleTranslate' => $classic_title_translate,
             'disablePageSelectsMessage' => $disable_page_selects_message,
             'protectedCategoryTermIds' => $protected_category_term_ids,
             'hideProtectedTermDeleteLink' => $hide_protected_term_delete_link,
@@ -119,6 +131,7 @@ class WP_LOC_Admin {
                 'translateTitle' => __( 'Translate title', 'wp-loc' ),
                 'translateTermName' => __( 'Translate term name', 'wp-loc' ),
                 'chooseTargetLanguage' => __( 'Choose target language', 'wp-loc' ),
+                'autoUpdateSlug' => __( 'Automatically update the slug from the translated title', 'wp-loc' ),
                 'noTitleToTranslate' => __( 'There is no title to translate.', 'wp-loc' ),
                 'noTermNameToTranslate' => __( 'There is no term name to translate.', 'wp-loc' ),
                 'noAvailableTranslationTargets' => __( 'There are no available translation targets for this post.', 'wp-loc' ),
@@ -221,6 +234,10 @@ class WP_LOC_Admin {
                 <h2 id="wp-loc-title-translate-modal-title"><?php esc_html_e( 'Translate title', 'wp-loc' ); ?></h2>
                 <p class="wp-loc-title-translate-modal__description"><?php esc_html_e( 'Choose target language', 'wp-loc' ); ?></p>
                 <div class="wp-loc-title-translate-modal__targets"></div>
+                <label class="wp-loc-title-translate-modal__slug-toggle">
+                    <input type="checkbox" class="wp-loc-title-translate-update-slug" checked />
+                    <span><?php esc_html_e( 'Automatically update the slug from the translated title', 'wp-loc' ); ?></span>
+                </label>
                 <div class="wp-loc-title-translate-modal__status" aria-live="polite"></div>
             </div>
         </div>
@@ -706,6 +723,9 @@ class WP_LOC_Admin {
 
         $post_id = isset( $_POST['post_id'] ) ? (int) $_POST['post_id'] : 0;
         $target_lang = isset( $_POST['target_lang'] ) ? sanitize_key( (string) $_POST['target_lang'] ) : '';
+        $should_update_slug = ! isset( $_POST['update_slug'] ) || rest_sanitize_boolean( $_POST['update_slug'] );
+        $editor_context = ! empty( $_POST['editor_context'] ) && rest_sanitize_boolean( $_POST['editor_context'] );
+        $current_post_only = ! empty( $_POST['current_post_only'] ) && rest_sanitize_boolean( $_POST['current_post_only'] );
 
         if ( ! $post_id || ! $target_lang ) {
             wp_send_json_error( [ 'message' => __( 'Missing required parameters.', 'wp-loc' ) ], 400 );
@@ -733,9 +753,13 @@ class WP_LOC_Admin {
             wp_send_json_error( [ 'message' => __( 'Source post language was not found.', 'wp-loc' ) ], 400 );
         }
 
-        $translated_post_id = $source_lang === $target_lang
+        $translated_post_id = $current_post_only
             ? $post_id
-            : (int) $db->get_element_translation( $post_id, $element_type, $target_lang );
+            : (
+                $source_lang === $target_lang
+                    ? $post_id
+                    : (int) $db->get_element_translation( $post_id, $element_type, $target_lang )
+            );
 
         if ( ! $translated_post_id ) {
             wp_send_json_error( [ 'message' => __( 'Translation post was not found for the selected language.', 'wp-loc' ) ], 404 );
@@ -757,6 +781,32 @@ class WP_LOC_Admin {
             wp_send_json_error( [ 'message' => __( 'Title translation failed.', 'wp-loc' ) ], 500 );
         }
 
+        $new_slug = (string) $post->post_name;
+
+        if ( $should_update_slug ) {
+            $new_slug = sanitize_title( $translated_title );
+            $new_slug = wp_unique_post_slug(
+                $new_slug,
+                $post_id,
+                (string) $post->post_status,
+                (string) $post->post_type,
+                (int) $post->post_parent
+            );
+        }
+
+        if ( $editor_context ) {
+            wp_send_json_success(
+                [
+                    'message'      => __( 'Title translated successfully.', 'wp-loc' ),
+                    'new_title'    => $translated_title,
+                    'new_slug'     => $new_slug,
+                    'slug_updated' => $should_update_slug,
+                    'target_lang'  => $target_lang,
+                    'editor_only'  => true,
+                ]
+            );
+        }
+
         $result = wp_update_post(
             [
                 'ID'         => $translated_post_id,
@@ -769,27 +819,30 @@ class WP_LOC_Admin {
             wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
         }
 
-        $new_slug = sanitize_title( $translated_title );
-        $new_slug = wp_unique_post_slug(
-            $new_slug,
-            $translated_post_id,
-            (string) $translated_post->post_status,
-            (string) $translated_post->post_type,
-            (int) $translated_post->post_parent
-        );
+        if ( $should_update_slug ) {
+            $new_slug = sanitize_title( $translated_title );
+            $new_slug = wp_unique_post_slug(
+                $new_slug,
+                $translated_post_id,
+                (string) $translated_post->post_status,
+                (string) $translated_post->post_type,
+                (int) $translated_post->post_parent
+            );
 
-        wp_update_post(
-            [
-                'ID'        => $translated_post_id,
-                'post_name' => $new_slug,
-            ]
-        );
+            wp_update_post(
+                [
+                    'ID'        => $translated_post_id,
+                    'post_name' => $new_slug,
+                ]
+            );
+        }
 
         wp_send_json_success(
             [
                 'message'    => __( 'Title translated successfully.', 'wp-loc' ),
                 'new_title'  => $translated_title,
                 'new_slug'   => $new_slug,
+                'slug_updated' => $should_update_slug,
                 'target_lang'=> $target_lang,
                 'edit_url'   => get_edit_post_link( $translated_post_id, 'raw' ),
             ]

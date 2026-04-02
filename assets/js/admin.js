@@ -854,6 +854,10 @@
                     '<h2 id="wp-loc-title-translate-modal-title">' + (wpLocAdmin.i18n && wpLocAdmin.i18n.translateTitle ? wpLocAdmin.i18n.translateTitle : 'Translate title') + '</h2>' +
                     '<p class="wp-loc-title-translate-modal__description">' + (wpLocAdmin.i18n && wpLocAdmin.i18n.chooseTargetLanguage ? wpLocAdmin.i18n.chooseTargetLanguage : 'Choose target language') + '</p>' +
                     '<div class="wp-loc-title-translate-modal__targets"></div>' +
+                    '<label class="wp-loc-title-translate-modal__slug-toggle">' +
+                        '<input type="checkbox" class="wp-loc-title-translate-update-slug" checked />' +
+                        '<span>' + (wpLocAdmin.i18n && wpLocAdmin.i18n.autoUpdateSlug ? wpLocAdmin.i18n.autoUpdateSlug : 'Automatically update the slug from the translated title') + '</span>' +
+                    '</label>' +
                     '<div class="wp-loc-title-translate-modal__status" aria-live="polite"></div>' +
                 '</div>';
 
@@ -865,12 +869,15 @@
 
         const targetsWrap = modal.querySelector('.wp-loc-title-translate-modal__targets');
         const statusWrap = modal.querySelector('.wp-loc-title-translate-modal__status');
+        const slugToggleWrap = modal.querySelector('.wp-loc-title-translate-modal__slug-toggle');
+        const slugToggleInput = modal.querySelector('.wp-loc-title-translate-update-slug');
         const closeSelectors = '.wp-loc-title-translate-modal__close, .wp-loc-title-translate-modal__backdrop';
         const i18n = Object.assign({
             translating: 'Translating...',
             translateTitle: 'Translate title',
             translateTermName: 'Translate term name',
             chooseTargetLanguage: 'Choose target language',
+            autoUpdateSlug: 'Automatically update the slug from the translated title',
             noTitleToTranslate: 'There is no title to translate.',
             noTermNameToTranslate: 'There is no term name to translate.',
             noAvailableTranslationTargets: 'There are no available translation targets for this post.',
@@ -913,7 +920,69 @@
             if (targetsWrap) {
                 targetsWrap.innerHTML = '';
             }
+            if (slugToggleInput) {
+                slugToggleInput.checked = true;
+            }
             setStatus('', '');
+        };
+
+        const updateClassicPermalinkUi = function(newSlug) {
+            if (!newSlug) {
+                return;
+            }
+
+            const realSlugInput = document.querySelector('#post_name');
+            const slugInput = document.querySelector('#new-post-slug');
+            const editableFull = document.querySelector('#editable-post-name-full');
+            const editableShort = document.querySelector('#editable-post-name');
+            const permalinkAnchor = document.querySelector('#sample-permalink a');
+            const viewLink = document.querySelector('#view-post-btn a');
+
+            if (realSlugInput) {
+                realSlugInput.value = newSlug;
+            }
+
+            if (slugInput) {
+                slugInput.value = newSlug;
+            }
+
+            if (editableFull) {
+                editableFull.textContent = newSlug;
+            }
+
+            if (editableShort) {
+                editableShort.textContent = newSlug;
+            }
+
+            const updateHrefSlug = function(href) {
+                if (!href) {
+                    return href;
+                }
+
+                try {
+                    const url = new URL(href, window.location.origin);
+                    const parts = url.pathname.split('/').filter(Boolean);
+
+                    if (!parts.length) {
+                        return href;
+                    }
+
+                    parts[parts.length - 1] = newSlug;
+                    url.pathname = '/' + parts.join('/') + '/';
+                    return url.toString();
+                } catch (error) {
+                    return href;
+                }
+            };
+
+            if (permalinkAnchor) {
+                permalinkAnchor.href = updateHrefSlug(permalinkAnchor.href);
+                permalinkAnchor.textContent = permalinkAnchor.href;
+            }
+
+            if (viewLink) {
+                viewLink.href = updateHrefSlug(viewLink.href);
+            }
         };
 
         const titleNode = modal.querySelector('#wp-loc-title-translate-modal-title');
@@ -928,6 +997,12 @@
             currentEntityType = config.entityType || 'post';
             if (targetsWrap) {
                 targetsWrap.innerHTML = '';
+            }
+            if (slugToggleWrap) {
+                slugToggleWrap.hidden = currentEntityType !== 'post';
+            }
+            if (slugToggleInput) {
+                slugToggleInput.checked = true;
             }
             setStatus('', '');
             if (titleNode) {
@@ -1040,12 +1115,83 @@
             titleWrapper.appendChild(button);
         };
 
+        const renderClassicButton = function() {
+            const config = wpLocAdmin.classicTitleTranslate;
+            if (!config || !config.postId || !Array.isArray(config.targets) || !config.targets.length) {
+                return;
+            }
+
+            const titleWrap = document.querySelector('#titlediv #titlewrap');
+            const titleInput = document.querySelector('#title');
+
+            if (!titleWrap || !titleInput || titleWrap.querySelector('.wp-loc-classic-title-translate')) {
+                return;
+            }
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'wp-loc-classic-title-translate';
+            button.setAttribute('aria-label', i18n.translateTitle);
+            button.setAttribute('title', i18n.translateTitle);
+            button.innerHTML = '<span class="dashicons dashicons-translation" aria-hidden="true"></span>';
+
+            titleWrap.classList.add('wp-loc-has-classic-title-translate');
+            titleWrap.appendChild(button);
+        };
+
+        const renderTermEditButton = function() {
+            const dataNode = document.querySelector('#wp-loc-term-edit-translate-data');
+            const nameInput = document.querySelector('#name');
+
+            if (!dataNode || !nameInput) {
+                return;
+            }
+
+            let targets = [];
+
+            try {
+                targets = JSON.parse(dataNode.getAttribute('data-targets') || '[]');
+            } catch (error) {
+                targets = [];
+            }
+
+            if (!targets.length) {
+                return;
+            }
+
+            const inputWrap = nameInput.closest('td');
+
+            if (!inputWrap || inputWrap.querySelector('.wp-loc-term-edit-translate')) {
+                return;
+            }
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'wp-loc-term-edit-translate';
+            button.setAttribute('aria-label', i18n.translateTermName || i18n.translateTitle);
+            button.setAttribute('title', i18n.translateTermName || i18n.translateTitle);
+            button.setAttribute('data-term-id', dataNode.getAttribute('data-term-id') || '');
+            button.setAttribute('data-taxonomy', dataNode.getAttribute('data-taxonomy') || '');
+            button.setAttribute('data-current-title', dataNode.getAttribute('data-current-title') || '');
+            button.setAttribute('data-targets', dataNode.getAttribute('data-targets') || '[]');
+            button.innerHTML = '<span class="dashicons dashicons-translation" aria-hidden="true"></span>';
+
+            inputWrap.classList.add('wp-loc-has-term-edit-translate');
+            inputWrap.appendChild(button);
+        };
+
         if (typeof wp !== 'undefined' && wp.data && wp.data.subscribe && wpLocAdmin.gutenbergTitleTranslate) {
             renderGutenbergButton();
             wp.data.subscribe(function() {
                 renderGutenbergButton();
             });
         }
+
+        if (wpLocAdmin.classicTitleTranslate) {
+            renderClassicButton();
+        }
+
+        renderTermEditButton();
 
         $(document).on('click', '.wp-loc-gutenberg-title-translate', function(event) {
             event.preventDefault();
@@ -1068,6 +1214,60 @@
                 source: 'gutenberg',
                 entityType: 'post',
                 modalTitle: i18n.translateTitle
+            });
+        });
+
+        $(document).on('click', '.wp-loc-classic-title-translate', function(event) {
+            event.preventDefault();
+
+            const config = wpLocAdmin.classicTitleTranslate || {};
+            const titleInput = document.querySelector('#title');
+            const title = titleInput ? String(titleInput.value || '').trim() : '';
+
+            if (!title) {
+                window.alert(i18n.noTitleToTranslate);
+                return;
+            }
+
+            openModal({
+                postId: parseInt(config.postId || '0', 10),
+                title: title,
+                targets: config.targets || [],
+                source: 'classic',
+                entityType: 'post',
+                modalTitle: i18n.translateTitle
+            });
+        });
+
+        $(document).on('click', '.wp-loc-term-edit-translate', function(event) {
+            event.preventDefault();
+
+            const termId = parseInt(this.getAttribute('data-term-id') || '0', 10);
+            const taxonomy = String(this.getAttribute('data-taxonomy') || '');
+            const nameInput = document.querySelector('#name');
+            const title = nameInput ? String(nameInput.value || '').trim() : '';
+            const rawTargets = this.getAttribute('data-targets') || '[]';
+            let targets = [];
+
+            try {
+                targets = JSON.parse(rawTargets);
+            } catch (error) {
+                targets = [];
+            }
+
+            if (!title) {
+                window.alert(i18n.noTermNameToTranslate || i18n.noTitleToTranslate);
+                return;
+            }
+
+            openModal({
+                termId: termId,
+                taxonomy: taxonomy,
+                title: title,
+                targets: targets,
+                source: 'term-edit',
+                entityType: 'term',
+                modalTitle: i18n.translateTermName || i18n.translateTitle
             });
         });
 
@@ -1105,6 +1305,12 @@
             } else {
                 payload.action = 'wp_loc_translate_post_title';
                 payload.post_id = currentPostId;
+                payload.update_slug = slugToggleInput && slugToggleInput.checked ? '1' : '0';
+                if (currentSource === 'gutenberg' || currentSource === 'classic') {
+                    payload.editor_context = '1';
+                } else if (currentSource === 'list') {
+                    payload.current_post_only = '1';
+                }
             }
 
             $.post(wpLocAdmin.ajaxUrl, {
@@ -1122,14 +1328,47 @@
                         : i18n.titleTranslateSuccess),
                     'success'
                 );
-                if (currentSource === 'gutenberg' && currentEntityType === 'post') {
-                    const config = wpLocAdmin.gutenbergTitleTranslate || {};
-                    const currentLang = String(config.currentLang || '');
+                if (currentSource !== 'list' && currentEntityType === 'post') {
+                    if (currentSource === 'gutenberg') {
+                        if (typeof wp !== 'undefined' && wp.data && wp.data.dispatch) {
+                            const postUpdate = {
+                                title: response.data.new_title || currentTitle
+                            };
 
-                    if (response.data && response.data.target_lang === currentLang && typeof wp !== 'undefined' && wp.data && wp.data.dispatch) {
-                        wp.data.dispatch('core/editor').editPost({
-                            title: response.data.new_title || currentTitle
-                        });
+                            if (response.data.slug_updated && response.data.new_slug) {
+                                postUpdate.slug = response.data.new_slug;
+                            }
+
+                            wp.data.dispatch('core/editor').editPost(postUpdate);
+                        }
+                    } else if (currentSource === 'classic') {
+                        const titleInput = document.querySelector('#title');
+                        if (titleInput) {
+                            titleInput.value = response.data.new_title || currentTitle;
+                            $(titleInput).trigger('input').trigger('change');
+                        }
+
+                        if (response.data.slug_updated && response.data.new_slug) {
+                            updateClassicPermalinkUi(response.data.new_slug);
+                        }
+                    } else if (currentSource === 'term-edit') {
+                        const nameInput = document.querySelector('#name');
+                        const slugInput = document.querySelector('#slug');
+                        const dataNode = document.querySelector('#wp-loc-term-edit-translate-data');
+
+                        if (nameInput) {
+                            nameInput.value = response.data.new_title || currentTitle;
+                            $(nameInput).trigger('input').trigger('change');
+                        }
+
+                        if (slugInput && response.data.new_slug) {
+                            slugInput.value = response.data.new_slug;
+                            $(slugInput).trigger('input').trigger('change');
+                        }
+
+                        if (dataNode) {
+                            dataNode.setAttribute('data-current-title', response.data.new_title || currentTitle);
+                        }
                     }
 
                     window.setTimeout(function() {

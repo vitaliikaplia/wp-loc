@@ -219,6 +219,10 @@ msgstr "Дія"
 msgid "Default"
 msgstr "За замовчуванням"
 
+#: includes/class-wp-loc-admin.php:134 includes/class-wp-loc-admin.php:239
+msgid "Automatically update the slug from the translated title"
+msgstr "Автоматично оновлювати слаг із перекладеного заголовка"
+
 #: includes/class-wp-loc-admin-languages.php:398
 msgid "Delete"
 msgstr "Видалити"

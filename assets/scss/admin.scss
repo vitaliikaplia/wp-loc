@@ -160,6 +160,95 @@ $transition-speed: .15s;
   }
 }
 
+#titlediv {
+  #titlewrap.wp-loc-has-classic-title-translate {
+    position: relative;
+
+    #title {
+      padding-right: 38px;
+    }
+  }
+}
+
+.wp-loc-classic-title-translate {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  margin: -2px 0 0 0;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #50575e;
+  cursor: pointer;
+
+  .dashicons {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+  }
+
+  &:hover,
+  &:focus {
+    color: $color-wp-blue;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+.wp-loc-has-term-edit-translate {
+  position: relative;
+
+  #name {
+    padding-right: 42px;
+  }
+}
+
+.wp-loc-term-edit-translate {
+  position: absolute;
+  top: 17px;
+  right: 42px;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #50575e;
+  cursor: pointer;
+
+  .dashicons {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+  }
+
+  &:hover,
+  &:focus {
+    color: $color-wp-blue;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
 // ===========================================
 // Translation Meta Box (post editor sidebar)
 // ===========================================
@@ -1157,6 +1246,18 @@ td.column-wp_loc_translations {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
+}
+
+.wp-loc-title-translate-modal__slug-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: #1d2327;
+
+  input {
+    margin: 0;
+  }
 }
 
 .wp-loc-title-translate-target {

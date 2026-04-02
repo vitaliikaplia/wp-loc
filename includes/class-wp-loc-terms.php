@@ -1475,10 +1475,7 @@ class WP_LOC_Terms {
         }
 
         $source_lang = self::get_term_language( (int) $term->term_id, $taxonomy ) ?: self::get_context_language();
-
-        $target_term_id = $source_lang === $target_lang
-            ? (int) $term->term_id
-            : (int) self::get_term_translation( (int) $term->term_id, $taxonomy, $target_lang );
+        $target_term_id = (int) $term->term_id;
 
         if ( ! $target_term_id ) {
             wp_send_json_error( [ 'message' => __( 'Translation term was not found for the selected language.', 'wp-loc' ) ], 404 );
@@ -1576,8 +1573,18 @@ class WP_LOC_Terms {
      */
     public function render_term_edit_hidden_fields( \WP_Term $term, string $taxonomy ): void {
         $lang = self::get_term_language( (int) $term->term_id, $taxonomy ) ?: self::get_context_language();
+        $targets = $this->get_term_translate_targets( $term );
 
         echo '<input type="hidden" name="wp_loc_lang" value="' . esc_attr( $lang ) . '" />';
+
+        if ( ! empty( $targets ) ) {
+            echo '<div id="wp-loc-term-edit-translate-data" hidden'
+                . ' data-term-id="' . esc_attr( (string) $term->term_id ) . '"'
+                . ' data-taxonomy="' . esc_attr( $taxonomy ) . '"'
+                . ' data-current-title="' . esc_attr( $term->name ) . '"'
+                . ' data-targets="' . esc_attr( wp_json_encode( $targets, JSON_UNESCAPED_UNICODE ) ) . '"'
+                . '></div>';
+        }
     }
 
     /**
