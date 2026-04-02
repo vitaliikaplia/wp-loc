@@ -683,6 +683,48 @@ class WP_LOC_ACF {
         return null;
     }
 
+    private function get_post_shared_source_id( int $post_id, array $field ): ?int {
+        $post = get_post( $post_id );
+
+        if ( ! $post instanceof \WP_Post || ! $this->is_translatable_post_type_for_acf( $post->post_type ) ) {
+            return null;
+        }
+
+        if ( empty( $field['name'] ) ) {
+            return null;
+        }
+
+        if ( metadata_exists( 'post', $post_id, $field['name'] ) ) {
+            return null;
+        }
+
+        $element_type = WP_LOC_DB::post_element_type( $post->post_type );
+        $trid = WP_LOC::instance()->db->get_trid( $post_id, $element_type );
+
+        if ( ! $trid ) {
+            return null;
+        }
+
+        $translations = WP_LOC::instance()->db->get_element_translations( $trid, $element_type );
+        $current_lang = WP_LOC::instance()->db->get_element_language( $post_id, $element_type );
+
+        if ( ! $current_lang || empty( $translations[ $current_lang ] ) ) {
+            return null;
+        }
+
+        $source_lang = $translations[ $current_lang ]->source_language_code ?? null;
+
+        if ( ! $source_lang ) {
+            return null;
+        }
+
+        if ( ! empty( $translations[ $source_lang ]->element_id ) ) {
+            return (int) $translations[ $source_lang ]->element_id;
+        }
+
+        return null;
+    }
+
     private function translate_nav_menu_id_for_context( int $menu_id, ?string $target_lang = null ): int {
         if ( ! $menu_id || ! is_nav_menu( $menu_id ) ) {
             return $menu_id;
@@ -1030,6 +1072,18 @@ class WP_LOC_ACF {
     public function handle_pre_load_value( $null, $post_id, array $field ) {
         $post_entity_id = $this->get_post_entity_id( $post_id );
 
+        if ( $post_entity_id && in_array( $this->get_translation_mode( $field ), [ 'none', 'shared' ], true ) ) {
+            $source_post_id = $this->get_post_shared_source_id( $post_entity_id, $field );
+
+            if ( $source_post_id ) {
+                if ( function_exists( 'acf_get_value' ) ) {
+                    return acf_get_value( $source_post_id, $field );
+                }
+
+                return get_post_meta( $source_post_id, $field['name'], true );
+            }
+        }
+
         if ( $post_entity_id && $this->get_translation_mode( $field ) === 'copy_once' ) {
             $source_post_id = $this->get_post_copy_once_source_id( $post_entity_id, $field );
 
@@ -1173,29 +1227,34 @@ class WP_LOC_ACF {
         $post_entity_id = $this->get_post_entity_id( $post_id );
 
         if ( $post_entity_id ) {
-            $source_post_id = $this->get_post_copy_once_source_id( $post_entity_id, [ 'name' => '__bulk__' ] );
+            $meta = $this->build_post_meta( $post_entity_id );
+            $field_modes = get_option( 'wp_loc_acf_field_translation_modes', [] );
 
-            if ( $source_post_id ) {
-                $meta = $this->build_post_meta( $post_entity_id );
-                $source_meta = $this->build_post_meta( $source_post_id );
-                $field_modes = get_option( 'wp_loc_acf_field_translation_modes', [] );
-
-                foreach ( $field_modes as $field_name => $mode ) {
-                    if ( $mode !== 'copy_once' || metadata_exists( 'post', $post_entity_id, $field_name ) ) {
-                        continue;
-                    }
-
-                    if ( array_key_exists( $field_name, $source_meta ) ) {
-                        $meta[ $field_name ] = $source_meta[ $field_name ];
-                    }
-
-                    if ( array_key_exists( "_{$field_name}", $source_meta ) ) {
-                        $meta[ "_{$field_name}" ] = $source_meta[ "_{$field_name}" ];
-                    }
+            foreach ( $field_modes as $field_name => $mode ) {
+                if ( ! in_array( $mode, [ 'none', 'shared', 'copy_once' ], true ) || metadata_exists( 'post', $post_entity_id, $field_name ) ) {
+                    continue;
                 }
 
-                return $meta;
+                $source_post_id = in_array( $mode, [ 'none', 'shared' ], true )
+                    ? $this->get_post_shared_source_id( $post_entity_id, [ 'name' => $field_name ] )
+                    : $this->get_post_copy_once_source_id( $post_entity_id, [ 'name' => $field_name ] );
+
+                if ( ! $source_post_id ) {
+                    continue;
+                }
+
+                $source_meta = $this->build_post_meta( $source_post_id );
+
+                if ( array_key_exists( $field_name, $source_meta ) ) {
+                    $meta[ $field_name ] = $source_meta[ $field_name ];
+                }
+
+                if ( array_key_exists( "_{$field_name}", $source_meta ) ) {
+                    $meta[ "_{$field_name}" ] = $source_meta[ "_{$field_name}" ];
+                }
             }
+
+            return $meta;
         }
 
         if ( ! $this->is_options_post_id( $post_id ) || ! function_exists( 'acf_decode_post_id' ) || ! function_exists( 'acf_get_option_meta' ) ) {
@@ -1579,6 +1638,16 @@ class WP_LOC_ACF {
 
                 if ( ! empty( $field['sub_fields'] ) && is_array( $field['sub_fields'] ) ) {
                     $walker( $field['sub_fields'] );
+                }
+
+                if ( ! empty( $field['layouts'] ) && is_array( $field['layouts'] ) ) {
+                    foreach ( $field['layouts'] as $layout ) {
+                        if ( empty( $layout['sub_fields'] ) || ! is_array( $layout['sub_fields'] ) ) {
+                            continue;
+                        }
+
+                        $walker( $layout['sub_fields'] );
+                    }
                 }
             }
         };
