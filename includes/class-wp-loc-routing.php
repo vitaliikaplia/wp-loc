@@ -95,48 +95,86 @@ class WP_LOC_Routing {
 
         // Resolve pagename with language
         if ( isset( $query_vars['pagename'] ) && $effective_lang ) {
-            $slug = $query_vars['pagename'];
-            $lang_slug = $effective_lang;
+            $post_id = $this->resolve_pagename_to_post_id( (string) $query_vars['pagename'], $effective_lang, $active_languages );
 
-            if ( isset( $active_languages[ $lang_slug ] ) ) {
-                global $wpdb;
-                $table = WP_LOC::instance()->db->get_table();
-
-                // Try translatable posts first (match by slug + language)
-                $post_id = $wpdb->get_var( $wpdb->prepare(
-                    "SELECT p.ID FROM {$wpdb->posts} p
-                     INNER JOIN {$table} t ON t.element_id = p.ID AND t.element_type = CONCAT('post_', p.post_type)
-                     WHERE p.post_name = %s
-                       AND t.language_code = %s
-                       AND p.post_status NOT IN ('trash', 'auto-draft')
-                     LIMIT 1",
-                    $slug,
-                    $lang_slug
-                ) );
-
-                // Fallback: non-translatable post types (not in icl_translations at all)
-                if ( ! $post_id ) {
-                    $post_id = $wpdb->get_var( $wpdb->prepare(
-                        "SELECT p.ID FROM {$wpdb->posts} p
-                         LEFT JOIN {$table} t ON t.element_id = p.ID AND t.element_type = CONCAT('post_', p.post_type)
-                         WHERE p.post_name = %s
-                           AND t.element_id IS NULL
-                           AND p.post_status NOT IN ('trash', 'auto-draft')
-                         LIMIT 1",
-                        $slug
-                    ) );
-                }
-
-                if ( $post_id ) {
-                    $query_vars['page_id'] = $post_id;
-                    unset( $query_vars['pagename'] );
-                }
+            if ( $post_id ) {
+                $query_vars['page_id'] = $post_id;
+                unset( $query_vars['pagename'] );
             }
         }
 
         $query_vars = $this->resolve_translated_term_request( $query_vars, $effective_lang );
 
         return $query_vars;
+    }
+
+    /**
+     * Resolve a pagename to the correct post ID in the requested language.
+     */
+    private function resolve_pagename_to_post_id( string $pagename, string $lang_slug, array $active_languages ): ?int {
+        if ( ! isset( $active_languages[ $lang_slug ] ) ) {
+            return null;
+        }
+
+        $normalized_path = trim( $pagename, '/' );
+
+        if ( $normalized_path === '' ) {
+            return null;
+        }
+
+        $hierarchical_post_types = get_post_types( [ 'hierarchical' => true ], 'names' );
+
+        if ( ! empty( $hierarchical_post_types ) ) {
+            $path_match = get_page_by_path( $normalized_path, OBJECT, array_values( $hierarchical_post_types ) );
+
+            if ( $path_match instanceof \WP_Post ) {
+                $matched_post_type = $path_match->post_type;
+
+                if ( WP_LOC_Admin_Settings::is_translatable( $matched_post_type ) ) {
+                    $matched_lang = WP_LOC::instance()->db->get_element_language( $path_match->ID, WP_LOC_DB::post_element_type( $matched_post_type ) );
+
+                    if ( $matched_lang === $lang_slug ) {
+                        return (int) $path_match->ID;
+                    }
+                } else {
+                    return (int) $path_match->ID;
+                }
+            }
+        }
+
+        if ( str_contains( $normalized_path, '/' ) ) {
+            return null;
+        }
+
+        global $wpdb;
+        $table = WP_LOC::instance()->db->get_table();
+
+        $post_id = $wpdb->get_var( $wpdb->prepare(
+            "SELECT p.ID FROM {$wpdb->posts} p
+             INNER JOIN {$table} t ON t.element_id = p.ID AND t.element_type = CONCAT('post_', p.post_type)
+             WHERE p.post_name = %s
+               AND t.language_code = %s
+               AND p.post_status NOT IN ('trash', 'auto-draft')
+             LIMIT 1",
+            $normalized_path,
+            $lang_slug
+        ) );
+
+        if ( $post_id ) {
+            return (int) $post_id;
+        }
+
+        $post_id = $wpdb->get_var( $wpdb->prepare(
+            "SELECT p.ID FROM {$wpdb->posts} p
+             LEFT JOIN {$table} t ON t.element_id = p.ID AND t.element_type = CONCAT('post_', p.post_type)
+             WHERE p.post_name = %s
+               AND t.element_id IS NULL
+               AND p.post_status NOT IN ('trash', 'auto-draft')
+             LIMIT 1",
+            $normalized_path
+        ) );
+
+        return $post_id ? (int) $post_id : null;
     }
 
     /**

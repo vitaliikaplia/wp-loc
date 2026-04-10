@@ -5,6 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class WP_LOC_DB {
 
     private $table;
+    private const TRID_LOCK_NAME = 'wp_loc_trid_generation';
 
     public function __construct() {
         global $wpdb;
@@ -145,18 +146,25 @@ class WP_LOC_DB {
     public function set_element_language( int $element_id, string $element_type, string $language_code, ?int $trid = null, ?string $source_language_code = null ): int {
         global $wpdb;
 
-        // Generate new trid if not provided
-        if ( $trid === null ) {
-            $max_trid = (int) $wpdb->get_var( "SELECT MAX(trid) FROM {$this->table}" );
-            $trid = $max_trid + 1;
-        }
-
-        // Check if element already exists
-        $existing = $wpdb->get_var( $wpdb->prepare(
-            "SELECT translation_id FROM {$this->table} WHERE element_id = %d AND element_type = %s LIMIT 1",
+        $existing = $wpdb->get_row( $wpdb->prepare(
+            "SELECT translation_id, trid FROM {$this->table} WHERE element_id = %d AND element_type = %s LIMIT 1",
             $element_id,
             $element_type
         ) );
+
+        $existing_trid = $existing ? (int) $existing->trid : null;
+        $lock_acquired = false;
+
+        // Reuse an existing trid for updates; only allocate a new one for brand-new elements.
+        if ( $trid === null ) {
+            if ( $existing_trid ) {
+                $trid = $existing_trid;
+            } else {
+                $lock_acquired = $this->acquire_trid_lock();
+                $max_trid = (int) $wpdb->get_var( "SELECT MAX(trid) FROM {$this->table}" );
+                $trid = $max_trid + 1;
+            }
+        }
 
         if ( $existing ) {
             $wpdb->update(
@@ -187,7 +195,14 @@ class WP_LOC_DB {
             );
         }
 
-        $this->bust_cache( $element_id, $element_type, $trid );
+        if ( $lock_acquired ) {
+            $this->release_trid_lock();
+        }
+
+        $this->bust_cache( $element_id, $element_type, $existing_trid );
+        if ( $existing_trid !== $trid ) {
+            $this->bust_cache( $element_id, $element_type, $trid );
+        }
 
         return $trid;
     }
@@ -243,5 +258,17 @@ class WP_LOC_DB {
         if ( $trid ) {
             wp_cache_delete( "translations_{$trid}", 'wp_loc' );
         }
+    }
+
+    private function acquire_trid_lock(): bool {
+        global $wpdb;
+
+        return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 5)', self::TRID_LOCK_NAME ) ) === 1;
+    }
+
+    private function release_trid_lock(): void {
+        global $wpdb;
+
+        $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', self::TRID_LOCK_NAME ) );
     }
 }
