@@ -105,7 +105,7 @@
     $(document).on('click', '.wp-loc-config-delete', function(event) {
         const message = i18n.confirmDeleteWpmlConfig
             ? i18n.confirmDeleteWpmlConfig
-            : 'Delete this wpml-config.xml file?';
+            : 'Delete this legacy config file?';
 
         if (!window.confirm(message)) {
             event.preventDefault();

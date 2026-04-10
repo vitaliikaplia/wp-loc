@@ -694,14 +694,14 @@ class WP_LOC_Menu_Sync {
 
         $messages = [
             'current-written' => __( 'wp-loc-config.xml was written from the current wp-loc settings.', 'wp-loc' ),
-            'generated' => __( 'wp-loc-config.xml was generated from the detected wpml-config.xml file.', 'wp-loc' ),
-            'deleted' => __( 'wpml-config.xml was deleted.', 'wp-loc' ),
-            'source-missing' => __( 'The selected wpml-config.xml file was not found anymore.', 'wp-loc' ),
-            'nothing-supported' => __( 'The detected wpml-config.xml file does not contain translatable post types or taxonomies that wp-loc uses.', 'wp-loc' ),
+            'generated' => __( 'wp-loc-config.xml was generated from the detected legacy config file.', 'wp-loc' ),
+            'deleted' => __( 'The legacy config file was deleted.', 'wp-loc' ),
+            'source-missing' => __( 'The selected legacy config file was not found anymore.', 'wp-loc' ),
+            'nothing-supported' => __( 'The detected legacy config file does not contain translatable post types or taxonomies that wp-loc uses.', 'wp-loc' ),
             'empty-current' => __( 'Current wp-loc settings do not contain translatable post types or taxonomies to write.', 'wp-loc' ),
             'write-failed' => __( 'Could not write wp-loc-config.xml.', 'wp-loc' ),
-            'delete-failed' => __( 'Could not delete wpml-config.xml.', 'wp-loc' ),
-            'delete-not-allowed' => __( 'This wpml-config.xml belongs to a plugin source and is shown as read-only here.', 'wp-loc' ),
+            'delete-failed' => __( 'Could not delete the legacy config file.', 'wp-loc' ),
+            'delete-not-allowed' => __( 'This legacy config file belongs to a plugin source and is shown as read-only here.', 'wp-loc' ),
         ];
 
         if ( empty( $messages[ $notice ] ) ) {
@@ -756,7 +756,7 @@ class WP_LOC_Menu_Sync {
         ?>
         <div class="wp-loc-config-detected-state">
             <strong><?php esc_html_e( 'Status:', 'wp-loc' ); ?></strong>
-            <?php echo esc_html( ! empty( $sources ) ? __( 'wpml-config.xml found', 'wp-loc' ) : __( 'wpml-config.xml not found', 'wp-loc' ) ); ?>
+            <?php echo esc_html( ! empty( $sources ) ? __( 'Legacy config file found', 'wp-loc' ) : __( 'Legacy config file not found', 'wp-loc' ) ); ?>
         </div>
 
         <div class="wp-loc-config-panel">
@@ -794,13 +794,13 @@ class WP_LOC_Menu_Sync {
         <div class="wp-loc-config-panel">
             <div class="wp-loc-config-panel-head">
                 <div>
-                    <h2><?php esc_html_e( 'Found wpml-config.xml files', 'wp-loc' ); ?></h2>
-                    <p class="description"><?php esc_html_e( 'wp-loc reads only the post type and taxonomy information from WPML config files. Other WPML options are intentionally ignored here.', 'wp-loc' ); ?></p>
+                    <h2><?php esc_html_e( 'Found legacy config files', 'wp-loc' ); ?></h2>
+                    <p class="description"><?php esc_html_e( 'wp-loc reads only the post type and taxonomy information from supported legacy multilingual config files. Other config sections are intentionally ignored here.', 'wp-loc' ); ?></p>
                 </div>
             </div>
 
             <?php if ( empty( $sources ) ) : ?>
-                <p class="description"><?php esc_html_e( 'No relevant wpml-config.xml files were found in the active theme or active plugins.', 'wp-loc' ); ?></p>
+                <p class="description"><?php esc_html_e( 'No relevant legacy config files were found in the active theme or active plugins.', 'wp-loc' ); ?></p>
             <?php else : ?>
                 <div class="wp-loc-config-source-list">
                     <?php foreach ( $sources as $source ) : ?>
@@ -815,7 +815,7 @@ class WP_LOC_Menu_Sync {
                             <table class="form-table" role="presentation">
                                 <tbody>
                                     <tr>
-                                        <th scope="row"><?php esc_html_e( 'WPML file', 'wp-loc' ); ?></th>
+                                        <th scope="row"><?php esc_html_e( 'Legacy config file', 'wp-loc' ); ?></th>
                                         <td><code><?php echo esc_html( $source['wpml_path'] ); ?></code></td>
                                     </tr>
                                     <?php if ( ! empty( $source['wp_loc_exists'] ) ) : ?>
@@ -848,7 +848,7 @@ class WP_LOC_Menu_Sync {
                                     <form method="post">
                                         <?php wp_nonce_field( 'wp_loc_tools_config_action', 'wp_loc_tools_config_nonce' ); ?>
                                         <input type="hidden" name="wp_loc_config_source" value="<?php echo esc_attr( $source['wpml_path'] ); ?>" />
-                                        <button type="submit" name="wp_loc_config_action" value="<?php echo esc_attr( self::CONFIG_ACTION_DELETE_WPML ); ?>" class="wp-loc-config-delete"><?php esc_html_e( 'Delete wpml-config.xml', 'wp-loc' ); ?></button>
+                                        <button type="submit" name="wp_loc_config_action" value="<?php echo esc_attr( self::CONFIG_ACTION_DELETE_WPML ); ?>" class="wp-loc-config-delete"><?php esc_html_e( 'Delete legacy config file', 'wp-loc' ); ?></button>
                                     </form>
                                 <?php elseif ( ! empty( $source['wpml_exists'] ) ) : ?>
                                     <span class="wp-loc-config-note"><?php esc_html_e( 'Plugin config is shown as read-only here.', 'wp-loc' ); ?></span>
@@ -1005,7 +1005,7 @@ class WP_LOC_Menu_Sync {
             <div class="wp-loc-menu-sync-content"><?php echo $this->get_ai_translate_html(); ?></div>
             <?php elseif ( $current_tab === self::TAB_CONFIG_MIGRATION ) : ?>
             <p class="description">
-                <?php esc_html_e( 'Detect WPML config files, extract only the post types and taxonomies relevant for wp-loc, and generate a lightweight wp-loc-config.xml file.', 'wp-loc' ); ?>
+                <?php esc_html_e( 'Detect legacy multilingual config files, extract only the post types and taxonomies relevant for wp-loc, and generate a lightweight wp-loc-config.xml file.', 'wp-loc' ); ?>
             </p>
             <?php $this->render_config_notice(); ?>
             <div class="wp-loc-menu-sync-content"><?php echo $this->get_config_migration_html(); ?></div>

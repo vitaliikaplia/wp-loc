@@ -8,19 +8,19 @@ Lightweight multilingual plugin for WordPress.
 - **Automatic language detection** — install a language in WP General Settings, it auto-appears in WP-LOC. Delete from WP-LOC — removes language files too.
 - **Post/page translations** — auto-create translation drafts, translation metabox in editor with per-language `+` button for on-demand creation
 - **Bidirectional post taxonomy sync** — when a translated post changes its multilingual categories/tags/custom taxonomies, sibling posts receive the mapped term translations in their own language
-- **Taxonomy/term translations** — WPML-compatible term translation groups for `category`, `post_tag`, and selected custom taxonomies
+- **Taxonomy/term translations** — migration-compatible term translation groups for `category`, `post_tag`, and selected custom taxonomies
 - **Term translation UI** — translation column in term lists, translation panel on term edit screens, and per-language `+` buttons for on-demand term translation creation
 - **Automatic term translation creation** — creating a term can auto-create sibling translations in all active languages
 - **Hierarchical taxonomy sync** — translated parent terms are mapped automatically when creating/editing child terms
 - **Same slug in different languages** — term slugs are unique per language, not globally
 - **Cascade delete for term translations** — deleting any translated term deletes the whole translation group
 - **Protected default category group** — default category and all its translations cannot be deleted
-- **Multilingual nav menus** — WPML-like translated menu groups, translated menu items, language-aware menu locations, auto-created menu translations, and cascade deletion for menu translation groups
+- **Multilingual nav menus** — translated menu groups, translated menu items, language-aware menu locations, auto-created menu translations, and cascade deletion for menu translation groups
 - **Tools page** — Multilingual > Tools with tabbed utilities for WP Menus Sync, AI Translation, and Config Migration
 - **WP Menus Sync** — AJAX preview/apply for syncing menu structure from the default language to secondary languages
 - **AI-assisted custom menu links** — optional AI translation for `custom` nav menu items during menu sync, while preserving URLs and other menu item settings
 - **AI Translation tool** — TinyMCE-based AJAX translator for formatted HTML content, with translated content inserted back into the editor without reloading the page
-- **Config Migration tool** — detects `wpml-config.xml`, reads only translatable post types and taxonomies, generates lightweight `wp-loc-config.xml`, and can remove theme-level `wpml-config.xml`
+- **Config Migration tool** — detects legacy multilingual config files (`wpml-config.xml`), reads only translatable post types and taxonomies, generates lightweight `wp-loc-config.xml`, and can remove theme-level legacy config files
 - **Non-translatable post types** — work correctly with language URL prefixes (shared content across languages)
 - **URL structure** — `/ua/page-slug/`, `/en/page-slug/`, default language without prefix
 - **Admin language switcher** — in the admin bar with flags, cookie-based
@@ -93,11 +93,11 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 
 ### Config migration
 
-- In **Multilingual > Tools > Config Migration**, WP-LOC scans the active theme, parent theme, and active plugins for `wpml-config.xml`
-- WP-LOC reads only `custom-types` and `taxonomies` from WPML config files; other WPML config sections are ignored on purpose
+- In **Multilingual > Tools > Config Migration**, WP-LOC scans the active theme, parent theme, and active plugins for legacy multilingual config files such as `wpml-config.xml`
+- WP-LOC reads only `custom-types` and `taxonomies` from supported legacy config files; other config sections are ignored on purpose
 - You can generate a lightweight `wp-loc-config.xml` from the current WP-LOC settings
-- You can also generate `wp-loc-config.xml` from a detected `wpml-config.xml` source
-- Theme-level `wpml-config.xml` files can be removed from the same screen after migration; plugin-level files are shown as read-only
+- You can also generate `wp-loc-config.xml` from a detected legacy config source
+- Theme-level legacy config files can be removed from the same screen after migration; plugin-level files are shown as read-only
 
 ### ACF options pages
 
@@ -118,7 +118,13 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 ## Taxonomy Notes
 
 - Enable multilingual behavior per taxonomy in **Multilingual > Settings**
-- Term translations are stored in the WPML-compatible `icl_translations` table as `tax_{taxonomy}` rows using `term_taxonomy_id`
+- Term translations are stored in the `icl_translations` table as `tax_{taxonomy}` rows using `term_taxonomy_id`
+
+## Compatibility Note
+
+WP-LOC can interoperate with sites that already use the `icl_translations` table and legacy multilingual config files such as `wpml-config.xml`.
+
+WP-LOC is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by any third-party multilingual plugin vendor.
 - Category, tag, and custom taxonomy archive URLs are language-aware
 - For translatable posts, multilingual taxonomy assignments sync across the whole post translation group
 - If a translated term does not exist for the current language, the frontend switcher falls back to the language home URL

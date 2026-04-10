@@ -140,7 +140,7 @@ class WP_LOC_Admin {
                 'termNameTranslateSuccess' => __( 'Term name translated successfully.', 'wp-loc' ),
                 'closeLabel' => __( 'Close', 'wp-loc' ),
                 'confirmDeleteLanguage' => __( 'Delete this language? Its language files will also be removed from WordPress.', 'wp-loc' ),
-                'confirmDeleteWpmlConfig' => __( 'Delete this wpml-config.xml file?', 'wp-loc' ),
+                'confirmDeleteWpmlConfig' => __( 'Delete this legacy config file?', 'wp-loc' ),
             ],
         ] );
     }
