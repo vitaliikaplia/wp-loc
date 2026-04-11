@@ -26,6 +26,7 @@ Lightweight multilingual plugin for WordPress.
 - **Admin language switcher** — in the admin bar with flags, cookie-based
 - **Frontend language switcher** — `wp_loc_get_lang_switcher()`, `wp_loc_get_language_switcher_html()`, `wp_loc_the_language_switcher()` with translated post and term archive URLs
 - **SEO** — hreflang alternate tags, canonical URLs, proper `<html lang="">`
+- **Yoast SEO compatibility** — localized `wpseo_titles` / `wpseo_social` / `wpseo_rss` options, translated primary category resolution, copied Yoast term SEO meta for translated terms, multilingual sitemap alternate links, stripped category-base compatibility, and Yoast indexable invalidation after multilingual updates
 - **Localized options** — `blogname`, `blogdescription`, `page_on_front`, `page_for_posts` per language, including localized front page / posts page routing
 - **AI settings** — choose OpenAI / Claude / Gemini, store API keys, and enable AI translation for custom menu links during menu sync
 - **Third-party compatibility** — `icl_object_id()`, `$sitepress`, `ICL_LANGUAGE_CODE`, common multilingual filters
@@ -117,6 +118,17 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 - `shared` fields resolve the source-language value but map media/post/term/menu references into the current language
 - `copy_once` fields inherit the source-language value until the translated post/term/options page stores its own independent value
 - Container fields such as `group`, `repeater`, `flexible_content`, and `clone` preserve their ACF structure while mapping nested media and relation values per language
+
+### Yoast SEO
+
+- WP-LOC loads a dedicated Yoast compatibility layer only when Yoast SEO is active
+- Global Yoast options such as `wpseo_titles`, `wpseo_social`, and `wpseo_rss` can be localized per language through the same multilingual options model used by WP-LOC
+- Yoast primary category meta is resolved to the translated term in the current post language
+- Yoast taxonomy SEO meta is copied into translated terms so translated archives keep their own SEO title/description state
+- Yoast indexables are invalidated after multilingual post, term, and global-option updates so Yoast can rebuild its cached SEO data
+- Yoast XML sitemaps gain `xhtml:link` alternate-language entries for translated posts, pages, terms, and first archive links
+- Yoast `stripcategorybase` rewrites remain compatible with multilingual category slugs
+- Yoast News can reuse the current post language code for publication-language output when the addon is active
 
 ### In Twig (Timber)
 ```twig

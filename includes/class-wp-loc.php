@@ -23,6 +23,7 @@ class WP_LOC {
     public $menus;
     public $menu_sync;
     public $ai;
+    public $yoast;
 
     public static function instance() {
         if ( self::$instance === null ) {
@@ -60,6 +61,10 @@ class WP_LOC {
             require_once WP_LOC_PATH . "includes/{$file}.php";
         }
 
+        if ( defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Meta' ) ) {
+            require_once WP_LOC_PATH . 'includes/class-wp-loc-yoast.php';
+        }
+
         if ( class_exists( 'ACF' ) ) {
             require_once WP_LOC_PATH . 'includes/class-wp-loc-acf.php';
         }
@@ -80,6 +85,10 @@ class WP_LOC {
         $this->timber          = new WP_LOC_Timber();
         $this->menus           = new WP_LOC_Menus();
         $this->ai              = new WP_LOC_AI();
+
+        if ( defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Meta' ) ) {
+            $this->yoast = new WP_LOC_Yoast();
+        }
 
         if ( is_admin() ) {
             $this->admin           = new WP_LOC_Admin();

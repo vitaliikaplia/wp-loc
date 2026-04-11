@@ -365,7 +365,7 @@ class WP_LOC_Routing {
      * Add current language prefix to home_url() on frontend.
      */
     public function filter_home_url( $url, $path, $scheme, $blog_id ) {
-        if ( is_admin() ) {
+        if ( is_admin() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
             return $url;
         }
 
@@ -445,8 +445,13 @@ class WP_LOC_Routing {
             return self::$current_lang = 'en';
         }
 
-        // 1. From query var
-        $lang = get_query_var( 'lang' );
+        // 1. From query var when the main query is available.
+        $lang = null;
+        global $wp_query;
+
+        if ( $wp_query instanceof \WP_Query ) {
+            $lang = get_query_var( 'lang' );
+        }
 
         // 2. Fallback: parse from URI
         if ( ! $lang ) {
