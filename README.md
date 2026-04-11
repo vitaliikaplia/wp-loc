@@ -30,6 +30,9 @@ Lightweight multilingual plugin for WordPress.
 - **AI settings** — choose OpenAI / Claude / Gemini, store API keys, and enable AI translation for custom menu links during menu sync
 - **Third-party compatibility** — `icl_object_id()`, `$sitepress`, `ICL_LANGUAGE_CODE`, common multilingual filters
 - **ACF integration** — ACFML-like field/group translation config for DB, local JSON, and PHP-registered field groups, plus language-aware `options_{lang}` routing for options pages
+- **ACF field translation modes** — `shared`, `copy_once`, `translatable`, and editable shared-value `none` behavior for multilingual field workflows
+- **ACF media/relation mapping** — translated attachment, post, term, and nav menu IDs are resolved per language for fields like `image`, `file`, `gallery`, `post_object`, `page_link`, `relationship`, `taxonomy`, and `nav_menu`
+- **ACF container field support** — multilingual behavior for `group`, `repeater`, `flexible_content`, and `clone` fields across options pages, posts/pages, and term edit screens
 - **ACF nav_menu field support** — translated menu values resolve to the correct menu in the current language context
 - **Timber integration** — Twig functions `wp_loc_language_switcher()` and `wp_loc_languages()`
 - **Ukrainian slug** — `uk` locale → `ua` URL slug out of the box
@@ -103,8 +106,16 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 
 - `shared` fields stay on the base ACF options post ID (`options`)
 - `translatable` fields are routed through language-aware ACF options post IDs like `options_en` / `options_ru`
+- `copy_once` container fields inherit from the source language until the translated options page stores its own value
 - Both `get_field( 'field_name', 'options' )` and `get_fields( 'options' )` resolve translated values in the current language context
 - `nav_menu` ACF fields resolve to the translated menu for the current language
+
+### ACF content fields
+
+- The same multilingual ACF logic works for translatable posts/pages, classic editor post screens, Gutenberg page screens, and multilingual term edit screens
+- `shared` fields resolve the source-language value but map media/post/term/menu references into the current language
+- `copy_once` fields inherit the source-language value until the translated post/term/options page stores its own independent value
+- Container fields such as `group`, `repeater`, `flexible_content`, and `clone` preserve their ACF structure while mapping nested media and relation values per language
 
 ### In Twig (Timber)
 ```twig
