@@ -18,7 +18,7 @@ Lightweight multilingual plugin for WordPress.
 - **Multilingual nav menus** — translated menu groups, translated menu items, language-aware menu locations, auto-created menu translations, and cascade deletion for menu translation groups
 - **Tools page** — Multilingual > Tools with tabbed utilities for WP Menus Sync, AI Translation, and Config Migration
 - **WP Menus Sync** — AJAX preview/apply for syncing menu structure from the default language to secondary languages
-- **AI-assisted custom menu links** — optional AI translation for `custom` nav menu items during menu sync, while preserving URLs and other menu item settings
+- **AI-assisted custom menu links** — optional AI translation for `custom` nav menu items during menu sync, while preserving URLs and other menu item settings, with safe fallback when the AI provider refuses a short-field translation
 - **AI Translation tool** — TinyMCE-based AJAX translator for formatted HTML content, with translated content inserted back into the editor without reloading the page
 - **Config Migration tool** — detects legacy multilingual config files (`wpml-config.xml`), reads only translatable post types and taxonomies, generates lightweight `wp-loc-config.xml`, and can remove theme-level legacy config files
 - **Non-translatable post types** — work correctly with language URL prefixes (shared content across languages)
@@ -87,6 +87,7 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 - Menu locations are assigned from the default-language menu and resolved automatically per language on the frontend
 - Use **Multilingual > Tools > WP Menus Sync** to sync structure/order/options from the default-language menu to translated menus
 - If **Try to translate custom nav menu links with AI during menu sync** is enabled in **Multilingual > Settings > Content Translation**, custom menu links are translated with the selected AI engine during sync; otherwise they are duplicated 1:1 with the same title, URL, and item settings
+- If an AI provider returns a refusal or unusable short-text response for a custom menu link field, WP-LOC keeps the original field value instead of saving the refusal text into the translated menu item
 
 ### AI tools
 

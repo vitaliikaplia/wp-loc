@@ -95,6 +95,42 @@ class WP_LOC_AI {
         return $result;
     }
 
+    private static function is_probable_refusal_response( string $result ): bool {
+        $normalized = trim( wp_strip_all_tags( html_entity_decode( $result, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
+
+        if ( $normalized === '' ) {
+            return false;
+        }
+
+        $normalized = mb_strtolower( preg_replace( '/\s+/u', ' ', $normalized ) );
+
+        $patterns = [
+            "i'm sorry",
+            'i’m sorry',
+            'sorry, i can',
+            'i cannot assist',
+            "i can't assist",
+            'i can’t assist',
+            'i cannot help',
+            "i can't help",
+            'i can’t help',
+            "i'm unable to",
+            'i’m unable to',
+            'as an ai',
+            'i cannot comply',
+            "i can't comply",
+            'i can’t comply',
+        ];
+
+        foreach ( $patterns as $pattern ) {
+            if ( str_contains( $normalized, $pattern ) ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static function run_translation_prompt( string $prompt ): string {
         $response = self::get_response( $prompt );
 
@@ -136,6 +172,10 @@ class WP_LOC_AI {
 
             return $decoded !== $entity ? $decoded : $entity;
         }, $result );
+
+        if ( self::is_probable_refusal_response( $result ) ) {
+            return '';
+        }
 
         return trim( (string) $result );
     }
