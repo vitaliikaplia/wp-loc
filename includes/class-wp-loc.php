@@ -61,11 +61,11 @@ class WP_LOC {
             require_once WP_LOC_PATH . "includes/{$file}.php";
         }
 
-        if ( defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Meta' ) ) {
+        if ( ( defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Meta' ) ) && WP_LOC_Admin_Settings::is_yoast_compat_enabled() ) {
             require_once WP_LOC_PATH . 'includes/class-wp-loc-yoast.php';
         }
 
-        if ( class_exists( 'ACF' ) ) {
+        if ( class_exists( 'ACF' ) && WP_LOC_Admin_Settings::is_acf_compat_enabled() ) {
             require_once WP_LOC_PATH . 'includes/class-wp-loc-acf.php';
         }
     }
@@ -86,7 +86,7 @@ class WP_LOC {
         $this->menus           = new WP_LOC_Menus();
         $this->ai              = new WP_LOC_AI();
 
-        if ( defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Meta' ) ) {
+        if ( ( defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Meta' ) ) && WP_LOC_Admin_Settings::is_yoast_compat_enabled() ) {
             $this->yoast = new WP_LOC_Yoast();
         }
 
@@ -101,7 +101,7 @@ class WP_LOC {
             $this->compat = new WP_LOC_Compat();
         }
 
-        if ( class_exists( 'ACF' ) ) {
+        if ( class_exists( 'ACF' ) && WP_LOC_Admin_Settings::is_acf_compat_enabled() ) {
             $this->acf = new WP_LOC_ACF();
         }
     }

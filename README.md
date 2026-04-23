@@ -29,6 +29,10 @@ Lightweight multilingual plugin for WordPress.
 - **Yoast SEO compatibility** — localized `wpseo_titles` / `wpseo_social` / `wpseo_rss` options, translated primary category resolution, copied Yoast term SEO meta for translated terms, multilingual sitemap alternate links, stripped category-base compatibility, and Yoast indexable invalidation after multilingual updates
 - **Localized options** — `blogname`, `blogdescription`, `page_on_front`, `page_for_posts` per language, including localized front page / posts page routing
 - **AI settings** — choose OpenAI / Claude / Gemini, store API keys, and enable AI translation for custom menu links during menu sync
+- **Translation workflow settings** — control automatic creation of post, term, and menu translations from **Multilingual > Settings > Content Translation**
+- **Sync policy settings** — control taxonomy sync, featured image sync, and shared post-attribute sync for translation groups
+- **Switcher behavior settings** — control whether the frontend switcher shows flags and names, hides the current language, hides untranslated targets, or falls back to language home URLs
+- **Integration toggles** — enable or disable ACF compatibility, Yoast compatibility, and Yoast sitemap alternate links from **Multilingual > Settings > Integrations**
 - **Third-party compatibility** — `icl_object_id()`, `$sitepress`, `ICL_LANGUAGE_CODE`, common multilingual filters
 - **ACF integration** — ACFML-like field/group translation config for DB, local JSON, and PHP-registered field groups, plus language-aware `options_{lang}` routing for options pages
 - **ACF field translation modes** — `shared`, `copy_once`, `translatable`, and editable shared-value `none` behavior for multilingual field workflows
@@ -50,7 +54,7 @@ Lightweight multilingual plugin for WordPress.
 3. Go to **WP General Settings** and install the languages you need — they auto-appear in **Multilingual > Languages**
 4. Configure language slugs, display names and ordering in **Multilingual > Languages**
 5. Select translatable post types and taxonomies in **Multilingual > Settings**
-6. Configure **Multilingual > Settings** tabs, including AI provider settings if you want to use AI translation features
+6. Configure **Multilingual > Settings** tabs for content workflow, switcher behavior, integrations, and AI provider settings
 7. Use **Multilingual > Tools** for WP Menus Sync, the AI Translation tool, and Config Migration
 
 ## Usage
@@ -89,6 +93,7 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 - Use **Multilingual > Tools > WP Menus Sync** to sync structure/order/options from the default-language menu to translated menus
 - If **Try to translate custom nav menu links with AI during menu sync** is enabled in **Multilingual > Settings > Content Translation**, custom menu links are translated with the selected AI engine during sync; otherwise they are duplicated 1:1 with the same title, URL, and item settings
 - If an AI provider returns a refusal or unusable short-text response for a custom menu link field, WP-LOC keeps the original field value instead of saving the refusal text into the translated menu item
+- Automatic menu creation can be disabled from **Multilingual > Settings > Content Translation** if you prefer to create translated menus manually
 
 ### AI tools
 
@@ -122,6 +127,7 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 ### Yoast SEO
 
 - WP-LOC loads a dedicated Yoast compatibility layer only when Yoast SEO is active
+- The Yoast compatibility layer and Yoast sitemap alternate links can be toggled separately in **Multilingual > Settings > Integrations**
 - Global Yoast options such as `wpseo_titles`, `wpseo_social`, and `wpseo_rss` can be localized per language through the same multilingual options model used by WP-LOC
 - Yoast primary category meta is resolved to the translated term in the current post language
 - Yoast taxonomy SEO meta is copied into translated terms so translated archives keep their own SEO title/description state

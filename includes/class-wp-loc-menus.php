@@ -941,7 +941,7 @@ class WP_LOC_Menus {
             $this->clone_menu_items_from_source( $source_menu_id, $menu_id, $language_code );
         }
 
-        if ( ! $source_menu_id && ! $existing_lang ) {
+        if ( ! $source_menu_id && ! $existing_lang && WP_LOC_Admin_Settings::should_auto_create_menu_translations() ) {
             $this->ensure_menu_translations( $menu_id, $language_code );
         }
     }

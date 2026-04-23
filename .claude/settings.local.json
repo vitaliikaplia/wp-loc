@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Read(//Users/vitaliikaplia/Herd/wploc/**)",
+      "Bash(wp eval:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://wploc.test/pidstorinka/ -k)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://wploc.test/ru/pidstorinka/ -k)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://wploc.test/en/pidstorinka/ -k)",
+      "Bash(curl -s https://wploc.test/en/pidstorinka/ -k)",
+      "Bash(curl -s https://wploc.test/pidstorinka/ -k)",
+      "Bash(curl -s https://wploc.test/ru/pidstorinka/ -k)",
+      "Bash(grep -n \"^function wp_loc_\" /Users/vitaliikaplia/Herd/wp-loc/wp-content/plugins/wp-loc/includes/*.php)"
+    ]
+  }
+}

@@ -6,7 +6,20 @@ class WP_LOC_Admin_Settings {
 
     const OPTION_KEY = 'wp_loc_translatable_post_types';
     const TAXONOMIES_OPTION_KEY = 'wp_loc_translatable_taxonomies';
+    const AUTO_CREATE_POST_TRANSLATIONS_OPTION_KEY = 'wp_loc_auto_create_post_translations';
+    const AUTO_CREATE_TERM_TRANSLATIONS_OPTION_KEY = 'wp_loc_auto_create_term_translations';
+    const AUTO_CREATE_MENU_TRANSLATIONS_OPTION_KEY = 'wp_loc_auto_create_menu_translations';
+    const SYNC_POST_TAXONOMIES_OPTION_KEY = 'wp_loc_sync_post_taxonomies';
+    const SYNC_FEATURED_IMAGE_OPTION_KEY = 'wp_loc_sync_featured_image';
+    const SYNC_POST_ATTRIBUTES_OPTION_KEY = 'wp_loc_sync_post_attributes';
     const SHOW_FLAGS_OPTION_KEY = 'wp_loc_show_switcher_flags';
+    const SHOW_NAMES_OPTION_KEY = 'wp_loc_show_switcher_names';
+    const HIDE_CURRENT_LANGUAGE_OPTION_KEY = 'wp_loc_hide_current_language_switcher';
+    const HIDE_UNTRANSLATED_LANGUAGES_OPTION_KEY = 'wp_loc_hide_untranslated_languages_switcher';
+    const FALLBACK_UNTRANSLATED_TO_HOME_OPTION_KEY = 'wp_loc_fallback_untranslated_switcher_to_home';
+    const ENABLE_ACF_COMPAT_OPTION_KEY = 'wp_loc_enable_acf_compat';
+    const ENABLE_YOAST_COMPAT_OPTION_KEY = 'wp_loc_enable_yoast_compat';
+    const ENABLE_YOAST_SITEMAP_ALTERNATES_OPTION_KEY = 'wp_loc_enable_yoast_sitemap_alternates';
     const AI_ENGINE_OPTION_KEY = 'wp_loc_ai_engine';
     const OPENAI_API_KEY_OPTION_KEY = 'wp_loc_openai_api_key';
     const OPENAI_MODEL_OPTION_KEY = 'wp_loc_openai_model';
@@ -17,6 +30,7 @@ class WP_LOC_Admin_Settings {
     const AI_TRANSLATE_CUSTOM_MENU_LINKS_OPTION_KEY = 'wp_loc_ai_translate_custom_menu_links';
     const TAB_CONTENT = 'content';
     const TAB_SWITCHER = 'switcher';
+    const TAB_INTEGRATIONS = 'integrations';
     const TAB_AI = 'ai';
 
     public function __construct() {
@@ -40,7 +54,7 @@ class WP_LOC_Admin_Settings {
 
     private function get_current_tab(): string {
         $tab = isset( $_GET['tab'] ) ? sanitize_key( (string) $_GET['tab'] ) : self::TAB_CONTENT;
-        $allowed = [ self::TAB_CONTENT, self::TAB_SWITCHER, self::TAB_AI ];
+        $allowed = [ self::TAB_CONTENT, self::TAB_SWITCHER, self::TAB_INTEGRATIONS, self::TAB_AI ];
 
         return in_array( $tab, $allowed, true ) ? $tab : self::TAB_CONTENT;
     }
@@ -57,9 +71,10 @@ class WP_LOC_Admin_Settings {
 
     private function render_tabs( string $current_tab ): void {
         $tabs = [
-            self::TAB_CONTENT  => __( 'Content Translation', 'wp-loc' ),
-            self::TAB_SWITCHER => __( 'Frontend Language Switcher', 'wp-loc' ),
-            self::TAB_AI       => __( 'AI', 'wp-loc' ),
+            self::TAB_CONTENT      => __( 'Content Translation', 'wp-loc' ),
+            self::TAB_SWITCHER     => __( 'Frontend Language Switcher', 'wp-loc' ),
+            self::TAB_INTEGRATIONS => __( 'Integrations', 'wp-loc' ),
+            self::TAB_AI           => __( 'AI', 'wp-loc' ),
         ];
 
         echo '<nav class="nav-tab-wrapper wp-clearfix">';
@@ -121,6 +136,58 @@ class WP_LOC_Admin_Settings {
      */
     public static function show_switcher_flags(): bool {
         return (bool) get_option( self::SHOW_FLAGS_OPTION_KEY, true );
+    }
+
+    public static function show_switcher_names(): bool {
+        return (bool) get_option( self::SHOW_NAMES_OPTION_KEY, true );
+    }
+
+    public static function hide_current_language_in_switcher(): bool {
+        return (bool) get_option( self::HIDE_CURRENT_LANGUAGE_OPTION_KEY, false );
+    }
+
+    public static function hide_untranslated_languages_in_switcher(): bool {
+        return (bool) get_option( self::HIDE_UNTRANSLATED_LANGUAGES_OPTION_KEY, false );
+    }
+
+    public static function fallback_untranslated_switcher_links_to_home(): bool {
+        return (bool) get_option( self::FALLBACK_UNTRANSLATED_TO_HOME_OPTION_KEY, true );
+    }
+
+    public static function should_auto_create_post_translations(): bool {
+        return (bool) get_option( self::AUTO_CREATE_POST_TRANSLATIONS_OPTION_KEY, true );
+    }
+
+    public static function should_auto_create_term_translations(): bool {
+        return (bool) get_option( self::AUTO_CREATE_TERM_TRANSLATIONS_OPTION_KEY, true );
+    }
+
+    public static function should_auto_create_menu_translations(): bool {
+        return (bool) get_option( self::AUTO_CREATE_MENU_TRANSLATIONS_OPTION_KEY, true );
+    }
+
+    public static function should_sync_post_taxonomies(): bool {
+        return (bool) get_option( self::SYNC_POST_TAXONOMIES_OPTION_KEY, true );
+    }
+
+    public static function should_sync_featured_image(): bool {
+        return (bool) get_option( self::SYNC_FEATURED_IMAGE_OPTION_KEY, true );
+    }
+
+    public static function should_sync_post_attributes(): bool {
+        return (bool) get_option( self::SYNC_POST_ATTRIBUTES_OPTION_KEY, true );
+    }
+
+    public static function is_acf_compat_enabled(): bool {
+        return (bool) get_option( self::ENABLE_ACF_COMPAT_OPTION_KEY, true );
+    }
+
+    public static function is_yoast_compat_enabled(): bool {
+        return (bool) get_option( self::ENABLE_YOAST_COMPAT_OPTION_KEY, true );
+    }
+
+    public static function is_yoast_sitemap_alternates_enabled(): bool {
+        return (bool) get_option( self::ENABLE_YOAST_SITEMAP_ALTERNATES_OPTION_KEY, true );
     }
 
     public static function get_ai_engine(): string {
@@ -205,14 +272,43 @@ class WP_LOC_Admin_Settings {
         if ( $current_tab === self::TAB_CONTENT ) {
             $selected = isset( $_POST['wp_loc_post_types'] ) ? array_map( 'sanitize_key', (array) $_POST['wp_loc_post_types'] ) : [];
             $selected_taxonomies = isset( $_POST['wp_loc_taxonomies'] ) ? array_map( 'sanitize_key', (array) $_POST['wp_loc_taxonomies'] ) : [];
+            $auto_create_posts = isset( $_POST['wp_loc_auto_create_post_translations'] ) ? 1 : 0;
+            $auto_create_terms = isset( $_POST['wp_loc_auto_create_term_translations'] ) ? 1 : 0;
+            $auto_create_menus = isset( $_POST['wp_loc_auto_create_menu_translations'] ) ? 1 : 0;
+            $sync_post_taxonomies = isset( $_POST['wp_loc_sync_post_taxonomies'] ) ? 1 : 0;
+            $sync_featured_image = isset( $_POST['wp_loc_sync_featured_image'] ) ? 1 : 0;
+            $sync_post_attributes = isset( $_POST['wp_loc_sync_post_attributes'] ) ? 1 : 0;
             $translate_custom_menu_links = isset( $_POST['wp_loc_ai_translate_custom_menu_links'] ) ? 1 : 0;
 
             update_option( self::OPTION_KEY, $selected );
             update_option( self::TAXONOMIES_OPTION_KEY, $selected_taxonomies );
+            update_option( self::AUTO_CREATE_POST_TRANSLATIONS_OPTION_KEY, $auto_create_posts );
+            update_option( self::AUTO_CREATE_TERM_TRANSLATIONS_OPTION_KEY, $auto_create_terms );
+            update_option( self::AUTO_CREATE_MENU_TRANSLATIONS_OPTION_KEY, $auto_create_menus );
+            update_option( self::SYNC_POST_TAXONOMIES_OPTION_KEY, $sync_post_taxonomies );
+            update_option( self::SYNC_FEATURED_IMAGE_OPTION_KEY, $sync_featured_image );
+            update_option( self::SYNC_POST_ATTRIBUTES_OPTION_KEY, $sync_post_attributes );
             update_option( self::AI_TRANSLATE_CUSTOM_MENU_LINKS_OPTION_KEY, $translate_custom_menu_links );
         } elseif ( $current_tab === self::TAB_SWITCHER ) {
             $show_flags = isset( $_POST['wp_loc_show_switcher_flags'] ) ? 1 : 0;
+            $show_names = isset( $_POST['wp_loc_show_switcher_names'] ) ? 1 : 0;
+            $hide_current = isset( $_POST['wp_loc_hide_current_language_switcher'] ) ? 1 : 0;
+            $hide_untranslated = isset( $_POST['wp_loc_hide_untranslated_languages_switcher'] ) ? 1 : 0;
+            $fallback_untranslated_to_home = isset( $_POST['wp_loc_fallback_untranslated_switcher_to_home'] ) ? 1 : 0;
+
             update_option( self::SHOW_FLAGS_OPTION_KEY, $show_flags );
+            update_option( self::SHOW_NAMES_OPTION_KEY, $show_names );
+            update_option( self::HIDE_CURRENT_LANGUAGE_OPTION_KEY, $hide_current );
+            update_option( self::HIDE_UNTRANSLATED_LANGUAGES_OPTION_KEY, $hide_untranslated );
+            update_option( self::FALLBACK_UNTRANSLATED_TO_HOME_OPTION_KEY, $fallback_untranslated_to_home );
+        } elseif ( $current_tab === self::TAB_INTEGRATIONS ) {
+            $enable_acf_compat = isset( $_POST['wp_loc_enable_acf_compat'] ) ? 1 : 0;
+            $enable_yoast_compat = isset( $_POST['wp_loc_enable_yoast_compat'] ) ? 1 : 0;
+            $enable_yoast_sitemap_alternates = isset( $_POST['wp_loc_enable_yoast_sitemap_alternates'] ) ? 1 : 0;
+
+            update_option( self::ENABLE_ACF_COMPAT_OPTION_KEY, $enable_acf_compat );
+            update_option( self::ENABLE_YOAST_COMPAT_OPTION_KEY, $enable_yoast_compat );
+            update_option( self::ENABLE_YOAST_SITEMAP_ALTERNATES_OPTION_KEY, $enable_yoast_sitemap_alternates );
         } elseif ( $current_tab === self::TAB_AI ) {
             $ai_engine = isset( $_POST['wp_loc_ai_engine'] ) ? sanitize_key( (string) $_POST['wp_loc_ai_engine'] ) : 'openai';
             if ( ! in_array( $ai_engine, [ 'openai', 'claude', 'gemini' ], true ) ) {
@@ -265,7 +361,20 @@ class WP_LOC_Admin_Settings {
         $selected = ( $saved !== false && is_array( $saved ) ) ? $saved : [ 'post', 'page' ];
         $saved_taxonomies = get_option( self::TAXONOMIES_OPTION_KEY );
         $selected_taxonomies = ( $saved_taxonomies !== false && is_array( $saved_taxonomies ) ) ? $saved_taxonomies : [ 'category', 'post_tag' ];
+        $auto_create_posts = self::should_auto_create_post_translations();
+        $auto_create_terms = self::should_auto_create_term_translations();
+        $auto_create_menus = self::should_auto_create_menu_translations();
+        $sync_post_taxonomies = self::should_sync_post_taxonomies();
+        $sync_featured_image = self::should_sync_featured_image();
+        $sync_post_attributes = self::should_sync_post_attributes();
         $show_flags = self::show_switcher_flags();
+        $show_names = self::show_switcher_names();
+        $hide_current_language = self::hide_current_language_in_switcher();
+        $hide_untranslated_languages = self::hide_untranslated_languages_in_switcher();
+        $fallback_untranslated_to_home = self::fallback_untranslated_switcher_links_to_home();
+        $enable_acf_compat = self::is_acf_compat_enabled();
+        $enable_yoast_compat = self::is_yoast_compat_enabled();
+        $enable_yoast_sitemap_alternates = self::is_yoast_sitemap_alternates_enabled();
         $ai_engine = self::get_ai_engine();
         $openai_api_key = self::get_openai_api_key();
         $openai_model = self::get_openai_model();
@@ -287,7 +396,7 @@ class WP_LOC_Admin_Settings {
         ?>
         <div class="wrap wp-loc-settings-page">
             <h1><?php esc_html_e( 'Settings', 'wp-loc' ); ?></h1>
-            <p class="description"><?php esc_html_e( 'Configure which content types participate in multilingual behavior and how the frontend language switcher is displayed.', 'wp-loc' ); ?></p>
+            <p class="description"><?php esc_html_e( 'Configure translation workflow, sync policies, frontend switcher behavior, integrations, and AI services.', 'wp-loc' ); ?></p>
             <?php $this->render_tabs( $current_tab ); ?>
 
             <?php if ( isset( $_GET['updated'] ) ) : ?>
@@ -303,6 +412,38 @@ class WP_LOC_Admin_Settings {
                 <?php if ( $current_tab === self::TAB_CONTENT ) : ?>
                     <div class="wp-loc-settings-section">
                         <table class="form-table" role="presentation">
+                            <tr>
+                                <th scope="row"><?php esc_html_e( 'Translation Workflow', 'wp-loc' ); ?></th>
+                                <td>
+                                    <fieldset class="wp-loc-settings-stack">
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_auto_create_post_translations"
+                                                   value="1"
+                                                   <?php checked( $auto_create_posts ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Automatically create sibling post and page translations when a new source entry is saved', 'wp-loc' ); ?></span>
+                                        </label>
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_auto_create_term_translations"
+                                                   value="1"
+                                                   <?php checked( $auto_create_terms ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Automatically create sibling term translations when a new source term is created', 'wp-loc' ); ?></span>
+                                        </label>
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_auto_create_menu_translations"
+                                                   value="1"
+                                                   <?php checked( $auto_create_menus ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Automatically create sibling nav menus for the other active languages', 'wp-loc' ); ?></span>
+                                        </label>
+                                    </fieldset>
+                                    <p class="description"><?php esc_html_e( 'These defaults control whether new translation groups are created automatically or only when you create translations manually.', 'wp-loc' ); ?></p>
+                                </td>
+                            </tr>
                             <tr>
                                 <th scope="row"><?php esc_html_e( 'Translatable Post Types', 'wp-loc' ); ?></th>
                                 <td>
@@ -342,6 +483,38 @@ class WP_LOC_Admin_Settings {
                                 </td>
                             </tr>
                             <tr>
+                                <th scope="row"><?php esc_html_e( 'Content Sync', 'wp-loc' ); ?></th>
+                                <td>
+                                    <fieldset class="wp-loc-settings-stack">
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_sync_post_taxonomies"
+                                                   value="1"
+                                                   <?php checked( $sync_post_taxonomies ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Sync translated taxonomy assignments across post translations', 'wp-loc' ); ?></span>
+                                        </label>
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_sync_featured_image"
+                                                   value="1"
+                                                   <?php checked( $sync_featured_image ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Sync featured images across post translations using translated attachment IDs', 'wp-loc' ); ?></span>
+                                        </label>
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_sync_post_attributes"
+                                                   value="1"
+                                                   <?php checked( $sync_post_attributes ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Sync shared post attributes like status, author, parent, order, password, and page template', 'wp-loc' ); ?></span>
+                                        </label>
+                                    </fieldset>
+                                    <p class="description"><?php esc_html_e( 'Use these toggles to control which shared properties stay aligned across a translation group.', 'wp-loc' ); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
                                 <th scope="row"><?php esc_html_e( 'Menu Sync', 'wp-loc' ); ?></th>
                                 <td>
                                     <fieldset class="wp-loc-settings-stack">
@@ -378,9 +551,102 @@ class WP_LOC_Admin_Settings {
                                     <p class="description"><?php esc_html_e( 'Controls whether flags are rendered by the frontend language switcher helper.', 'wp-loc' ); ?></p>
                                 </td>
                             </tr>
+                            <tr>
+                                <th scope="row"><?php esc_html_e( 'Labels', 'wp-loc' ); ?></th>
+                                <td>
+                                    <fieldset class="wp-loc-settings-stack">
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_show_switcher_names"
+                                                   value="1"
+                                                   <?php checked( $show_names ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Show language names in the frontend language switcher', 'wp-loc' ); ?></span>
+                                        </label>
+                                    </fieldset>
+                                    <p class="description"><?php esc_html_e( 'Turn this off if you want a more compact switcher, for example flags only.', 'wp-loc' ); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><?php esc_html_e( 'Visibility Rules', 'wp-loc' ); ?></th>
+                                <td>
+                                    <fieldset class="wp-loc-settings-stack">
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_hide_current_language_switcher"
+                                                   value="1"
+                                                   <?php checked( $hide_current_language ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Hide the current language from the frontend language switcher', 'wp-loc' ); ?></span>
+                                        </label>
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_hide_untranslated_languages_switcher"
+                                                   value="1"
+                                                   <?php checked( $hide_untranslated_languages ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Hide languages that do not have a translated target for the current singular or term archive', 'wp-loc' ); ?></span>
+                                        </label>
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_fallback_untranslated_switcher_to_home"
+                                                   value="1"
+                                                   <?php checked( $fallback_untranslated_to_home ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'When a translation is missing, fall back to the target language home URL instead of the current path', 'wp-loc' ); ?></span>
+                                        </label>
+                                    </fieldset>
+                                    <p class="description"><?php esc_html_e( 'These options are especially helpful for projects that prefer a stricter switcher with fewer fallback links.', 'wp-loc' ); ?></p>
+                                </td>
+                            </tr>
                         </table>
                     </div>
-                <?php else : ?>
+                <?php elseif ( $current_tab === self::TAB_INTEGRATIONS ) : ?>
+                    <div class="wp-loc-settings-section">
+                        <table class="form-table" role="presentation">
+                            <tr>
+                                <th scope="row"><?php esc_html_e( 'Advanced Custom Fields', 'wp-loc' ); ?></th>
+                                <td>
+                                    <fieldset class="wp-loc-settings-stack">
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_enable_acf_compat"
+                                                   value="1"
+                                                   <?php checked( $enable_acf_compat ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Enable the ACF multilingual compatibility layer', 'wp-loc' ); ?></span>
+                                        </label>
+                                    </fieldset>
+                                    <p class="description"><?php esc_html_e( 'Loads the ACF integration for multilingual field groups, options, media, relation fields, and container field behavior.', 'wp-loc' ); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><?php esc_html_e( 'Yoast SEO', 'wp-loc' ); ?></th>
+                                <td>
+                                    <fieldset class="wp-loc-settings-stack">
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_enable_yoast_compat"
+                                                   value="1"
+                                                   <?php checked( $enable_yoast_compat ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Enable Yoast SEO multilingual compatibility', 'wp-loc' ); ?></span>
+                                        </label>
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_enable_yoast_sitemap_alternates"
+                                                   value="1"
+                                                   <?php checked( $enable_yoast_sitemap_alternates ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Add alternate-language links to Yoast XML sitemaps', 'wp-loc' ); ?></span>
+                                        </label>
+                                    </fieldset>
+                                    <p class="description"><?php esc_html_e( 'Use the master toggle to disable the Yoast integration entirely, or keep it enabled and control sitemap alternates separately.', 'wp-loc' ); ?></p>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                <?php elseif ( $current_tab === self::TAB_AI ) : ?>
                     <div class="wp-loc-settings-section">
                         <table class="form-table" role="presentation">
                             <tr>

@@ -959,6 +959,10 @@ class WP_LOC_Terms {
      * Whether the current term creation request should auto-create sibling translations.
      */
     private function should_auto_create_term_translations(): bool {
+        if ( ! WP_LOC_Admin_Settings::should_auto_create_term_translations() ) {
+            return false;
+        }
+
         if ( strtoupper( $_SERVER['REQUEST_METHOD'] ?? '' ) !== 'POST' ) {
             return false;
         }

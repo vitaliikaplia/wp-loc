@@ -219,6 +219,110 @@ msgstr "Дія"
 msgid "Default"
 msgstr "За замовчуванням"
 
+#: includes/class-wp-loc-admin-settings.php:76
+msgid "Integrations"
+msgstr "Інтеграції"
+
+#: includes/class-wp-loc-admin-settings.php:399
+msgid "Configure translation workflow, sync policies, frontend switcher behavior, integrations, and AI services."
+msgstr "Налаштуйте робочий процес перекладу, політики синхронізації, поведінку перемикача мов на фронтенді, інтеграції та сервіси ШІ."
+
+#: includes/class-wp-loc-admin-settings.php:416
+msgid "Translation Workflow"
+msgstr "Процес перекладу"
+
+#: includes/class-wp-loc-admin-settings.php:425
+msgid "Automatically create sibling post and page translations when a new source entry is saved"
+msgstr "Автоматично створювати переклади записів і сторінок для інших мов, коли зберігається новий оригінал"
+
+#: includes/class-wp-loc-admin-settings.php:433
+msgid "Automatically create sibling term translations when a new source term is created"
+msgstr "Автоматично створювати переклади термінів для інших мов, коли створюється новий оригінальний термін"
+
+#: includes/class-wp-loc-admin-settings.php:441
+msgid "Automatically create sibling nav menus for the other active languages"
+msgstr "Автоматично створювати переклади меню навігації для інших активних мов"
+
+#: includes/class-wp-loc-admin-settings.php:444
+msgid "These defaults control whether new translation groups are created automatically or only when you create translations manually."
+msgstr "Ці значення за замовчуванням визначають, чи нові групи перекладів створюються автоматично, чи лише вручну."
+
+#: includes/class-wp-loc-admin-settings.php:486
+msgid "Content Sync"
+msgstr "Синхронізація контенту"
+
+#: includes/class-wp-loc-admin-settings.php:495
+msgid "Sync translated taxonomy assignments across post translations"
+msgstr "Синхронізувати призначення перекладених таксономій між перекладами записів"
+
+#: includes/class-wp-loc-admin-settings.php:503
+msgid "Sync featured images across post translations using translated attachment IDs"
+msgstr "Синхронізувати головні зображення між перекладами записів, використовуючи перекладені ID вкладень"
+
+#: includes/class-wp-loc-admin-settings.php:511
+msgid "Sync shared post attributes like status, author, parent, order, password, and page template"
+msgstr "Синхронізувати спільні атрибути записів, як-от статус, автор, батьківський елемент, порядок, пароль і шаблон сторінки"
+
+#: includes/class-wp-loc-admin-settings.php:514
+msgid "Use these toggles to control which shared properties stay aligned across a translation group."
+msgstr "Використовуйте ці перемикачі, щоб керувати тим, які спільні властивості залишаються узгодженими в межах групи перекладу."
+
+#: includes/class-wp-loc-admin-settings.php:555
+msgid "Labels"
+msgstr "Підписи"
+
+#: includes/class-wp-loc-admin-settings.php:564
+msgid "Show language names in the frontend language switcher"
+msgstr "Показувати назви мов у перемикачі мов на фронтенді"
+
+#: includes/class-wp-loc-admin-settings.php:567
+msgid "Turn this off if you want a more compact switcher, for example flags only."
+msgstr "Вимкніть це, якщо хочете компактніший перемикач, наприклад лише з прапорами."
+
+#: includes/class-wp-loc-admin-settings.php:571
+msgid "Visibility Rules"
+msgstr "Правила видимості"
+
+#: includes/class-wp-loc-admin-settings.php:580
+msgid "Hide the current language from the frontend language switcher"
+msgstr "Приховувати поточну мову в перемикачі мов на фронтенді"
+
+#: includes/class-wp-loc-admin-settings.php:588
+msgid "Hide languages that do not have a translated target for the current singular or term archive"
+msgstr "Приховувати мови, для яких немає перекладеної цілі для поточного запису або архіву термінів"
+
+#: includes/class-wp-loc-admin-settings.php:596
+msgid "When a translation is missing, fall back to the target language home URL instead of the current path"
+msgstr "Якщо переклад відсутній, використовувати домашню URL-адресу цільової мови замість поточного шляху"
+
+#: includes/class-wp-loc-admin-settings.php:599
+msgid "These options are especially helpful for projects that prefer a stricter switcher with fewer fallback links."
+msgstr "Ці параметри особливо корисні для проєктів, які віддають перевагу суворішому перемикачу з меншою кількістю fallback-посилань."
+
+#: includes/class-wp-loc-admin-settings.php:608
+msgid "Advanced Custom Fields"
+msgstr "Advanced Custom Fields"
+
+#: includes/class-wp-loc-admin-settings.php:617
+msgid "Enable the ACF multilingual compatibility layer"
+msgstr "Увімкнути шар багатомовної сумісності для ACF"
+
+#: includes/class-wp-loc-admin-settings.php:620
+msgid "Loads the ACF integration for multilingual field groups, options, media, relation fields, and container field behavior."
+msgstr "Завантажує інтеграцію ACF для багатомовних груп полів, опцій, медіа, зв’язкових полів і поведінки контейнерних полів."
+
+#: includes/class-wp-loc-admin-settings.php:633
+msgid "Enable Yoast SEO multilingual compatibility"
+msgstr "Увімкнути багатомовну сумісність із Yoast SEO"
+
+#: includes/class-wp-loc-admin-settings.php:641
+msgid "Add alternate-language links to Yoast XML sitemaps"
+msgstr "Додавати посилання на альтернативні мови до XML-карт сайту Yoast"
+
+#: includes/class-wp-loc-admin-settings.php:644
+msgid "Use the master toggle to disable the Yoast integration entirely, or keep it enabled and control sitemap alternates separately."
+msgstr "Використовуйте головний перемикач, щоб повністю вимкнути інтеграцію з Yoast, або залиште її ввімкненою й окремо керуйте альтернативами в sitemap."
+
 #: includes/class-wp-loc-admin.php:134 includes/class-wp-loc-admin.php:239
 msgid "Automatically update the slug from the translated title"
 msgstr "Автоматично оновлювати слаг із перекладеного заголовка"

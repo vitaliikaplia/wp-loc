@@ -254,6 +254,7 @@ class WP_LOC_Media {
     public function sync_thumbnail( int $meta_id, int $post_id, string $meta_key, $meta_value ): void {
         if ( $meta_key !== '_thumbnail_id' ) return;
         if ( self::$duplicating ) return;
+        if ( ! WP_LOC_Admin_Settings::should_sync_featured_image() ) return;
 
         $post = get_post( $post_id );
         if ( ! $post ) return;
@@ -296,6 +297,7 @@ class WP_LOC_Media {
     public function sync_thumbnail_delete( array $meta_ids, int $post_id, string $meta_key, $meta_value ): void {
         if ( $meta_key !== '_thumbnail_id' ) return;
         if ( self::$duplicating ) return;
+        if ( ! WP_LOC_Admin_Settings::should_sync_featured_image() ) return;
 
         $post = get_post( $post_id );
         if ( ! $post || ! WP_LOC_Admin_Settings::is_translatable( $post->post_type ) ) return;

@@ -382,6 +382,10 @@ class WP_LOC_Yoast {
     }
 
     public function filter_sitemap_urlset( string $urlset ): string {
+        if ( ! WP_LOC_Admin_Settings::is_yoast_sitemap_alternates_enabled() ) {
+            return $urlset;
+        }
+
         if ( strpos( $urlset, 'xmlns:xhtml=' ) !== false ) {
             return $urlset;
         }
@@ -390,6 +394,10 @@ class WP_LOC_Yoast {
     }
 
     public function filter_sitemap_entry( $entry, string $type, $object ) {
+        if ( ! WP_LOC_Admin_Settings::is_yoast_sitemap_alternates_enabled() ) {
+            return $entry;
+        }
+
         if ( empty( $entry ) || ! is_array( $entry ) ) {
             return $entry;
         }
@@ -410,6 +418,10 @@ class WP_LOC_Yoast {
     }
 
     public function filter_sitemap_url( string $output, array $url ): string {
+        if ( ! WP_LOC_Admin_Settings::is_yoast_sitemap_alternates_enabled() ) {
+            return $output;
+        }
+
         if ( empty( $url['wp_loc_alternate_langs'] ) || ! is_array( $url['wp_loc_alternate_langs'] ) ) {
             return $output;
         }
@@ -431,6 +443,10 @@ class WP_LOC_Yoast {
     }
 
     public function filter_sitemap_post_type_first_links( array $links, string $post_type ): array {
+        if ( ! WP_LOC_Admin_Settings::is_yoast_sitemap_alternates_enabled() ) {
+            return $links;
+        }
+
         foreach ( $links as &$link ) {
             if ( empty( $link['loc'] ) || ! is_string( $link['loc'] ) ) {
                 continue;

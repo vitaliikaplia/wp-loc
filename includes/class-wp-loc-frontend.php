@@ -117,26 +117,43 @@ function wp_loc_get_lang_switcher(): array {
     $current = wp_loc_get_current_lang();
     $default = WP_LOC_Languages::get_default_language();
     $db = WP_LOC::instance()->db;
+    $hide_current = WP_LOC_Admin_Settings::hide_current_language_in_switcher();
+    $hide_untranslated = WP_LOC_Admin_Settings::hide_untranslated_languages_in_switcher();
+    $fallback_to_home = WP_LOC_Admin_Settings::fallback_untranslated_switcher_links_to_home();
 
     // Use raw home URL to avoid the home_url language prefix filter
     $home = set_url_scheme( get_option( 'home' ) );
+    $build_home_url = static function ( string $code ) use ( $home, $default ): string {
+        return $home . ( $code === $default ? '/' : "/{$code}/" );
+    };
+    $append_switcher_item = static function ( array &$switcher, string $code, array $data, string $url, bool $has_translation = true ) use ( $current, $hide_current, $hide_untranslated ) : void {
+        if ( $hide_current && $code === $current ) {
+            return;
+        }
+
+        if ( $hide_untranslated && ! $has_translation && $code !== $current ) {
+            return;
+        }
+
+        $locale = $data['locale'] ?? $code;
+
+        $switcher[] = [
+            'code'            => $code,
+            'locale'          => $locale,
+            'active'          => $code === $current,
+            'url'             => $url,
+            'flag'            => WP_LOC_Languages::get_flag_url( $locale ),
+            'name'            => WP_LOC_Languages::get_display_name( $code ),
+            'has_translation' => $has_translation,
+        ];
+    };
 
     $switcher = [];
 
     // Front page
     if ( is_front_page() ) {
         foreach ( $active as $code => $data ) {
-            $prefix = ( $code === $default ) ? '' : "/{$code}";
-            $locale = $data['locale'] ?? $code;
-
-            $switcher[] = [
-                'code'   => $code,
-                'locale' => $locale,
-                'active' => $code === $current,
-                'url'    => $home . $prefix . '/',
-                'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
-                'name'   => WP_LOC_Languages::get_display_name( $code ),
-            ];
+            $append_switcher_item( $switcher, $code, $data, $build_home_url( $code ) );
         }
         return $switcher;
     }
@@ -146,23 +163,20 @@ function wp_loc_get_lang_switcher(): array {
         $posts_page_id = (int) get_option( 'page_for_posts' );
 
         foreach ( $active as $code => $data ) {
-            $locale = $data['locale'] ?? $code;
-            $url = $home . ( $code === $default ? '/' : "/{$code}/" );
+            $url = $build_home_url( $code );
             $translated_posts_page_id = $posts_page_id ? $db->get_element_translation( $posts_page_id, WP_LOC_DB::post_element_type( 'page' ), $code ) : 0;
             $target_page_id = $translated_posts_page_id ?: $posts_page_id;
+            $has_translation = (bool) $translated_posts_page_id || $code === $current;
 
             if ( $target_page_id ) {
                 $url = get_permalink( $target_page_id );
             }
 
-            $switcher[] = [
-                'code'   => $code,
-                'locale' => $locale,
-                'active' => $code === $current,
-                'url'    => $url,
-                'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
-                'name'   => WP_LOC_Languages::get_display_name( $code ),
-            ];
+            if ( ! $translated_posts_page_id && $fallback_to_home ) {
+                $url = $build_home_url( $code );
+            }
+
+            $append_switcher_item( $switcher, $code, $data, $url, $has_translation );
         }
 
         return $switcher;
@@ -174,22 +188,15 @@ function wp_loc_get_lang_switcher(): array {
 
         if ( $queried_term instanceof \WP_Term && WP_LOC_Terms::is_translatable( $queried_term->taxonomy ) ) {
             foreach ( $active as $code => $data ) {
-                $locale = $data['locale'] ?? $code;
-                $url = $home . ( $code === $default ? '/' : "/{$code}/" );
+                $url = $build_home_url( $code );
                 $translated_link = WP_LOC_Terms::get_term_url_for_language( (int) $queried_term->term_id, $queried_term->taxonomy, $code );
+                $has_translation = (bool) $translated_link || $code === $current;
 
                 if ( $translated_link ) {
                     $url = $translated_link;
                 }
 
-                $switcher[] = [
-                    'code'   => $code,
-                    'locale' => $locale,
-                    'active' => $code === $current,
-                    'url'    => $url,
-                    'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
-                    'name'   => WP_LOC_Languages::get_display_name( $code ),
-                ];
+                $append_switcher_item( $switcher, $code, $data, $url, $has_translation );
             }
 
             return $switcher;
@@ -216,17 +223,14 @@ function wp_loc_get_lang_switcher(): array {
         }
 
         foreach ( $active as $code => $data ) {
-            $locale = $data['locale'] ?? $code;
-            $url = $urls[ $code ] ?? $home . ( $code === $default ? '/' : "/{$code}/" );
+            $has_translation = isset( $urls[ $code ] ) || $code === $current;
+            $url = $urls[ $code ] ?? $build_home_url( $code );
 
-            $switcher[] = [
-                'code'   => $code,
-                'locale' => $locale,
-                'active' => $code === $current,
-                'url'    => $url,
-                'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
-                'name'   => WP_LOC_Languages::get_display_name( $code ),
-            ];
+            if ( ! isset( $urls[ $code ] ) && ! $fallback_to_home ) {
+                $url = $home . ( $code === $default ? '/' : "/{$code}/" );
+            }
+
+            $append_switcher_item( $switcher, $code, $data, $url, $has_translation );
         }
 
         return $switcher;
@@ -240,19 +244,17 @@ function wp_loc_get_lang_switcher(): array {
     $clean_path = implode( '/', $clean_segments );
 
     foreach ( $active as $code => $data ) {
-        $locale = $data['locale'] ?? $code;
         $prefix = ( $code === $default ) ? '' : '/' . $code;
         $full_path = trim( $prefix . '/' . $clean_path, '/' );
         $url = $home . ( $full_path ? '/' . $full_path . '/' : '/' );
 
-        $switcher[] = [
-            'code'   => $code,
-            'locale' => $locale,
-            'active' => $code === $current,
-            'url'    => $url,
-            'flag'   => WP_LOC_Languages::get_flag_url( $locale ),
-            'name'   => WP_LOC_Languages::get_display_name( $code ),
-        ];
+        if ( ! $fallback_to_home && ! empty( $clean_path ) ) {
+            $url = $home . ( $full_path ? '/' . $full_path . '/' : '/' );
+        } elseif ( $fallback_to_home && ! empty( $clean_path ) ) {
+            $url = $build_home_url( $code );
+        }
+
+        $append_switcher_item( $switcher, $code, $data, $url );
     }
 
     return $switcher;
@@ -269,6 +271,7 @@ function wp_loc_get_language_switcher_html(): string {
     }
 
     $show_flags = WP_LOC_Admin_Settings::show_switcher_flags();
+    $show_names = WP_LOC_Admin_Settings::show_switcher_names();
     $html = '<ul class="languageSwitcher">';
 
     foreach ( $languages as $lang ) {
@@ -279,10 +282,16 @@ function wp_loc_get_language_switcher_html(): string {
 
         if ( $show_flags && ! empty( $lang['flag'] ) ) {
             $html .= '<img src="' . esc_url( $lang['flag'] ) . '" alt="' . esc_attr( $lang['name'] ) . '" />';
-            $html .= ' ';
+            if ( $show_names ) {
+                $html .= ' ';
+            }
         }
 
-        $html .= esc_html( $lang['name'] );
+        if ( $show_names ) {
+            $html .= esc_html( $lang['name'] );
+        } else {
+            $html .= '<span class="screen-reader-text">' . esc_html( $lang['name'] ) . '</span>';
+        }
         $html .= '</a>';
         $html .= '</li>';
     }

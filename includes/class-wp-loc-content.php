@@ -176,8 +176,9 @@ class WP_LOC_Content {
         $current_lang = wp_loc_get_admin_lang();
         $db->set_element_language( $post_id, $element_type, $current_lang );
 
-        // Auto-create translation drafts
-        $this->create_translations( $post_id );
+        if ( WP_LOC_Admin_Settings::should_auto_create_post_translations() ) {
+            $this->create_translations( $post_id );
+        }
     }
 
     /**
@@ -289,40 +290,44 @@ class WP_LOC_Content {
 
         self::$syncing = true;
 
-        $page_template = get_page_template_slug( $post_id );
+        if ( WP_LOC_Admin_Settings::should_sync_post_attributes() ) {
+            $page_template = get_page_template_slug( $post_id );
 
-        foreach ( $translations as $slug => $row ) {
-            $sibling_id = (int) $row->element_id;
-            if ( $sibling_id === $post_id ) continue;
+            foreach ( $translations as $slug => $row ) {
+                $sibling_id = (int) $row->element_id;
+                if ( $sibling_id === $post_id ) continue;
 
-            $sibling = get_post( $sibling_id );
-            if ( ! $sibling ) continue;
+                $sibling = get_post( $sibling_id );
+                if ( ! $sibling ) continue;
 
-            $update_data = [
-                'ID'            => $sibling_id,
-                'menu_order'    => $post->menu_order,
-                'post_status'   => $post->post_status,
-                'post_author'   => $post->post_author,
-                'post_password' => $post->post_password,
-            ];
+                $update_data = [
+                    'ID'            => $sibling_id,
+                    'menu_order'    => $post->menu_order,
+                    'post_status'   => $post->post_status,
+                    'post_author'   => $post->post_author,
+                    'post_password' => $post->post_password,
+                ];
 
-            // Resolve translated parent
-            if ( $post->post_parent ) {
-                $translated_parent = $db->get_element_translation( $post->post_parent, $element_type, $slug );
-                $update_data['post_parent'] = $translated_parent ?: $post->post_parent;
-            } else {
-                $update_data['post_parent'] = 0;
-            }
+                // Resolve translated parent
+                if ( $post->post_parent ) {
+                    $translated_parent = $db->get_element_translation( $post->post_parent, $element_type, $slug );
+                    $update_data['post_parent'] = $translated_parent ?: $post->post_parent;
+                } else {
+                    $update_data['post_parent'] = 0;
+                }
 
-            wp_update_post( $update_data );
+                wp_update_post( $update_data );
 
-            // Sync page template
-            if ( $page_template !== false ) {
-                update_post_meta( $sibling_id, '_wp_page_template', $page_template ?: 'default' );
+                // Sync page template
+                if ( $page_template !== false ) {
+                    update_post_meta( $sibling_id, '_wp_page_template', $page_template ?: 'default' );
+                }
             }
         }
 
-        $this->sync_post_terms( $post_id, $post, $translations, $source_lang );
+        if ( WP_LOC_Admin_Settings::should_sync_post_taxonomies() ) {
+            $this->sync_post_terms( $post_id, $post, $translations, $source_lang );
+        }
 
         self::$syncing = false;
     }
