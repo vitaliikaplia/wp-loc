@@ -20,8 +20,40 @@ define( 'WP_LOC_BASENAME', plugin_basename( __FILE__ ) );
 require_once WP_LOC_PATH . 'includes/class-wp-loc-db.php';
 require_once WP_LOC_PATH . 'includes/class-wp-loc.php';
 
-register_activation_hook( __FILE__, [ 'WP_LOC_DB', 'activate' ] );
+register_activation_hook( __FILE__, 'wp_loc_activate' );
 register_deactivation_hook( __FILE__, 'wp_loc_deactivate' );
+
+function wp_loc_activate(): void {
+    wp_loc_deactivate_conflicting_plugins();
+    WP_LOC_DB::activate();
+}
+
+function wp_loc_deactivate_conflicting_plugins(): void {
+    if ( ! function_exists( 'deactivate_plugins' ) ) {
+        require_once ABSPATH . 'wp-admin/includes/plugin.php';
+    }
+
+    $conflicting_plugins = [
+        'sitepress-multilingual-cms/sitepress.php',
+        'wp-seo-multilingual/plugin.php',
+        'acfml/wpml-acf.php',
+    ];
+
+    $plugins_to_deactivate = [];
+    $active_plugins = (array) get_option( 'active_plugins', [] );
+    $network_active_plugins = is_multisite() ? array_keys( (array) get_site_option( 'active_sitewide_plugins', [] ) ) : [];
+    $active_plugin_files = array_merge( $active_plugins, $network_active_plugins );
+
+    foreach ( $conflicting_plugins as $plugin_file ) {
+        if ( in_array( $plugin_file, $active_plugin_files, true ) ) {
+            $plugins_to_deactivate[] = $plugin_file;
+        }
+    }
+
+    if ( $plugins_to_deactivate ) {
+        deactivate_plugins( array_values( array_unique( $plugins_to_deactivate ) ) );
+    }
+}
 
 function wp_loc_deactivate(): void {
     flush_rewrite_rules();
