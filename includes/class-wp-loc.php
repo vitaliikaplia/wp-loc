@@ -41,6 +41,7 @@ class WP_LOC {
     private function load_includes() {
         $includes = [
             'class-wp-loc-db',
+            'class-wp-loc-language-registry',
             'class-wp-loc-languages',
             'class-wp-loc-routing',
             'class-wp-loc-admin',

@@ -457,7 +457,7 @@ class WP_LOC_Admin {
 
         if ( ! WP_LOC_Admin_Settings::is_translatable( $post_type ) ) return;
 
-        $lang = self::get_admin_lang();
+        $lang = WP_LOC_DB::to_db_language_code( self::get_admin_lang() ) ?: self::get_admin_lang();
         $element_type = WP_LOC_DB::post_element_type( $post_type );
         $table = WP_LOC::instance()->db->get_table();
 
@@ -922,7 +922,7 @@ class WP_LOC_Admin {
         if ( ! is_admin() ) return $counts;
         if ( ! WP_LOC_Admin_Settings::is_translatable( $type ) ) return $counts;
 
-        $lang = self::get_admin_lang();
+        $lang = WP_LOC_DB::to_db_language_code( self::get_admin_lang() ) ?: self::get_admin_lang();
         $element_type = WP_LOC_DB::post_element_type( $type );
         $table = WP_LOC::instance()->db->get_table();
 
@@ -967,7 +967,7 @@ class WP_LOC_Admin {
         add_filter( "views_edit-{$post_type}", function ( $views ) use ( $post_type ) {
             if ( ! isset( $views['mine'] ) ) return $views;
 
-            $lang = self::get_admin_lang();
+            $lang = WP_LOC_DB::to_db_language_code( self::get_admin_lang() ) ?: self::get_admin_lang();
             $element_type = WP_LOC_DB::post_element_type( $post_type );
             $table = WP_LOC::instance()->db->get_table();
 

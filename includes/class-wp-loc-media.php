@@ -146,7 +146,7 @@ class WP_LOC_Media {
         $screen = get_current_screen();
         if ( ! $screen || $screen->id !== 'upload' ) return;
 
-        $lang = wp_loc_get_admin_lang();
+        $lang = WP_LOC_DB::to_db_language_code( wp_loc_get_admin_lang() ) ?: wp_loc_get_admin_lang();
         $element_type = WP_LOC_DB::post_element_type( 'attachment' );
         $table = WP_LOC::instance()->db->get_table();
 
@@ -172,7 +172,7 @@ class WP_LOC_Media {
     public function filter_ajax_media_by_language( array $args ): array {
         if ( ! is_admin() ) return $args;
 
-        $lang = wp_loc_get_admin_lang();
+        $lang = WP_LOC_DB::to_db_language_code( wp_loc_get_admin_lang() ) ?: wp_loc_get_admin_lang();
         $element_type = WP_LOC_DB::post_element_type( 'attachment' );
         $table = WP_LOC::instance()->db->get_table();
 

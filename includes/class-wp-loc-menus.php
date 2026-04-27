@@ -1184,10 +1184,11 @@ class WP_LOC_Menus {
         }
 
         global $wpdb;
+        $db_lang = WP_LOC_DB::to_db_language_code( $lang ) ?: $lang;
 
         return $where . $wpdb->prepare(
             " AND (wp_loc_nav_menu_posts.language_code = %s OR wp_loc_nav_menu_posts.element_id IS NULL)",
-            $lang
+            $db_lang
         );
     }
 

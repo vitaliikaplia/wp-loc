@@ -587,6 +587,182 @@ msgstr "Назву терма успішно перекладено."
 msgid "Close"
 msgstr "Закрити"
 
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Request failed. Please try again."
+msgstr "Запит не виконано. Спробуйте ще раз."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Scanning database..."
+msgstr "Сканування бази даних..."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Optimizing database..."
+msgstr "Оптимізація бази даних..."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "No removable legacy data was found. Your database is already clean."
+msgstr "Застарілих даних для видалення не знайдено. База даних уже чиста."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Are you sure you do not want to optimize the database? This wizard will be dismissed and WP-LOC will continue without cleaning legacy multilingual data."
+msgstr "Ви впевнені, що не хочете оптимізувати базу даних? Цей майстер буде відхилено, а WP-LOC продовжить роботу без очищення застарілих багатомовних даних."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Are you sure you want to continue? Legacy multilingual service data will be permanently removed and this action cannot be undone."
+msgstr "Ви впевнені, що хочете продовжити? Застарілі службові дані багатомовності буде видалено назавжди, і цю дію неможливо скасувати."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "No language records were found for import."
+msgstr "Записів мов для імпорту не знайдено."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "translation links kept"
+msgstr "зв'язків перекладів збережено"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "post records recognized"
+msgstr "записів контенту розпізнано"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "term records recognized"
+msgstr "записів термінів розпізнано"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "menu records recognized"
+msgstr "записів меню розпізнано"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "media records recognized"
+msgstr "записів медіа розпізнано"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "languages detected"
+msgstr "мов виявлено"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "localized options detected"
+msgstr "локалізованих опцій виявлено"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "field preferences detected"
+msgstr "налаштувань полів виявлено"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Kept by WP-LOC"
+msgstr "Залишається у WP-LOC"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Compatible translation links remain in place and continue powering posts, pages, media, terms, and menus."
+msgstr "Сумісні зв'язки перекладів залишаються на місці й продовжують працювати для записів, сторінок, медіа, термінів і меню."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Content types found"
+msgstr "Знайдені типи контенту"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "No translated post types were found."
+msgstr "Перекладених типів записів не знайдено."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Taxonomies found"
+msgstr "Знайдені таксономії"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "No translated taxonomies were found."
+msgstr "Перекладених таксономій не знайдено."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Languages to adopt"
+msgstr "Мови для прийняття"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Legacy data to remove"
+msgstr "Застарілі дані для видалення"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "%1$s option rows and %2$s meta rows are marked for cleanup."
+msgstr "%1$s рядків опцій і %2$s рядків метаданих позначено для очищення."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "languages imported"
+msgstr "мов імпортовано"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "legacy tables removed"
+msgstr "застарілих таблиць видалено"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "option rows removed"
+msgstr "рядків опцій видалено"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "meta rows removed"
+msgstr "рядків метаданих видалено"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "WP-LOC is ready to continue with the optimized multilingual database."
+msgstr "WP-LOC готовий продовжити роботу з оптимізованою багатомовною базою даних."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Database optimization"
+msgstr "Оптимізація бази даних"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Prepare multilingual data for WP-LOC"
+msgstr "Підготовка багатомовних даних для WP-LOC"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "WP-LOC can scan multilingual data left by another plugin, adopt compatible translation links, and remove obsolete service data after your confirmation."
+msgstr "WP-LOC може просканувати багатомовні дані, залишені іншим плагіном, прийняти сумісні зв'язки перекладів і видалити застарілі службові дані після вашого підтвердження."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Continue"
+msgstr "Продовжити"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Do not optimize database"
+msgstr "Не оптимізувати базу даних"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Review"
+msgstr "Перегляд"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Database scan summary"
+msgstr "Підсумок сканування бази даних"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Agree and optimize"
+msgstr "Погодитись і оптимізувати"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Optimization"
+msgstr "Оптимізація"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Optimizing database"
+msgstr "Оптимізація бази даних"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Please wait while WP-LOC applies the selected cleanup."
+msgstr "Зачекайте, поки WP-LOC виконає вибране очищення."
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Complete"
+msgstr "Завершено"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Database optimization completed"
+msgstr "Оптимізацію бази даних завершено"
+
+#: includes/class-wp-loc-db-optimization-wizard.php
+msgid "Continue using WP-LOC"
+msgstr "Продовжити використовувати WP-LOC"
+
+#: wp-loc.php
+msgid "Wizard"
+msgstr "Майстер"
+
 #: includes/class-wp-loc-admin.php:130
 msgid "Delete this wpml-config.xml file?"
 msgstr "Видалити цей файл wpml-config.xml?"
@@ -1073,6 +1249,50 @@ msgstr "Не вдалося перекласти назву терма."
 #, php-format
 msgid "Creating a translation in %s."
 msgstr "Створення перекладу в %s."
+
+#: includes/class-wp-loc-db-optimization-wizard.php:163
+msgid "Adopt as"
+msgstr "Прийняти як"
+
+#: includes/class-wp-loc-db-optimization-wizard.php:164
+msgid "Exact match"
+msgstr "Точний збіг"
+
+#: includes/class-wp-loc-db-optimization-wizard.php:165
+msgid "Slug normalized"
+msgstr "Слаг нормалізовано"
+
+#: includes/class-wp-loc-db-optimization-wizard.php:166
+msgid "Locale match"
+msgstr "Збіг локалі"
+
+#: includes/class-wp-loc-db-optimization-wizard.php:167
+msgid "Code match"
+msgstr "Збіг коду"
+
+#: includes/class-wp-loc-db-optimization-wizard.php:168
+msgid "WordPress match"
+msgstr "Збіг WordPress"
+
+#: includes/class-wp-loc-db-optimization-wizard.php:169
+msgid "Fallback match"
+msgstr "Резервне зіставлення"
+
+#: includes/class-wp-loc-db-optimization-wizard.php:170
+msgid "Manual match"
+msgstr "Ручне зіставлення"
+
+#: includes/class-wp-loc-db-optimization-wizard.php:1436
+msgid "Invalid language mapping payload."
+msgstr "Некоректні дані зіставлення мов."
+
+#: includes/class-wp-loc-db-optimization-wizard.php:1470
+msgid "Invalid language mapping selected."
+msgstr "Вибрано некоректне зіставлення мови."
+
+#: includes/class-wp-loc-db-optimization-wizard.php:1475
+msgid "Each detected language must be mapped to a unique WP-LOC language."
+msgstr "Кожна знайдена мова має бути зіставлена з унікальною мовою WP-LOC."
 
 #~ msgid "Detected config files"
 #~ msgstr "Знайдені конфіг-файли"

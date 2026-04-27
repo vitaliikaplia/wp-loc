@@ -21,10 +21,16 @@ Lightweight multilingual plugin for WordPress.
 - **AI-assisted custom menu links** — optional AI translation for `custom` nav menu items during menu sync, while preserving URLs and other menu item settings, with safe fallback when the AI provider refuses a short-field translation
 - **AI Translation tool** — TinyMCE-based AJAX translator for formatted HTML content, with translated content inserted back into the editor without reloading the page
 - **Config Migration tool** — detects legacy multilingual config files (`wpml-config.xml`), reads only translatable post types and taxonomies, generates lightweight `wp-loc-config.xml`, and can remove theme-level legacy config files
+- **Database Optimization Wizard** — appears in admin after activation, scans multilingual data left by another plugin, adopts compatible translation links, imports languages, detects translated post types/taxonomies/options, and removes obsolete service data after confirmation
+- **Manual language mapping during optimization** — the wizard auto-matches detected languages through a built-in registry, shows match confidence, and lets admins override the target WP-LOC language before applying cleanup
+- **Language registry** — central locale/code/slug/name/flag normalization for common WordPress and multilingual-plugin language codes, including aliases like `uk` → `ua` and legacy `iw` → `he`
+- **Separate URL slugs and compatibility codes** — languages can use URL slugs like `ua` while compatible database/API language codes remain `uk`
 - **Non-translatable post types** — work correctly with language URL prefixes (shared content across languages)
+- **Translatable post type detection** — if compatible translation rows already exist, WP-LOC can detect translated custom post types and taxonomies and merge them into runtime settings
+- **Frontend/admin query filtering** — translatable posts are filtered by the current language for main, secondary, AJAX, REST, and Gutenberg preview `WP_Query` calls when filters are not suppressed
 - **URL structure** — `/ua/page-slug/`, `/en/page-slug/`, default language without prefix
 - **Admin language switcher** — in the admin bar with flags, cookie-based
-- **Frontend language switcher** — `wp_loc_get_lang_switcher()`, `wp_loc_get_language_switcher_html()`, `wp_loc_the_language_switcher()` with translated post and term archive URLs
+- **Frontend language switcher** — `wp_loc_get_lang_switcher()`, `wp_loc_get_language_switcher_html()`, `wp_loc_the_language_switcher()` with translated post, custom post type, taxonomy, and archive URLs
 - **SEO** — hreflang alternate tags, canonical URLs, proper `<html lang="">`
 - **Yoast SEO compatibility** — localized `wpseo_titles` / `wpseo_social` / `wpseo_rss` options, translated primary category resolution, copied Yoast term SEO meta for translated terms, multilingual sitemap alternate links, stripped category-base compatibility, and Yoast indexable invalidation after multilingual updates
 - **Localized options** — `blogname`, `blogdescription`, `page_on_front`, `page_for_posts` per language, including localized front page / posts page routing
@@ -40,6 +46,7 @@ Lightweight multilingual plugin for WordPress.
 - **ACF container field support** — multilingual behavior for `group`, `repeater`, `flexible_content`, and `clone` fields across options pages, posts/pages, and term edit screens
 - **ACF nav_menu field support** — translated menu values resolve to the correct menu in the current language context
 - **Timber integration** — Twig functions `wp_loc_language_switcher()` and `wp_loc_languages()`
+- **Activation safety** — on activation, WP-LOC deactivates known conflicting multilingual add-ons instead of deleting them
 - **Ukrainian slug** — `uk` locale → `ua` URL slug out of the box
 
 ## Requirements
@@ -51,11 +58,12 @@ Lightweight multilingual plugin for WordPress.
 
 1. Upload `wp-loc` folder to `/wp-content/plugins/`
 2. Activate the plugin
-3. Go to **WP General Settings** and install the languages you need — they auto-appear in **Multilingual > Languages**
-4. Configure language slugs, display names and ordering in **Multilingual > Languages**
-5. Select translatable post types and taxonomies in **Multilingual > Settings**
-6. Configure **Multilingual > Settings** tabs for content workflow, switcher behavior, integrations, and AI provider settings
-7. Use **Multilingual > Tools** for WP Menus Sync, the AI Translation tool, and Config Migration
+3. If the Database Optimization Wizard appears, review the scan, adjust language mapping if needed, and apply or dismiss it
+4. Go to **WP General Settings** and install any additional languages you need — they auto-appear in **Multilingual > Languages**
+5. Configure language slugs, display names and ordering in **Multilingual > Languages**
+6. Select or review translatable post types and taxonomies in **Multilingual > Settings**
+7. Configure **Multilingual > Settings** tabs for content workflow, switcher behavior, integrations, and AI provider settings
+8. Use **Multilingual > Tools** for WP Menus Sync, the AI Translation tool, and Config Migration
 
 ## Usage
 
@@ -109,6 +117,17 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 - You can also generate `wp-loc-config.xml` from a detected legacy config source
 - Theme-level legacy config files can be removed from the same screen after migration; plugin-level files are shown as read-only
 
+### Database optimization wizard
+
+- The wizard opens automatically for admins after activation while its status is `pending`
+- Closing the modal with the `X` only hides it for the current page load; dismissing optimization stores that choice and stops the automatic modal
+- A plugin-row **Wizard** action remains available while the wizard has not been completed, so admins can return to it after dismissing
+- The scan summarizes compatible translation links, detected content types, taxonomies, media, menus, localized options, language records, and removable service data
+- Detected languages are normalized through `WP_LOC_Language_Registry`; the wizard shows match confidence and lets admins manually map each detected source language to a WP-LOC target language
+- Imported languages preserve compatible language codes and detected switcher display names where available, so URL slugs and database/API codes do not have to be identical
+- Applying optimization imports or updates WP-LOC languages, adopts compatible translation links, imports detected translatable post types/taxonomies into settings, cleans obsolete options/meta/tables, and marks the wizard as completed
+- The apply flow requires confirmation because removed service data is not restored by WP-LOC
+
 ### ACF options pages
 
 - `shared` fields stay on the base ACF options post ID (`options`)
@@ -149,16 +168,22 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 
 - Enable multilingual behavior per taxonomy in **Multilingual > Settings**
 - Term translations are stored in the `icl_translations` table as `tax_{taxonomy}` rows using `term_taxonomy_id`
+- Category, tag, and custom taxonomy archive URLs are language-aware
+- For translatable posts, multilingual taxonomy assignments sync across the whole post translation group
+- If a translated term does not exist for the current language, the frontend switcher falls back to the language home URL
+- Wrong-language term archive URLs return `404`
+
+## Routing Notes
+
+- Translated singular URLs resolve by language, post type, and slug, so translated posts from different post types can safely share the same slug
+- Custom post type translations with identical slugs across languages resolve to their translated post instead of redirecting back to the default-language post
+- Compatibility switcher APIs such as `icl_get_languages()` use the same translated URLs as WP-LOC's native switcher helpers
 
 ## Compatibility Note
 
 WP-LOC can interoperate with sites that already use the `icl_translations` table and legacy multilingual config files such as `wpml-config.xml`.
 
 WP-LOC is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by any third-party multilingual plugin vendor.
-- Category, tag, and custom taxonomy archive URLs are language-aware
-- For translatable posts, multilingual taxonomy assignments sync across the whole post translation group
-- If a translated term does not exist for the current language, the frontend switcher falls back to the language home URL
-- Wrong-language term archive URLs return `404`
 
 ## License
 

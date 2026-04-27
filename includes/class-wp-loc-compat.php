@@ -10,14 +10,71 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class WP_LOC_Compat {
 
-    private function get_context_language(): string {
+    private function get_internal_context_language(): string {
         return is_admin() ? wp_loc_get_admin_lang() : wp_loc_get_current_lang();
     }
 
+    private function get_context_language(): string {
+        $language = $this->get_internal_context_language();
+
+        return WP_LOC_DB::to_db_language_code( $language ) ?: $language;
+    }
+
+    private function get_default_context_language(): string {
+        $language = WP_LOC_Languages::get_default_language();
+
+        return WP_LOC_DB::to_db_language_code( $language ) ?: $language;
+    }
+
     public function __construct() {
+        $this->sync_legacy_settings();
         $this->register_filters();
         $this->register_constant();
         $this->register_sitepress_global();
+    }
+
+    private function sync_legacy_settings(): void {
+        $active = WP_LOC_Languages::get_active_languages();
+        $active_codes = [];
+
+        foreach ( $active as $slug => $data ) {
+            $active_codes[] = WP_LOC_DB::to_db_language_code( (string) $slug ) ?: (string) $slug;
+        }
+
+        $settings = get_option( 'icl_sitepress_settings', [] );
+        $settings = is_array( $settings ) ? $settings : [];
+        $original_settings = $settings;
+        $settings['default_language'] = $this->get_default_context_language();
+        $settings['active_languages'] = array_values( array_unique( array_filter( $active_codes ) ) );
+
+        if ( $settings !== $original_settings ) {
+            update_option( 'icl_sitepress_settings', $settings, false );
+        }
+    }
+
+    private function get_switcher_urls_by_language(): array {
+        if ( ! function_exists( 'wp_loc_get_lang_switcher' ) ) {
+            return [];
+        }
+
+        $urls = [];
+        foreach ( wp_loc_get_lang_switcher() as $language ) {
+            $code = sanitize_key( (string) ( $language['code'] ?? '' ) );
+            $url = (string) ( $language['url'] ?? '' );
+
+            if ( $code && $url ) {
+                $urls[ $code ] = $url;
+            }
+        }
+
+        return $urls;
+    }
+
+    private function build_home_url_for_language( string $slug ): string {
+        $default = WP_LOC_Languages::get_default_language();
+        $home = rtrim( set_url_scheme( get_option( 'home' ) ), '/' );
+
+        return $home . ( $slug === $default ? '/' : "/{$slug}/" );
     }
 
     /**
@@ -41,30 +98,30 @@ class WP_LOC_Compat {
 
         // wpml_default_language
         add_filter( 'wpml_default_language', function () {
-            return WP_LOC_Languages::get_default_language();
+            return $this->get_default_context_language();
         } );
 
         // wpml_active_languages
         add_filter( 'wpml_active_languages', function ( $value = null ) {
             $active = WP_LOC_Languages::get_active_languages();
-            $current = $this->get_context_language();
-            $default = WP_LOC_Languages::get_default_language();
-            $home = rtrim( set_url_scheme( get_option( 'home' ) ), '/' );
+            $current = $this->get_internal_context_language();
+            $switcher_urls = $this->get_switcher_urls_by_language();
 
             $result = [];
             foreach ( $active as $slug => $data ) {
                 $locale = $data['locale'] ?? $slug;
-                $url = $home . ( $slug === $default ? '/' : "/{$slug}/" );
-                $result[ $slug ] = [
-                    'code'            => $slug,
-                    'id'              => $slug,
-                    'native_name'     => WP_LOC_Languages::get_language_display_name( $locale ),
-                    'translated_name' => WP_LOC_Languages::get_language_display_name( $locale ),
-                    'language_code'   => $slug,
+                $display_name = WP_LOC_Languages::get_display_name( $slug );
+                $compat_code = WP_LOC_DB::to_db_language_code( $slug ) ?: $slug;
+                $result[ $compat_code ] = [
+                    'code'            => $compat_code,
+                    'id'              => $compat_code,
+                    'native_name'     => $display_name,
+                    'translated_name' => $display_name,
+                    'language_code'   => $compat_code,
                     'default_locale'  => $locale,
                     'active'          => $slug === $current ? 1 : 0,
                     'tag'             => str_replace( '_', '-', $locale ),
-                    'url'             => $url,
+                    'url'             => $switcher_urls[ $slug ] ?? $this->build_home_url_for_language( $slug ),
                     'country_flag_url' => WP_LOC_Languages::get_flag_url( $locale ),
                 ];
             }
@@ -87,7 +144,20 @@ class WP_LOC_Compat {
         add_filter( 'wpml_get_element_translations', function ( $value, $trid, $element_type = '' ) {
             $normalized_type = $element_type ? $this->normalize_element_type( (string) $element_type ) : '';
 
-            return WP_LOC::instance()->db->get_element_translations( (int) $trid, $normalized_type ?: (string) $element_type );
+            $translations = WP_LOC::instance()->db->get_element_translations( (int) $trid, $normalized_type ?: (string) $element_type );
+            $result = [];
+
+            foreach ( $translations as $language => $row ) {
+                $compat_code = WP_LOC_DB::to_db_language_code( $language ) ?: $language;
+                $compat_row = clone $row;
+                $compat_row->language_code = $compat_code;
+                $compat_row->source_language_code = $row->source_language_code
+                    ? ( WP_LOC_DB::to_db_language_code( $row->source_language_code ) ?: $row->source_language_code )
+                    : null;
+                $result[ $compat_code ] = $compat_row;
+            }
+
+            return $result;
         }, 10, 3 );
 
         // wpml_element_language_code
@@ -100,7 +170,9 @@ class WP_LOC_Compat {
                 return $value;
             }
 
-            return WP_LOC::instance()->db->get_element_language( $element['id'], $element['type'] ) ?: $value;
+            $language = WP_LOC::instance()->db->get_element_language( $element['id'], $element['type'] );
+
+            return $language ? ( WP_LOC_DB::to_db_language_code( $language ) ?: $language ) : $value;
         }, 10, 2 );
 
         // wpml_element_language_details
@@ -134,20 +206,20 @@ class WP_LOC_Compat {
         }
 
         if ( ! defined( 'ICL_LANGUAGE_NAME' ) ) {
-            $locale = is_admin() ? WP_LOC_Admin::get_admin_locale() : wp_loc_get_current_locale();
-            define( 'ICL_LANGUAGE_NAME', WP_LOC_Languages::get_language_display_name( $locale ) );
+            define( 'ICL_LANGUAGE_NAME', WP_LOC_Languages::get_display_name( $this->get_internal_context_language() ) );
         }
 
-        // Prevent loading of external multilingual CSS/JS
-        if ( ! defined( 'ICL_DONT_LOAD_NAVIGATION_CSS' ) ) {
-            define( 'ICL_DONT_LOAD_NAVIGATION_CSS', true );
-        }
-        if ( ! defined( 'ICL_DONT_LOAD_LANGUAGE_SELECTOR_CSS' ) ) {
-            define( 'ICL_DONT_LOAD_LANGUAGE_SELECTOR_CSS', true );
-        }
-        if ( ! defined( 'ICL_DONT_LOAD_LANGUAGES_JS' ) ) {
-            define( 'ICL_DONT_LOAD_LANGUAGES_JS', true );
-        }
+        add_action( 'after_setup_theme', function (): void {
+            if ( ! defined( 'ICL_DONT_LOAD_NAVIGATION_CSS' ) ) {
+                define( 'ICL_DONT_LOAD_NAVIGATION_CSS', true );
+            }
+            if ( ! defined( 'ICL_DONT_LOAD_LANGUAGE_SELECTOR_CSS' ) ) {
+                define( 'ICL_DONT_LOAD_LANGUAGE_SELECTOR_CSS', true );
+            }
+            if ( ! defined( 'ICL_DONT_LOAD_LANGUAGES_JS' ) ) {
+                define( 'ICL_DONT_LOAD_LANGUAGES_JS', true );
+            }
+        }, 99 );
     }
 
     /**
@@ -295,8 +367,8 @@ class WP_LOC_Compat {
 
         return [
             'trid'                 => $trid,
-            'language_code'        => $language_code,
-            'source_language_code' => $source_language_code,
+            'language_code'        => $language_code ? ( WP_LOC_DB::to_db_language_code( $language_code ) ?: $language_code ) : null,
+            'source_language_code' => $source_language_code ? ( WP_LOC_DB::to_db_language_code( $source_language_code ) ?: $source_language_code ) : null,
         ];
     }
 
@@ -340,11 +412,15 @@ class WP_LOC_Compat {
 class WP_LOC_Sitepress_Mock {
 
     public function get_current_language(): string {
-        return is_admin() ? wp_loc_get_admin_lang() : wp_loc_get_current_lang();
+        $language = is_admin() ? wp_loc_get_admin_lang() : wp_loc_get_current_lang();
+
+        return WP_LOC_DB::to_db_language_code( $language ) ?: $language;
     }
 
     public function get_default_language(): string {
-        return WP_LOC_Languages::get_default_language();
+        $language = WP_LOC_Languages::get_default_language();
+
+        return WP_LOC_DB::to_db_language_code( $language ) ?: $language;
     }
 
     public function switch_lang( string $language_code ): void {

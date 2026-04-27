@@ -33,6 +33,9 @@ class WP_LOC_Admin_Settings {
     const TAB_INTEGRATIONS = 'integrations';
     const TAB_AI = 'ai';
 
+    private static $detected_translatable_post_types = null;
+    private static $detected_translatable_taxonomies = null;
+
     public function __construct() {
         add_action( 'admin_menu', [ $this, 'add_menu' ], 20 );
         add_action( 'admin_init', [ $this, 'handle_save' ] );
@@ -97,7 +100,7 @@ class WP_LOC_Admin_Settings {
             return $saved;
         }
 
-        return $post_types;
+        return array_values( array_unique( array_merge( $post_types, self::get_detected_translatable_post_types() ) ) );
     }
 
     /**
@@ -118,7 +121,59 @@ class WP_LOC_Admin_Settings {
             return $saved;
         }
 
-        return $taxonomies;
+        return array_values( array_unique( array_merge( $taxonomies, self::get_detected_translatable_taxonomies() ) ) );
+    }
+
+    private static function get_detected_translatable_post_types(): array {
+        if ( self::$detected_translatable_post_types !== null ) {
+            return self::$detected_translatable_post_types;
+        }
+
+        global $wpdb;
+
+        $table = $wpdb->prefix . 'icl_translations';
+        if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) !== $table ) {
+            return self::$detected_translatable_post_types = [];
+        }
+
+        $types = $wpdb->get_col(
+            "SELECT DISTINCT REPLACE(element_type, 'post_', '') AS post_type
+             FROM {$table}
+             WHERE element_type LIKE 'post\_%'"
+        );
+
+        $excluded = [ 'attachment', 'nav_menu_item', 'revision' ];
+
+        return self::$detected_translatable_post_types = array_values( array_filter(
+            array_map( 'sanitize_key', array_map( 'strval', (array) $types ) ),
+            static fn( string $post_type ): bool => $post_type !== '' && ! in_array( $post_type, $excluded, true ) && post_type_exists( $post_type )
+        ) );
+    }
+
+    private static function get_detected_translatable_taxonomies(): array {
+        if ( self::$detected_translatable_taxonomies !== null ) {
+            return self::$detected_translatable_taxonomies;
+        }
+
+        global $wpdb;
+
+        $table = $wpdb->prefix . 'icl_translations';
+        if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) !== $table ) {
+            return self::$detected_translatable_taxonomies = [];
+        }
+
+        $taxonomies = $wpdb->get_col(
+            "SELECT DISTINCT REPLACE(element_type, 'tax_', '') AS taxonomy
+             FROM {$table}
+             WHERE element_type LIKE 'tax\_%'"
+        );
+
+        $excluded = [ 'nav_menu' ];
+
+        return self::$detected_translatable_taxonomies = array_values( array_filter(
+            array_map( 'sanitize_key', array_map( 'strval', (array) $taxonomies ) ),
+            static fn( string $taxonomy ): bool => $taxonomy !== '' && ! in_array( $taxonomy, $excluded, true ) && taxonomy_exists( $taxonomy )
+        ) );
     }
 
     /**
@@ -358,9 +413,13 @@ class WP_LOC_Admin_Settings {
         unset( $all_taxonomies['post_format'], $all_taxonomies['nav_menu'] );
 
         $saved = get_option( self::OPTION_KEY );
-        $selected = ( $saved !== false && is_array( $saved ) ) ? $saved : [ 'post', 'page' ];
+        $selected = ( $saved !== false && is_array( $saved ) )
+            ? $saved
+            : array_values( array_unique( array_merge( [ 'post', 'page' ], self::get_detected_translatable_post_types() ) ) );
         $saved_taxonomies = get_option( self::TAXONOMIES_OPTION_KEY );
-        $selected_taxonomies = ( $saved_taxonomies !== false && is_array( $saved_taxonomies ) ) ? $saved_taxonomies : [ 'category', 'post_tag' ];
+        $selected_taxonomies = ( $saved_taxonomies !== false && is_array( $saved_taxonomies ) )
+            ? $saved_taxonomies
+            : array_values( array_unique( array_merge( [ 'category', 'post_tag' ], self::get_detected_translatable_taxonomies() ) ) );
         $auto_create_posts = self::should_auto_create_post_translations();
         $auto_create_terms = self::should_auto_create_term_translations();
         $auto_create_menus = self::should_auto_create_menu_translations();

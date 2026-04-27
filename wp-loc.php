@@ -60,6 +60,18 @@ function wp_loc_deactivate(): void {
     delete_option( 'wp_loc_flush_rewrite_rules' );
 }
 
+add_action( 'admin_post_wp_loc_restart_db_optimization_wizard', function (): void {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( esc_html__( 'Sorry, you are not allowed to do that.', 'wp-loc' ) );
+    }
+
+    check_admin_referer( 'wp_loc_restart_db_optimization_wizard' );
+    update_option( 'wp_loc_db_optimization_wizard_status', 'pending' );
+
+    wp_safe_redirect( admin_url( 'plugins.php' ) );
+    exit;
+} );
+
 add_action( 'plugins_loaded', function () {
     load_plugin_textdomain( 'wp-loc', false, dirname( WP_LOC_BASENAME ) . '/languages' );
     WP_LOC::instance();
@@ -67,5 +79,15 @@ add_action( 'plugins_loaded', function () {
 
 add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), function ( array $links ): array {
     $links[] = '<a href="' . admin_url( 'admin.php?page=wp-loc-settings' ) . '">' . __( 'Settings', 'wp-loc' ) . '</a>';
+
+    if ( current_user_can( 'manage_options' ) && get_option( 'wp_loc_db_optimization_wizard_status', 'pending' ) !== 'completed' ) {
+        $wizard_url = wp_nonce_url(
+            admin_url( 'admin-post.php?action=wp_loc_restart_db_optimization_wizard' ),
+            'wp_loc_restart_db_optimization_wizard'
+        );
+
+        $links[] = '<a href="' . esc_url( $wizard_url ) . '">' . __( 'Wizard', 'wp-loc' ) . '</a>';
+    }
+
     return $links;
 } );

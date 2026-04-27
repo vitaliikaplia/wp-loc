@@ -153,6 +153,7 @@ class WP_LOC_Admin_Languages {
                 'locale'       => sanitize_text_field( $locale ),
                 'enabled'      => ! empty( $data['enabled'] ),
                 'display_name' => $display_name,
+                'wpml_code'    => WP_LOC_Language_Registry::wpml_code_from_locale( (string) $locale ),
             ];
         }
 

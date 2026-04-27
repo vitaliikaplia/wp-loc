@@ -79,39 +79,123 @@ class WP_LOC_Frontend {
      * Filter frontend posts by current language
      */
     public function filter_posts_by_language( \WP_Query $query ): void {
-        if ( is_admin() || ! $query->is_main_query() ) return;
+        if ( $query->get( 'suppress_filters' ) ) return;
 
-        $lang_slug = get_query_var( 'lang' );
-        if ( ! $lang_slug ) return;
+        $lang_slug = $query->get( 'lang' ) ?: $this->get_query_context_language();
+        if ( ! $lang_slug || $lang_slug === 'all' ) return;
 
         $active = WP_LOC_Languages::get_active_languages();
         if ( ! isset( $active[ $lang_slug ] ) ) return;
+        $db_lang = WP_LOC_DB::to_db_language_code( $lang_slug ) ?: $lang_slug;
+
+        $post_types = $this->get_query_post_types( $query );
+        $filterable_post_types = array_values( array_filter(
+            $post_types,
+            static fn( string $post_type ): bool => WP_LOC_Admin_Settings::is_translatable( $post_type )
+        ) );
+
+        if ( empty( $filterable_post_types ) ) {
+            return;
+        }
 
         $table = WP_LOC::instance()->db->get_table();
 
-        add_filter( 'posts_join', function ( $join, \WP_Query $filtered_query ) use ( $table, $query ) {
+        add_filter( 'posts_join', function ( $join, \WP_Query $filtered_query ) use ( $table, $query, $filterable_post_types ) {
             if ( $filtered_query !== $query ) {
                 return $join;
             }
 
             global $wpdb;
             if ( strpos( $join, 'wp_loc_ft' ) !== false ) return $join;
-            $join .= " LEFT JOIN {$table} AS wp_loc_ft ON {$wpdb->posts}.ID = wp_loc_ft.element_id AND wp_loc_ft.element_type = CONCAT('post_', {$wpdb->posts}.post_type)";
+            $element_types = array_map(
+                static fn( string $post_type ): string => 'post_' . $post_type,
+                $filterable_post_types
+            );
+            $quoted_element_types = "'" . implode( "','", array_map( 'esc_sql', $element_types ) ) . "'";
+            $join .= " LEFT JOIN {$table} AS wp_loc_ft
+                ON {$wpdb->posts}.ID = wp_loc_ft.element_id
+                AND wp_loc_ft.element_type IN ({$quoted_element_types})";
             return $join;
         }, 10, 2 );
 
-        add_filter( 'posts_where', function ( $where, \WP_Query $filtered_query ) use ( $lang_slug, $query ) {
+        add_filter( 'posts_where', function ( $where, \WP_Query $filtered_query ) use ( $db_lang, $query, $filterable_post_types ) {
             if ( $filtered_query !== $query ) {
                 return $where;
             }
 
             global $wpdb;
+            $quoted_post_types = "'" . implode( "','", array_map( 'esc_sql', $filterable_post_types ) ) . "'";
             $where .= $wpdb->prepare(
-                " AND (wp_loc_ft.language_code = %s OR wp_loc_ft.element_id IS NULL)",
-                $lang_slug
+                " AND (
+                    {$wpdb->posts}.post_type NOT IN ({$quoted_post_types})
+                    OR wp_loc_ft.language_code = %s
+                    OR wp_loc_ft.element_id IS NULL
+                )",
+                $db_lang
             );
             return $where;
         }, 10, 2 );
+    }
+
+    private function get_query_context_language(): ?string {
+        $is_editor_context = is_admin() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || wp_doing_ajax();
+
+        if ( $is_editor_context ) {
+            $post_id = $this->get_admin_context_post_id();
+            if ( ! $post_id ) {
+                return null;
+            }
+
+            $post_type = get_post_type( $post_id );
+            if ( ! $post_type || ! WP_LOC_Admin_Settings::is_translatable( $post_type ) ) {
+                return null;
+            }
+
+            return WP_LOC::instance()->db->get_element_language( $post_id, WP_LOC_DB::post_element_type( $post_type ) );
+        }
+
+        return wp_loc_get_current_lang();
+    }
+
+    private function get_admin_context_post_id(): int {
+        foreach ( [ 'post_id', 'post', 'post_ID', 'id' ] as $key ) {
+            if ( isset( $_REQUEST[ $key ] ) && is_numeric( $_REQUEST[ $key ] ) ) {
+                $post_id = absint( wp_unslash( $_REQUEST[ $key ] ) );
+                if ( $post_id && get_post( $post_id ) ) {
+                    return $post_id;
+                }
+            }
+        }
+
+        if ( function_exists( 'get_current_screen' ) ) {
+            $screen = get_current_screen();
+            if ( $screen && ! empty( $screen->is_block_editor ) && isset( $_GET['post'] ) && is_numeric( $_GET['post'] ) ) {
+                $post_id = absint( wp_unslash( $_GET['post'] ) );
+                if ( $post_id && get_post( $post_id ) ) {
+                    return $post_id;
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    private function get_query_post_types( \WP_Query $query ): array {
+        $post_type = $query->get( 'post_type' );
+
+        if ( empty( $post_type ) ) {
+            return apply_filters( 'wp_loc_translatable_post_types', [ 'post', 'page' ] );
+        }
+
+        if ( $post_type === 'any' ) {
+            return get_post_types( [ 'public' => true ], 'names' );
+        }
+
+        if ( is_array( $post_type ) ) {
+            return array_values( array_filter( array_map( 'sanitize_key', $post_type ) ) );
+        }
+
+        return [ sanitize_key( (string) $post_type ) ];
     }
 }
 

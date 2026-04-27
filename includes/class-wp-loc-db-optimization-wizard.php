@@ -37,13 +37,47 @@ class WP_LOC_DB_Optimization_Wizard {
         }
 
         wp_localize_script( 'wp-loc-admin', 'wpLocDbOptimizationWizard', [
-            'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-            'nonce'   => wp_create_nonce( 'wp_loc_db_optimization_wizard' ),
-            'i18n'    => [
+            'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+            'redirectUrl' => admin_url( 'admin.php?page=wp-loc' ),
+            'nonce'       => wp_create_nonce( 'wp_loc_db_optimization_wizard' ),
+            'i18n'        => [
                 'requestFailed' => __( 'Request failed. Please try again.', 'wp-loc' ),
                 'scanning'      => __( 'Scanning database...', 'wp-loc' ),
                 'optimizing'    => __( 'Optimizing database...', 'wp-loc' ),
                 'noCleanup'     => __( 'No removable legacy data was found. Your database is already clean.', 'wp-loc' ),
+                'confirmDismiss' => __( 'Are you sure you do not want to optimize the database? This wizard will be dismissed and WP-LOC will continue without cleaning legacy multilingual data.', 'wp-loc' ),
+                'confirmApply'   => __( 'Are you sure you want to continue? Legacy multilingual service data will be permanently removed and this action cannot be undone.', 'wp-loc' ),
+                'noLanguages'    => __( 'No language records were found for import.', 'wp-loc' ),
+                'translationLinksKept' => __( 'translation links kept', 'wp-loc' ),
+                'postRecordsRecognized' => __( 'post records recognized', 'wp-loc' ),
+                'termRecordsRecognized' => __( 'term records recognized', 'wp-loc' ),
+                'menuRecordsRecognized' => __( 'menu records recognized', 'wp-loc' ),
+                'mediaRecordsRecognized' => __( 'media records recognized', 'wp-loc' ),
+                'languagesDetected' => __( 'languages detected', 'wp-loc' ),
+                'localizedOptionsDetected' => __( 'localized options detected', 'wp-loc' ),
+                'fieldPreferencesDetected' => __( 'field preferences detected', 'wp-loc' ),
+                'keptByWpLoc' => __( 'Kept by WP-LOC', 'wp-loc' ),
+                'keptByWpLocDescription' => __( 'Compatible translation links remain in place and continue powering posts, pages, media, terms, and menus.', 'wp-loc' ),
+                'contentTypesFound' => __( 'Content types found', 'wp-loc' ),
+                'noPostTypes' => __( 'No translated post types were found.', 'wp-loc' ),
+                'taxonomiesFound' => __( 'Taxonomies found', 'wp-loc' ),
+                'noTaxonomies' => __( 'No translated taxonomies were found.', 'wp-loc' ),
+                'languagesToAdopt' => __( 'Languages to adopt', 'wp-loc' ),
+                'adoptAs' => __( 'Adopt as', 'wp-loc' ),
+                'matchExact' => __( 'Exact match', 'wp-loc' ),
+                'matchNormalized' => __( 'Slug normalized', 'wp-loc' ),
+                'matchLocale' => __( 'Locale match', 'wp-loc' ),
+                'matchCode' => __( 'Code match', 'wp-loc' ),
+                'matchWordPress' => __( 'WordPress match', 'wp-loc' ),
+                'matchFallback' => __( 'Needs review', 'wp-loc' ),
+                'matchManual' => __( 'Manual match', 'wp-loc' ),
+                'legacyDataToRemove' => __( 'Legacy data to remove', 'wp-loc' ),
+                'cleanupRowsSummary' => __( '%1$s option rows and %2$s meta rows are marked for cleanup.', 'wp-loc' ),
+                'languagesImported' => __( 'languages imported', 'wp-loc' ),
+                'legacyTablesRemoved' => __( 'legacy tables removed', 'wp-loc' ),
+                'optionRowsRemoved' => __( 'option rows removed', 'wp-loc' ),
+                'metaRowsRemoved' => __( 'meta rows removed', 'wp-loc' ),
+                'optimizationReady' => __( 'WP-LOC is ready to continue with the optimized multilingual database.', 'wp-loc' ),
             ],
         ] );
     }
@@ -69,8 +103,16 @@ class WP_LOC_DB_Optimization_Wizard {
                 </div>
 
                 <div class="wp-loc-db-wizard__step" data-step="scan">
-                    <p class="wp-loc-db-wizard__eyebrow"><?php esc_html_e( 'Review', 'wp-loc' ); ?></p>
-                    <h2><?php esc_html_e( 'Database scan summary', 'wp-loc' ); ?></h2>
+                    <div class="wp-loc-db-wizard__header">
+                        <div>
+                            <p class="wp-loc-db-wizard__eyebrow"><?php esc_html_e( 'Review', 'wp-loc' ); ?></p>
+                            <h2><?php esc_html_e( 'Database scan summary', 'wp-loc' ); ?></h2>
+                        </div>
+                        <aside class="wp-loc-db-wizard__note">
+                            <h3><?php esc_html_e( 'Kept by WP-LOC', 'wp-loc' ); ?></h3>
+                            <p><?php esc_html_e( 'Compatible translation links remain in place and continue powering posts, pages, media, terms, and menus.', 'wp-loc' ); ?></p>
+                        </aside>
+                    </div>
                     <div class="wp-loc-db-wizard__loading" data-loading-scan><?php esc_html_e( 'Scanning database...', 'wp-loc' ); ?></div>
                     <div class="wp-loc-db-wizard__summary" data-summary hidden></div>
                     <div class="wp-loc-db-wizard__actions">
@@ -113,8 +155,11 @@ class WP_LOC_DB_Optimization_Wizard {
     public function ajax_apply(): void {
         $this->assert_ajax_permissions();
         $scan = $this->scan_database();
+        $scan = $this->apply_requested_language_mapping( $scan );
+        $this->normalize_translation_language_codes( $scan );
         $cleanup = $this->cleanup_legacy_data( $scan );
         $languages_imported = $this->import_languages_from_scan( $scan );
+        $content_settings = $this->adopt_content_settings_from_scan( $scan );
 
         update_option( self::STATUS_OPTION, self::STATUS_COMPLETED );
 
@@ -124,6 +169,8 @@ class WP_LOC_DB_Optimization_Wizard {
             'options_removed'    => $cleanup['options_removed'],
             'meta_removed'       => $cleanup['meta_removed'],
             'kept_rows'          => (int) ( $scan['compatible']['translation_rows'] ?? 0 ),
+            'post_types_adopted' => $content_settings['post_types'],
+            'taxonomies_adopted' => $content_settings['taxonomies'],
         ] );
     }
 
@@ -173,6 +220,7 @@ class WP_LOC_DB_Optimization_Wizard {
                 'field_preferences' => $this->count_field_preferences(),
             ],
             'languages' => $languages,
+            'language_targets' => WP_LOC_Language_Registry::get_language_options(),
             'legacy'    => [
                 'tables'        => array_map( [ $this, 'table_summary' ], $removable_tables ),
                 'options'       => $this->count_legacy_options(),
@@ -225,21 +273,35 @@ class WP_LOC_DB_Optimization_Wizard {
             return 0;
         }
 
-        $existing = WP_LOC_Languages::get_languages();
+        $existing = $this->normalize_configured_languages( WP_LOC_Languages::get_languages() );
         $imported = 0;
 
         foreach ( $languages as $language ) {
             $slug = sanitize_key( (string) ( $language['code'] ?? '' ) );
             $locale = sanitize_text_field( (string) ( $language['locale'] ?? $slug ) );
+            $display_name = trim( sanitize_text_field( (string) ( $language['display_name'] ?? '' ) ) );
 
-            if ( ! $slug || isset( $existing[ $slug ] ) ) {
+            if ( ! $slug ) {
+                continue;
+            }
+
+            if ( isset( $existing[ $slug ] ) ) {
+                if ( empty( $existing[ $slug ]['wpml_code'] ) ) {
+                    $existing[ $slug ]['wpml_code'] = sanitize_key( (string) ( $language['wpml_code'] ?? WP_LOC_Language_Registry::wpml_code_from_locale( $locale ?: $slug ) ) );
+                    $imported++;
+                }
+                if ( $display_name && $this->is_generated_display_name( (string) ( $existing[ $slug ]['display_name'] ?? '' ), $slug, $locale ) ) {
+                    $existing[ $slug ]['display_name'] = $display_name;
+                    $imported++;
+                }
                 continue;
             }
 
             $existing[ $slug ] = [
                 'locale'       => $locale ?: $slug,
                 'enabled'      => true,
-                'display_name' => WP_LOC_Languages::get_language_display_name( $locale ?: $slug ),
+                'display_name' => $display_name ?: WP_LOC_Languages::get_language_display_name( $locale ?: $slug ),
+                'wpml_code'    => sanitize_key( (string) ( $language['wpml_code'] ?? WP_LOC_Language_Registry::wpml_code_from_locale( $locale ?: $slug ) ) ),
             ];
             $imported++;
         }
@@ -253,20 +315,145 @@ class WP_LOC_DB_Optimization_Wizard {
         return $imported;
     }
 
+    private function apply_requested_language_mapping( array $scan ): array {
+        $mapping = $this->get_requested_language_mapping();
+
+        if ( empty( $mapping ) ) {
+            return $scan;
+        }
+
+        $target_codes = [];
+
+        foreach ( $scan['languages']['items'] ?? [] as $index => $language ) {
+            $source_code = sanitize_key( (string) ( $language['source_code'] ?? $language['code'] ?? '' ) );
+
+            if ( ! $source_code || empty( $mapping[ $source_code ] ) ) {
+                continue;
+            }
+
+            $target = WP_LOC_Language_Registry::normalize_external_language(
+                (string) ( $mapping[ $source_code ]['code'] ?? '' ),
+                (string) ( $mapping[ $source_code ]['locale'] ?? '' ),
+                (string) ( $mapping[ $source_code ]['display_name'] ?? '' )
+            );
+
+            $target_code = sanitize_key( (string) ( $target['code'] ?? '' ) );
+            if ( ! $target_code ) {
+                wp_send_json_error( [ 'message' => __( 'Invalid language mapping selected.', 'wp-loc' ) ], 400 );
+            }
+
+            if ( isset( $target_codes[ $target_code ] ) ) {
+                wp_send_json_error( [ 'message' => __( 'Each detected language must be mapped to a unique WP-LOC language.', 'wp-loc' ) ], 400 );
+            }
+
+            $target_codes[ $target_code ] = true;
+
+            $scan['languages']['items'][ $index ] = array_merge( $language, [
+                'code'         => $target_code,
+                'wpml_code'    => sanitize_key( (string) ( $target['wpml_code'] ?? WP_LOC_Language_Registry::wpml_code_from_locale( (string) ( $target['locale'] ?? $target_code ) ) ) ),
+                'locale'       => sanitize_text_field( (string) ( $target['locale'] ?? $target_code ) ),
+                'display_name' => sanitize_text_field( (string) ( $language['display_name'] ?? $target['display_name'] ?? '' ) ),
+                'flag'         => sanitize_key( (string) ( $target['flag'] ?? '' ) ),
+                'confidence'   => 'manual',
+            ] );
+        }
+
+        return $scan;
+    }
+
+    private function get_requested_language_mapping(): array {
+        $raw = isset( $_POST['language_mapping'] ) ? wp_unslash( $_POST['language_mapping'] ) : '';
+        if ( ! is_string( $raw ) || trim( $raw ) === '' ) {
+            return [];
+        }
+
+        $decoded = json_decode( $raw, true );
+        if ( ! is_array( $decoded ) ) {
+            wp_send_json_error( [ 'message' => __( 'Invalid language mapping payload.', 'wp-loc' ) ], 400 );
+        }
+
+        $mapping = [];
+        foreach ( $decoded as $source_code => $target ) {
+            if ( ! is_array( $target ) ) {
+                continue;
+            }
+
+            $source_code = sanitize_key( (string) $source_code );
+            if ( ! $source_code ) {
+                continue;
+            }
+
+            $mapping[ $source_code ] = [
+                'code'         => sanitize_key( (string) ( $target['code'] ?? '' ) ),
+                'locale'       => sanitize_text_field( (string) ( $target['locale'] ?? '' ) ),
+                'display_name' => sanitize_text_field( (string) ( $target['display_name'] ?? '' ) ),
+            ];
+        }
+
+        return $mapping;
+    }
+
+    private function is_generated_display_name( string $display_name, string $slug, string $locale ): bool {
+        $display_name = trim( $display_name );
+
+        if ( $display_name === '' || $display_name === strtoupper( $slug ) ) {
+            return true;
+        }
+
+        return $display_name === WP_LOC_Languages::get_language_display_name( $locale ?: $slug );
+    }
+
+    private function adopt_content_settings_from_scan( array $scan ): array {
+        $post_types = $this->extract_summary_labels( $scan['details']['post_types'] ?? [] );
+        $taxonomies = $this->extract_summary_labels( $scan['details']['taxonomies'] ?? [] );
+
+        if ( $post_types ) {
+            $existing = get_option( WP_LOC_Admin_Settings::OPTION_KEY, [] );
+            $existing = is_array( $existing ) ? array_map( 'sanitize_key', $existing ) : [];
+            update_option( WP_LOC_Admin_Settings::OPTION_KEY, array_values( array_unique( array_merge( $existing, $post_types ) ) ) );
+        }
+
+        if ( $taxonomies ) {
+            $existing = get_option( WP_LOC_Admin_Settings::TAXONOMIES_OPTION_KEY, [] );
+            $existing = is_array( $existing ) ? array_map( 'sanitize_key', $existing ) : [];
+            update_option( WP_LOC_Admin_Settings::TAXONOMIES_OPTION_KEY, array_values( array_unique( array_merge( $existing, $taxonomies ) ) ) );
+        }
+
+        return [
+            'post_types' => count( $post_types ),
+            'taxonomies' => count( $taxonomies ),
+        ];
+    }
+
+    private function extract_summary_labels( array $items ): array {
+        $labels = [];
+
+        foreach ( $items as $item ) {
+            if ( ! is_array( $item ) ) {
+                continue;
+            }
+
+            $label = sanitize_key( (string) ( $item['label'] ?? '' ) );
+            if ( $label ) {
+                $labels[] = $label;
+            }
+        }
+
+        return array_values( array_unique( $labels ) );
+    }
+
     private function detect_languages(): array {
         global $wpdb;
 
         $items = [];
         $translations_table = $wpdb->prefix . 'icl_translations';
+        $display_names = $this->detect_language_display_names();
 
         if ( $this->table_exists( $translations_table ) ) {
             $codes = $wpdb->get_col( "SELECT DISTINCT language_code FROM {$translations_table} WHERE language_code != '' ORDER BY language_code ASC" );
 
             foreach ( $codes as $code ) {
-                $items[ $code ] = [
-                    'code'   => $code,
-                    'locale' => WP_LOC_Languages::get_language_locale( $code ),
-                ];
+                $this->add_detected_language( $items, (string) $code, WP_LOC_Languages::get_language_locale( (string) $code ), $display_names[ (string) $code ] ?? '' );
             }
         }
 
@@ -280,10 +467,7 @@ class WP_LOC_DB_Optimization_Wizard {
                     continue;
                 }
 
-                $items[ $code ] = [
-                    'code'   => $code,
-                    'locale' => sanitize_text_field( (string) $row->locale ) ?: $code,
-                ];
+                $this->add_detected_language( $items, $code, sanitize_text_field( (string) $row->locale ) ?: $code, $display_names[ $code ] ?? '' );
             }
         }
 
@@ -291,6 +475,237 @@ class WP_LOC_DB_Optimization_Wizard {
             'count' => count( $items ),
             'items' => array_values( $items ),
         ];
+    }
+
+    private function add_detected_language( array &$items, string $source_code, string $locale, string $display_name = '' ): void {
+        $language = WP_LOC_Language_Registry::normalize_external_language( $source_code, $locale, $display_name );
+        $source_code = sanitize_key( (string) ( $language['source_code'] ?? $source_code ) );
+        $slug = sanitize_key( (string) ( $language['code'] ?? '' ) );
+
+        if ( ! $slug ) {
+            return;
+        }
+
+        $items[ $slug ] = [
+            'code'        => $slug,
+            'wpml_code'   => sanitize_key( (string) ( $language['wpml_code'] ?? WP_LOC_Language_Registry::wpml_code_from_locale( (string) ( $language['locale'] ?? $slug ) ) ) ),
+            'locale'      => sanitize_text_field( (string) ( $language['locale'] ?? $slug ) ),
+            'source_code' => $source_code,
+            'display_name' => sanitize_text_field( (string) ( $language['display_name'] ?? '' ) ),
+            'flag'        => sanitize_key( (string) ( $language['flag'] ?? '' ) ),
+            'confidence'  => sanitize_key( (string) ( $language['confidence'] ?? 'fallback' ) ),
+        ];
+    }
+
+    private function detect_language_display_names(): array {
+        global $wpdb;
+
+        $names = [];
+        $names = $this->detect_language_names_from_language_table( $names );
+        $translations_table = $wpdb->prefix . 'icl_languages_translations';
+
+        if ( ! $this->table_exists( $translations_table ) ) {
+            return $names;
+        }
+
+        $switcher_names = [];
+        $display_codes = $this->detect_switcher_display_language_codes();
+        $rows = $wpdb->get_results(
+            "SELECT language_code, display_language_code, name
+             FROM {$translations_table}
+             WHERE language_code != ''
+               AND display_language_code != ''
+               AND name != ''"
+        );
+
+        $fallback_names = [];
+
+        foreach ( $rows as $row ) {
+            $language_code = sanitize_key( (string) $row->language_code );
+            $display_language_code = sanitize_key( (string) $row->display_language_code );
+            $name = trim( sanitize_text_field( (string) $row->name ) );
+
+            if ( ! $language_code || ! $display_language_code || $name === '' ) {
+                continue;
+            }
+
+            if ( $display_codes && in_array( $display_language_code, $display_codes, true ) ) {
+                $switcher_names[ $language_code ][ $display_language_code ] = $name;
+            }
+
+            if ( $language_code === $display_language_code ) {
+                $this->add_detected_display_name( $names, $language_code, $name );
+                continue;
+            }
+
+            if ( ! isset( $fallback_names[ $language_code ] ) ) {
+                $this->add_detected_display_name( $fallback_names, $language_code, $name );
+            }
+        }
+
+        foreach ( $switcher_names as $language_code => $localized_names ) {
+            $unique_names = array_values( array_unique( array_filter( array_map( 'trim', $localized_names ) ) ) );
+
+            if ( count( $unique_names ) === 1 ) {
+                $this->add_detected_display_name( $names, (string) $language_code, (string) $unique_names[0] );
+            }
+        }
+
+        return $names + $fallback_names;
+    }
+
+    private function detect_switcher_display_language_codes(): array {
+        global $wpdb;
+
+        $codes = [];
+        $settings = get_option( 'wpml_language_switcher', [] );
+
+        if ( is_array( $settings ) && ! empty( $settings['languages_order'] ) && is_array( $settings['languages_order'] ) ) {
+            $codes = array_merge( $codes, array_map( 'sanitize_key', $settings['languages_order'] ) );
+        }
+
+        $sitepress_settings = get_option( 'icl_sitepress_settings', [] );
+        if ( is_array( $sitepress_settings ) && ! empty( $sitepress_settings['languages_order'] ) && is_array( $sitepress_settings['languages_order'] ) ) {
+            $codes = array_merge( $codes, array_map( 'sanitize_key', $sitepress_settings['languages_order'] ) );
+        }
+
+        $translations_table = $wpdb->prefix . 'icl_translations';
+        if ( $this->table_exists( $translations_table ) ) {
+            $db_codes = $wpdb->get_col( "SELECT DISTINCT language_code FROM {$translations_table} WHERE language_code != ''" );
+            $codes = array_merge( $codes, array_map( 'sanitize_key', (array) $db_codes ) );
+        }
+
+        return array_values( array_unique( array_filter( $codes ) ) );
+    }
+
+    private function detect_language_names_from_language_table( array $names ): array {
+        global $wpdb;
+
+        $table = $wpdb->prefix . 'icl_languages';
+        if ( ! $this->table_exists( $table ) ) {
+            return $names;
+        }
+
+        $columns = $wpdb->get_col( "SHOW COLUMNS FROM {$table}", 0 );
+        $columns = array_map( 'strval', (array) $columns );
+
+        if ( ! in_array( 'code', $columns, true ) ) {
+            return $names;
+        }
+
+        $name_column = '';
+        foreach ( [ 'native_name', 'display_name', 'translated_name', 'english_name' ] as $candidate ) {
+            if ( in_array( $candidate, $columns, true ) ) {
+                $name_column = $candidate;
+                break;
+            }
+        }
+
+        if ( ! $name_column ) {
+            return $names;
+        }
+
+        $rows = $wpdb->get_results( "SELECT code, {$name_column} AS name FROM {$table} WHERE code != '' AND {$name_column} != ''" );
+
+        foreach ( $rows as $row ) {
+            $this->add_detected_display_name( $names, (string) $row->code, (string) $row->name );
+        }
+
+        return $names;
+    }
+
+    private function add_detected_display_name( array &$names, string $code, string $name ): void {
+        $code = sanitize_key( $code );
+        $name = trim( sanitize_text_field( $name ) );
+
+        if ( ! $code || $name === '' ) {
+            return;
+        }
+
+        $names[ $code ] = $name;
+
+        $normalized = $this->normalize_language_slug( $code );
+        if ( $normalized && ! isset( $names[ $normalized ] ) ) {
+            $names[ $normalized ] = $name;
+        }
+    }
+
+    private function normalize_language_slug( string $code, string $locale = '' ): string {
+        $language = WP_LOC_Language_Registry::normalize_external_language( $code, $locale ?: WP_LOC_Languages::get_language_locale( $code ) );
+        $slug = (string) ( $language['code'] ?? '' );
+
+        return sanitize_key( $slug ?: $code );
+    }
+
+    private function normalize_translation_language_codes( array $scan ): void {
+        global $wpdb;
+
+        $translations_table = $wpdb->prefix . 'icl_translations';
+        if ( ! $this->table_exists( $translations_table ) ) {
+            return;
+        }
+
+        foreach ( $scan['languages']['items'] ?? [] as $language ) {
+            $source_code = sanitize_key( (string) ( $language['source_code'] ?? '' ) );
+            $target_code = sanitize_key( (string) ( $language['wpml_code'] ?? '' ) );
+
+            if ( ! $target_code ) {
+                $target_code = WP_LOC_DB::to_db_language_code( sanitize_key( (string) ( $language['code'] ?? '' ) ) ) ?: '';
+            }
+
+            if ( ! $source_code || ! $target_code || $source_code === $target_code ) {
+                continue;
+            }
+
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$translations_table} SET language_code = %s WHERE language_code = %s",
+                $target_code,
+                $source_code
+            ) );
+
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$translations_table} SET source_language_code = %s WHERE source_language_code = %s",
+                $target_code,
+                $source_code
+            ) );
+        }
+    }
+
+    private function normalize_configured_languages( array $languages ): array {
+        $normalized = [];
+
+        foreach ( $languages as $slug => $data ) {
+            if ( ! is_array( $data ) ) {
+                continue;
+            }
+
+            $locale = sanitize_text_field( (string) ( $data['locale'] ?? $slug ) );
+            $normalized_slug = $this->normalize_language_slug( (string) $slug, $locale );
+
+            if ( ! $normalized_slug ) {
+                continue;
+            }
+
+            if ( isset( $normalized[ $normalized_slug ] ) ) {
+                $normalized[ $normalized_slug ] = array_merge( $data, $normalized[ $normalized_slug ] );
+            } else {
+                $normalized[ $normalized_slug ] = $data;
+            }
+
+            $normalized[ $normalized_slug ]['locale'] = $locale ?: $normalized_slug;
+            $normalized[ $normalized_slug ]['wpml_code'] = WP_LOC_Languages::get_wpml_code( $normalized_slug );
+            if ( empty( $normalized[ $normalized_slug ]['display_name'] ) ) {
+                $normalized[ $normalized_slug ]['display_name'] = WP_LOC_Languages::get_language_display_name( $locale ?: $normalized_slug );
+            }
+        }
+
+        if ( $normalized !== $languages ) {
+            update_option( 'wp_loc_languages', $normalized );
+            update_option( 'wp_loc_flush_rewrite_rules', true );
+            WP_LOC_Languages::flush();
+        }
+
+        return $normalized;
     }
 
     private function get_legacy_tables(): array {

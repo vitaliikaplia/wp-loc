@@ -98,12 +98,38 @@ class WP_LOC_Routing {
             $post_id = $this->resolve_pagename_to_post_id( (string) $query_vars['pagename'], $effective_lang, $active_languages );
 
             if ( $post_id ) {
-                $query_vars['page_id'] = $post_id;
+                $query_vars = $this->set_resolved_singular_query_vars( $query_vars, $post_id );
                 unset( $query_vars['pagename'] );
             }
         }
 
+        if ( isset( $query_vars['name'] ) && $effective_lang ) {
+            $post_id = $this->resolve_pagename_to_post_id( (string) $query_vars['name'], $effective_lang, $active_languages );
+
+            if ( $post_id ) {
+                $query_vars = $this->set_resolved_singular_query_vars( $query_vars, $post_id );
+            }
+        }
+
         $query_vars = $this->resolve_translated_term_request( $query_vars, $effective_lang );
+
+        return $query_vars;
+    }
+
+    private function set_resolved_singular_query_vars( array $query_vars, int $post_id ): array {
+        $post = get_post( $post_id );
+
+        if ( ! $post instanceof \WP_Post ) {
+            return $query_vars;
+        }
+
+        if ( $post->post_type === 'page' ) {
+            $query_vars['page_id'] = $post_id;
+        } else {
+            $query_vars['p'] = $post_id;
+            $query_vars['post_type'] = $post->post_type;
+            $query_vars['name'] = $post->post_name;
+        }
 
         return $query_vars;
     }
@@ -148,6 +174,7 @@ class WP_LOC_Routing {
 
         global $wpdb;
         $table = WP_LOC::instance()->db->get_table();
+        $db_lang_slug = WP_LOC_DB::to_db_language_code( $lang_slug ) ?: $lang_slug;
 
         $post_id = $wpdb->get_var( $wpdb->prepare(
             "SELECT p.ID FROM {$wpdb->posts} p
@@ -157,7 +184,7 @@ class WP_LOC_Routing {
                AND p.post_status NOT IN ('trash', 'auto-draft')
              LIMIT 1",
             $normalized_path,
-            $lang_slug
+            $db_lang_slug
         ) );
 
         if ( $post_id ) {
@@ -331,6 +358,7 @@ class WP_LOC_Routing {
     private function generate_unique_slug_for_lang( string $slug, string $post_type, string $lang, int $post_id = 0 ): string {
         global $wpdb;
         $table = WP_LOC::instance()->db->get_table();
+        $db_lang = WP_LOC_DB::to_db_language_code( $lang ) ?: $lang;
 
         $base_slug = $slug;
         $suffix = 1;
@@ -352,7 +380,7 @@ class WP_LOC_Routing {
                 $test_slug,
                 $post_type,
                 $post_id,
-                $lang
+                $db_lang
             ) );
 
             $suffix++;
@@ -369,10 +397,17 @@ class WP_LOC_Routing {
             return $url;
         }
 
+        static $filtering = false;
+        if ( $filtering ) {
+            return $url;
+        }
+
+        $filtering = true;
         $current = self::get_current_lang();
         $default = WP_LOC_Languages::get_default_language();
 
         if ( $current === $default ) {
+            $filtering = false;
             return $url;
         }
 
@@ -381,10 +416,14 @@ class WP_LOC_Routing {
         // Avoid double-prefixing
         $prefixed = rtrim( $raw_home, '/' ) . '/' . $current;
         if ( str_starts_with( $url, $prefixed . '/' ) || $url === $prefixed ) {
+            $filtering = false;
             return $url;
         }
 
-        return str_replace( $raw_home, $prefixed, $url );
+        $url = str_replace( $raw_home, $prefixed, $url );
+        $filtering = false;
+
+        return $url;
     }
 
     /**

@@ -213,6 +213,7 @@ class WP_LOC_Terms {
         }
 
         $table = WP_LOC::instance()->db->get_table();
+        $db_lang = WP_LOC_DB::to_db_language_code( $lang ) ?: $lang;
         $term_id = $wpdb->get_var( $wpdb->prepare(
             "SELECT t.term_id
              FROM {$wpdb->terms} t
@@ -229,7 +230,7 @@ class WP_LOC_Terms {
             $taxonomy,
             $parent,
             WP_LOC_DB::tax_element_type( $taxonomy ),
-            $lang,
+            $db_lang,
             $slug
         ) );
 
@@ -348,6 +349,7 @@ class WP_LOC_Terms {
         global $wpdb;
 
         $table = WP_LOC::instance()->db->get_table();
+        $db_lang = WP_LOC_DB::to_db_language_code( $lang ) ?: $lang;
         $sql = "SELECT t.term_id
                 FROM {$wpdb->terms} t
                 INNER JOIN {$wpdb->term_taxonomy} tt
@@ -364,7 +366,7 @@ class WP_LOC_Terms {
             $taxonomy,
             $parent,
             WP_LOC_DB::tax_element_type( $taxonomy ),
-            $lang,
+            $db_lang,
             $slug,
         ];
 
@@ -748,6 +750,7 @@ class WP_LOC_Terms {
         if ( ! $lang || $lang === 'all' ) {
             return $clauses;
         }
+        $db_lang = WP_LOC_DB::to_db_language_code( $lang ) ?: $lang;
 
         global $wpdb;
 
@@ -768,7 +771,7 @@ class WP_LOC_Terms {
                 ( wp_loc_terms_tr.element_type IN ({$quoted_element_types}) AND wp_loc_terms_tr.language_code = %s )
                 OR wp_loc_terms_tr.element_type IS NULL
             )",
-            $lang
+            $db_lang
         );
 
         return $clauses;

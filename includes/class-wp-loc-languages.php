@@ -5,6 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class WP_LOC_Languages {
 
     private static $languages = null;
+    private static $default_language = null;
 
     /**
      * Locale → preferred URL slug mapping.
@@ -34,17 +35,45 @@ class WP_LOC_Languages {
             return $map[ $locale ];
         }
 
+        if ( class_exists( 'WP_LOC_Language_Registry' ) ) {
+            return WP_LOC_Language_Registry::slug_from_locale( $locale );
+        }
+
         return strtolower( substr( $locale, 0, 2 ) );
     }
 
     public function __construct() {
+        $this->ensure_current_language_exists();
         add_action( 'update_option_WPLANG', [ $this, 'on_wplang_change' ], 10, 2 );
+    }
+
+    private function ensure_current_language_exists(): void {
+        $langs = self::get_languages();
+
+        if ( ! empty( $langs ) ) {
+            return;
+        }
+
+        $locale = self::get_raw_option( 'WPLANG', 'en_US' ) ?: 'en_US';
+        $slug = self::locale_to_slug( $locale );
+
+        update_option( 'wp_loc_languages', [
+            $slug => [
+                'locale'       => $locale,
+                'enabled'      => true,
+                'display_name' => self::get_language_display_name( $locale ),
+                'wpml_code'    => class_exists( 'WP_LOC_Language_Registry' ) ? WP_LOC_Language_Registry::wpml_code_from_locale( $locale ) : $slug,
+            ],
+        ] );
+
+        self::$languages = null;
+        self::$default_language = null;
     }
 
     /**
      * Get all configured languages
      *
-     * @return array [ 'uk' => ['locale' => 'uk', 'enabled' => true], 'en' => [...], ... ]
+     * @return array [ 'ua' => ['locale' => 'uk', 'enabled' => true, 'wpml_code' => 'uk'], 'en' => [...], ... ]
      */
     public static function get_languages(): array {
         if ( self::$languages !== null ) {
@@ -52,6 +81,14 @@ class WP_LOC_Languages {
         }
 
         self::$languages = get_option( 'wp_loc_languages', [] );
+        foreach ( self::$languages as $slug => &$language ) {
+            if ( is_array( $language ) && empty( $language['wpml_code'] ) ) {
+                $language['wpml_code'] = class_exists( 'WP_LOC_Language_Registry' )
+                    ? WP_LOC_Language_Registry::wpml_code_from_locale( (string) ( $language['locale'] ?? $slug ) )
+                    : ( $slug === 'ua' ? 'uk' : sanitize_key( (string) $slug ) );
+            }
+        }
+        unset( $language );
 
         return self::$languages;
     }
@@ -67,17 +104,44 @@ class WP_LOC_Languages {
      * Get default language slug
      */
     public static function get_default_language(): string {
+        if ( self::$default_language !== null ) {
+            return self::$default_language;
+        }
+
+        static $resolving = false;
         $languages = self::get_active_languages();
-        $system_locale = get_option( 'WPLANG' ) ?: 'en_US';
+        if ( $resolving ) {
+            return $languages ? array_key_first( $languages ) : 'en';
+        }
+
+        $resolving = true;
+        $system_locale = self::get_raw_option( 'WPLANG', 'en_US' ) ?: 'en_US';
 
         foreach ( $languages as $slug => $data ) {
             $locale = $data['locale'] ?? '';
             if ( $locale === $system_locale ) {
-                return $slug;
+                $resolving = false;
+                return self::$default_language = $slug;
             }
         }
 
-        return $languages ? array_key_first( $languages ) : 'en';
+        $resolving = false;
+        return self::$default_language = ( $languages ? array_key_first( $languages ) : 'en' );
+    }
+
+    private static function get_raw_option( string $option, $default = false ) {
+        global $wpdb;
+
+        if ( ! $wpdb ) {
+            return get_option( $option, $default );
+        }
+
+        $value = $wpdb->get_var( $wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
+            $option
+        ) );
+
+        return $value === null ? $default : maybe_unserialize( $value );
     }
 
     /**
@@ -95,6 +159,20 @@ class WP_LOC_Languages {
     public static function get_language_locale( string $slug ): string {
         $languages = self::get_languages();
         return $languages[ $slug ]['locale'] ?? $slug;
+    }
+
+    public static function get_wpml_code( string $slug ): string {
+        $languages = self::get_languages();
+
+        if ( ! empty( $languages[ $slug ]['wpml_code'] ) ) {
+            return sanitize_key( (string) $languages[ $slug ]['wpml_code'] );
+        }
+
+        if ( class_exists( 'WP_LOC_Language_Registry' ) ) {
+            return WP_LOC_Language_Registry::wpml_code_from_locale( (string) ( $languages[ $slug ]['locale'] ?? $slug ) );
+        }
+
+        return $slug === 'ua' ? 'uk' : sanitize_key( $slug );
     }
 
     /**
@@ -142,6 +220,14 @@ class WP_LOC_Languages {
      * Get native display name for a locale
      */
     public static function get_language_display_name( string $locale ): string {
+        if ( class_exists( 'WP_LOC_Language_Registry' ) ) {
+            $normalized = WP_LOC_Language_Registry::normalize_external_language( '', $locale );
+
+            if ( ! empty( $normalized['display_name'] ) ) {
+                return $normalized['display_name'];
+            }
+        }
+
         if ( $locale === 'en_US' ) {
             return 'English';
         }
@@ -169,6 +255,10 @@ class WP_LOC_Languages {
      * Get flag URL for a language slug or locale
      */
     public static function get_flag_url( string $code ): string {
+        if ( class_exists( 'WP_LOC_Language_Registry' ) ) {
+            return esc_url( WP_LOC_URL . 'assets/flags/' . WP_LOC_Language_Registry::flag_from_locale( $code ) . '.svg' );
+        }
+
         $exceptions = [
             'uk' => 'ua',
             'en' => 'us',
@@ -201,16 +291,21 @@ class WP_LOC_Languages {
 
         if ( ! isset( $langs[ $slug ] ) ) {
             $langs[ $slug ] = [
-                'locale'  => $new ?: 'en_US',
-                'enabled' => true,
+                'locale'    => $new ?: 'en_US',
+                'enabled'   => true,
+                'wpml_code' => class_exists( 'WP_LOC_Language_Registry' ) ? WP_LOC_Language_Registry::wpml_code_from_locale( $new ?: 'en_US' ) : $slug,
             ];
         } else {
             $langs[ $slug ]['enabled'] = true;
+            if ( empty( $langs[ $slug ]['wpml_code'] ) ) {
+                $langs[ $slug ]['wpml_code'] = class_exists( 'WP_LOC_Language_Registry' ) ? WP_LOC_Language_Registry::wpml_code_from_locale( $new ?: 'en_US' ) : $slug;
+            }
         }
 
         update_option( 'wp_loc_languages', $langs );
         update_option( 'wp_loc_flush_rewrite_rules', true );
         self::$languages = null;
+        self::$default_language = null;
     }
 
     /**
@@ -218,5 +313,6 @@ class WP_LOC_Languages {
      */
     public static function flush(): void {
         self::$languages = null;
+        self::$default_language = null;
     }
 }
