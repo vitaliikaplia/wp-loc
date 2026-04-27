@@ -1,3 +1,5 @@
+//@prepros-prepend db-optimization-wizard.js
+
 /**
  * WP-LOC Admin Scripts
  */

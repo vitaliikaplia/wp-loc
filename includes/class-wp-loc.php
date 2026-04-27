@@ -22,6 +22,7 @@ class WP_LOC {
     public $timber;
     public $menus;
     public $menu_sync;
+    public $db_optimization_wizard;
     public $ai;
     public $yoast;
 
@@ -55,6 +56,7 @@ class WP_LOC {
             'class-wp-loc-menus',
             'class-wp-loc-ai',
             'class-wp-loc-menu-sync',
+            'class-wp-loc-db-optimization-wizard',
         ];
 
         foreach ( $includes as $file ) {
@@ -94,6 +96,7 @@ class WP_LOC {
             $this->admin           = new WP_LOC_Admin();
             $this->admin_languages = new WP_LOC_Admin_Languages();
             $this->menu_sync       = new WP_LOC_Menu_Sync();
+            $this->db_optimization_wizard = new WP_LOC_DB_Optimization_Wizard();
         }
 
         // Compatibility layer (only when no other multilingual plugin is active)

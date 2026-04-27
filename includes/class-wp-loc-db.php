@@ -37,6 +37,7 @@ class WP_LOC_DB {
         dbDelta( $sql );
 
         update_option( 'wp_loc_db_version', WP_LOC_VERSION );
+        add_option( 'wp_loc_db_optimization_wizard_status', 'pending' );
         flush_rewrite_rules();
     }
 
