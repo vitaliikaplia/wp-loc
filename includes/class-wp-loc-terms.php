@@ -148,7 +148,9 @@ class WP_LOC_Terms {
      * Get current language for term context.
      */
     public static function get_context_language(): string {
-        return is_admin() ? wp_loc_get_admin_lang() : wp_loc_get_current_lang();
+        return WP_LOC_Routing::is_frontend_ajax_request() || ! is_admin()
+            ? wp_loc_get_current_lang()
+            : wp_loc_get_admin_lang();
     }
 
     /**

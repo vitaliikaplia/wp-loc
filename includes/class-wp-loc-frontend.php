@@ -138,6 +138,10 @@ class WP_LOC_Frontend {
     }
 
     private function get_query_context_language(): ?string {
+        if ( WP_LOC_Routing::is_frontend_ajax_request() ) {
+            return wp_loc_get_current_lang();
+        }
+
         $is_editor_context = is_admin() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || wp_doing_ajax();
 
         if ( $is_editor_context ) {

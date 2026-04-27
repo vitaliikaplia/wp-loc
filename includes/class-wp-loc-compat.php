@@ -11,7 +11,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class WP_LOC_Compat {
 
     private function get_internal_context_language(): string {
-        return is_admin() ? wp_loc_get_admin_lang() : wp_loc_get_current_lang();
+        return WP_LOC_Routing::is_frontend_ajax_request() || ! is_admin()
+            ? wp_loc_get_current_lang()
+            : wp_loc_get_admin_lang();
     }
 
     private function get_context_language(): string {
@@ -412,7 +414,9 @@ class WP_LOC_Compat {
 class WP_LOC_Sitepress_Mock {
 
     public function get_current_language(): string {
-        $language = is_admin() ? wp_loc_get_admin_lang() : wp_loc_get_current_lang();
+        $language = WP_LOC_Routing::is_frontend_ajax_request() || ! is_admin()
+            ? wp_loc_get_current_lang()
+            : wp_loc_get_admin_lang();
 
         return WP_LOC_DB::to_db_language_code( $language ) ?: $language;
     }

@@ -54,7 +54,9 @@ class WP_LOC_Media {
         if ( $db->get_trid( $attachment_id, $element_type ) ) return;
 
         // Register original in current admin language
-        $current_lang = is_admin() ? wp_loc_get_admin_lang() : ( function_exists( 'wp_loc_get_current_lang' ) ? wp_loc_get_current_lang() : null );
+        $current_lang = ( WP_LOC_Routing::is_frontend_ajax_request() || ! is_admin() )
+            ? ( function_exists( 'wp_loc_get_current_lang' ) ? wp_loc_get_current_lang() : null )
+            : wp_loc_get_admin_lang();
         if ( ! $current_lang ) {
             $current_lang = WP_LOC_Languages::get_default_language();
         }

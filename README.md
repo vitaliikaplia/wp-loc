@@ -28,6 +28,7 @@ Lightweight multilingual plugin for WordPress.
 - **Non-translatable post types** — work correctly with language URL prefixes (shared content across languages)
 - **Translatable post type detection** — if compatible translation rows already exist, WP-LOC can detect translated custom post types and taxonomies and merge them into runtime settings
 - **Frontend/admin query filtering** — translatable posts are filtered by the current language for main, secondary, AJAX, REST, and Gutenberg preview `WP_Query` calls when filters are not suppressed
+- **Frontend AJAX language context** — standard `admin-ajax.php` handlers inherit the current frontend language through compatible cookies, request parameters, and referring URLs
 - **URL structure** — `/ua/page-slug/`, `/en/page-slug/`, default language without prefix
 - **Admin language switcher** — in the admin bar with flags, cookie-based
 - **Frontend language switcher** — `wp_loc_get_lang_switcher()`, `wp_loc_get_language_switcher_html()`, `wp_loc_the_language_switcher()` with translated post, custom post type, taxonomy, and archive URLs
@@ -178,6 +179,7 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 - Translated singular URLs resolve by language, post type, and slug, so translated posts from different post types can safely share the same slug
 - Custom post type translations with identical slugs across languages resolve to their translated post instead of redirecting back to the default-language post
 - Compatibility switcher APIs such as `icl_get_languages()` use the same translated URLs as WP-LOC's native switcher helpers
+- Frontend requests persist `wp_loc_current_language`, `wp_loc_current_locale`, `_icl_current_language`, and `wp-wpml_current_language` cookies so same-origin AJAX calls to `admin-ajax.php` keep the expected language context
 
 ## Compatibility Note
 

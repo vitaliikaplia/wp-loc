@@ -5,11 +5,18 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class WP_LOC_Routing {
 
     private static $current_lang = null;
+    private const CURRENT_LANGUAGE_COOKIE = 'wp_loc_current_language';
+    private const CURRENT_LOCALE_COOKIE = 'wp_loc_current_locale';
+    private const WPML_CURRENT_LANGUAGE_COOKIES = [
+        '_icl_current_language',
+        'wp-wpml_current_language',
+    ];
 
     public function __construct() {
         add_filter( 'rewrite_rules_array', [ $this, 'add_rewrite_rules' ] );
         add_filter( 'query_vars', [ $this, 'register_query_vars' ] );
         add_filter( 'request', [ $this, 'handle_request' ] );
+        add_action( 'init', [ $this, 'bootstrap_ajax_language_context' ], 0 );
         add_action( 'template_redirect', [ $this, 'set_locale' ], 1 );
         add_filter( 'redirect_canonical', [ $this, 'prevent_lang_front_redirect' ], 10, 2 );
         add_filter( 'wp_unique_post_slug', [ $this, 'allow_duplicate_slugs' ], 99, 6 );
@@ -275,6 +282,7 @@ class WP_LOC_Routing {
         $slug = self::get_current_lang();
         $locale = WP_LOC_Languages::get_language_locale( $slug );
 
+        $this->persist_frontend_language_context( $slug );
         switch_to_locale( $locale );
 
         if ( get_query_var( 'wp_loc_invalid_term_lang' ) ) {
@@ -484,15 +492,17 @@ class WP_LOC_Routing {
             return self::$current_lang = 'en';
         }
 
-        // 1. From query var when the main query is available.
-        $lang = null;
+        // 1. Explicit request language, including frontend calls to admin-ajax.php.
+        $lang = self::get_request_language_context();
+
+        // 2. From query var when the main query is available.
         global $wp_query;
 
-        if ( $wp_query instanceof \WP_Query ) {
+        if ( ! $lang && $wp_query instanceof \WP_Query ) {
             $lang = get_query_var( 'lang' );
         }
 
-        // 2. Fallback: parse from URI
+        // 3. Fallback: parse from URI
         if ( ! $lang ) {
             $uri = trim( parse_url( $_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH ), '/' );
             $parts = explode( '/', $uri );
@@ -503,7 +513,12 @@ class WP_LOC_Routing {
             }
         }
 
-        // 3. Fallback: default language
+        // 4. Frontend AJAX fallback: cookies first, then the referring frontend URL.
+        if ( ! $lang && wp_doing_ajax() ) {
+            $lang = self::get_ajax_language_context();
+        }
+
+        // 5. Fallback: default language
         if ( ! $lang || ! isset( $active[ $lang ] ) ) {
             $lang = WP_LOC_Languages::get_default_language();
         }
@@ -516,6 +531,164 @@ class WP_LOC_Routing {
      */
     public static function get_current_locale(): string {
         return WP_LOC_Languages::get_language_locale( self::get_current_lang() );
+    }
+
+    public function bootstrap_ajax_language_context(): void {
+        if ( ! wp_doing_ajax() ) {
+            return;
+        }
+
+        $lang = self::get_request_language_context();
+        if ( ! $lang ) {
+            $lang = self::is_frontend_ajax_request() ? self::get_current_lang() : wp_loc_get_admin_lang();
+        }
+
+        $locale = WP_LOC_Languages::get_language_locale( $lang );
+
+        if ( $locale ) {
+            switch_to_locale( $locale );
+        }
+    }
+
+    public static function is_frontend_ajax_request(): bool {
+        if ( ! wp_doing_ajax() ) {
+            return false;
+        }
+
+        $referer = wp_get_referer();
+
+        if ( ! $referer && ! empty( $_SERVER['HTTP_REFERER'] ) ) {
+            $referer = (string) wp_unslash( $_SERVER['HTTP_REFERER'] );
+        }
+
+        if ( $referer ) {
+            $admin_url = admin_url();
+            return ! str_starts_with( trailingslashit( $referer ), trailingslashit( $admin_url ) );
+        }
+
+        return (bool) self::get_cookie_language_context();
+    }
+
+    public static function normalize_language_context( ?string $candidate ): ?string {
+        $candidate = trim( (string) $candidate );
+
+        if ( $candidate === '' ) {
+            return null;
+        }
+
+        $active = WP_LOC_Languages::get_active_languages();
+        $slug = sanitize_key( strtolower( str_replace( '_', '-', $candidate ) ) );
+
+        if ( isset( $active[ $slug ] ) ) {
+            return $slug;
+        }
+
+        $from_db = WP_LOC_DB::from_db_language_code( $slug );
+        if ( $from_db && isset( $active[ $from_db ] ) ) {
+            return $from_db;
+        }
+
+        $locale_candidate = str_replace( '-', '_', $candidate );
+        foreach ( $active as $active_slug => $data ) {
+            $locale = (string) ( $data['locale'] ?? '' );
+            if ( $locale && strtolower( $locale ) === strtolower( $locale_candidate ) ) {
+                return (string) $active_slug;
+            }
+
+            $wpml_code = (string) ( $data['wpml_code'] ?? '' );
+            if ( $wpml_code && sanitize_key( $wpml_code ) === $slug ) {
+                return (string) $active_slug;
+            }
+        }
+
+        return null;
+    }
+
+    private static function get_request_language_context(): ?string {
+        foreach ( [ 'lang', 'wp_loc_lang', 'wpml_lang', '_wpml_lang', 'icl_language', 'ICL_LANGUAGE_CODE' ] as $key ) {
+            if ( ! isset( $_REQUEST[ $key ] ) ) {
+                continue;
+            }
+
+            $lang = self::normalize_language_context( sanitize_text_field( wp_unslash( $_REQUEST[ $key ] ) ) );
+            if ( $lang ) {
+                return $lang;
+            }
+        }
+
+        return null;
+    }
+
+    private static function get_cookie_language_context(): ?string {
+        $cookie_names = array_merge(
+            [ self::CURRENT_LANGUAGE_COOKIE, self::CURRENT_LOCALE_COOKIE ],
+            self::WPML_CURRENT_LANGUAGE_COOKIES
+        );
+
+        foreach ( $cookie_names as $cookie_name ) {
+            if ( empty( $_COOKIE[ $cookie_name ] ) ) {
+                continue;
+            }
+
+            $lang = self::normalize_language_context( sanitize_text_field( wp_unslash( $_COOKIE[ $cookie_name ] ) ) );
+            if ( $lang ) {
+                return $lang;
+            }
+        }
+
+        return null;
+    }
+
+    private static function get_referer_language_context(): ?string {
+        $referer = wp_get_referer();
+
+        if ( ! $referer && ! empty( $_SERVER['HTTP_REFERER'] ) ) {
+            $referer = (string) wp_unslash( $_SERVER['HTTP_REFERER'] );
+        }
+
+        if ( ! $referer ) {
+            return null;
+        }
+
+        $path = trim( (string) wp_parse_url( $referer, PHP_URL_PATH ), '/' );
+        $first = explode( '/', $path )[0] ?? '';
+
+        return self::normalize_language_context( $first );
+    }
+
+    private static function get_ajax_language_context(): ?string {
+        if ( ! self::is_frontend_ajax_request() ) {
+            return null;
+        }
+
+        return self::get_cookie_language_context() ?: self::get_referer_language_context();
+    }
+
+    private function persist_frontend_language_context( string $slug ): void {
+        if ( headers_sent() ) {
+            return;
+        }
+
+        $active = WP_LOC_Languages::get_active_languages();
+        if ( ! isset( $active[ $slug ] ) ) {
+            return;
+        }
+
+        $locale = WP_LOC_Languages::get_language_locale( $slug );
+        $compat_code = WP_LOC_DB::to_db_language_code( $slug ) ?: $slug;
+        $expires = time() + MONTH_IN_SECONDS;
+        $path = defined( 'COOKIEPATH' ) && COOKIEPATH ? COOKIEPATH : '/';
+        $domain = defined( 'COOKIE_DOMAIN' ) && COOKIE_DOMAIN ? (string) COOKIE_DOMAIN : '';
+
+        foreach ( [
+            self::CURRENT_LANGUAGE_COOKIE => $slug,
+            self::CURRENT_LOCALE_COOKIE => $locale,
+            '_icl_current_language' => $compat_code,
+            'wp-wpml_current_language' => $compat_code,
+        ] as $cookie_name => $cookie_value ) {
+            setcookie( $cookie_name, $cookie_value, $expires, $path, $domain );
+            $_COOKIE[ $cookie_name ] = $cookie_value;
+        }
     }
 
     /**

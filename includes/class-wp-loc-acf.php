@@ -1278,7 +1278,9 @@ class WP_LOC_ACF {
     }
 
     private function get_context_language(): string {
-        return is_admin() ? wp_loc_get_admin_lang() : wp_loc_get_current_lang();
+        return WP_LOC_Routing::is_frontend_ajax_request() || ! is_admin()
+            ? wp_loc_get_current_lang()
+            : wp_loc_get_admin_lang();
     }
 
     private function get_post_entity_id( $post_id ): ?int {
