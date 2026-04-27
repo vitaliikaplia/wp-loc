@@ -89,21 +89,29 @@ class WP_LOC_Frontend {
 
         $table = WP_LOC::instance()->db->get_table();
 
-        add_filter( 'posts_join', function ( $join ) use ( $table ) {
+        add_filter( 'posts_join', function ( $join, \WP_Query $filtered_query ) use ( $table, $query ) {
+            if ( $filtered_query !== $query ) {
+                return $join;
+            }
+
             global $wpdb;
             if ( strpos( $join, 'wp_loc_ft' ) !== false ) return $join;
             $join .= " LEFT JOIN {$table} AS wp_loc_ft ON {$wpdb->posts}.ID = wp_loc_ft.element_id AND wp_loc_ft.element_type = CONCAT('post_', {$wpdb->posts}.post_type)";
             return $join;
-        } );
+        }, 10, 2 );
 
-        add_filter( 'posts_where', function ( $where ) use ( $lang_slug ) {
+        add_filter( 'posts_where', function ( $where, \WP_Query $filtered_query ) use ( $lang_slug, $query ) {
+            if ( $filtered_query !== $query ) {
+                return $where;
+            }
+
             global $wpdb;
             $where .= $wpdb->prepare(
                 " AND (wp_loc_ft.language_code = %s OR wp_loc_ft.element_id IS NULL)",
                 $lang_slug
             );
             return $where;
-        } );
+        }, 10, 2 );
     }
 }
 
