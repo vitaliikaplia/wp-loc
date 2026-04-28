@@ -17,6 +17,7 @@ class WP_LOC_Routing {
         add_filter( 'query_vars', [ $this, 'register_query_vars' ] );
         add_filter( 'request', [ $this, 'handle_request' ] );
         add_action( 'init', [ $this, 'bootstrap_ajax_language_context' ], 0 );
+        add_action( 'template_redirect', [ $this, 'redirect_language_front_trailing_slash' ], 0 );
         add_action( 'template_redirect', [ $this, 'set_locale' ], 1 );
         add_filter( 'redirect_canonical', [ $this, 'prevent_lang_front_redirect' ], 10, 2 );
         add_filter( 'wp_unique_post_slug', [ $this, 'allow_duplicate_slugs' ], 99, 6 );
@@ -271,6 +272,55 @@ class WP_LOC_Routing {
         }
 
         return $query_vars;
+    }
+
+    /**
+     * Canonicalize non-default language home URLs to the trailing-slash version.
+     */
+    public function redirect_language_front_trailing_slash(): void {
+        if ( is_admin() || wp_doing_ajax() || headers_sent() ) {
+            return;
+        }
+
+        $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+
+        if ( $request_uri === '' ) {
+            return;
+        }
+
+        $path = (string) wp_parse_url( $request_uri, PHP_URL_PATH );
+
+        if ( $path === '' || str_ends_with( $path, '/' ) ) {
+            return;
+        }
+
+        $relative_path = $this->get_request_path_relative_to_home( $path );
+
+        if ( ! in_array( $relative_path, WP_LOC_Languages::get_additional_languages(), true ) ) {
+            return;
+        }
+
+        $raw_home = rtrim( set_url_scheme( get_option( 'home' ) ), '/' );
+        $redirect_url = $raw_home . '/' . $relative_path . '/';
+        $query = wp_parse_url( $request_uri, PHP_URL_QUERY );
+
+        if ( is_string( $query ) && $query !== '' ) {
+            $redirect_url .= '?' . $query;
+        }
+
+        wp_safe_redirect( $redirect_url, 301 );
+        exit;
+    }
+
+    private function get_request_path_relative_to_home( string $request_path ): string {
+        $request_path = trim( $request_path, '/' );
+        $home_path = trim( (string) wp_parse_url( set_url_scheme( get_option( 'home' ) ), PHP_URL_PATH ), '/' );
+
+        if ( $home_path !== '' && ( $request_path === $home_path || str_starts_with( $request_path, $home_path . '/' ) ) ) {
+            $request_path = trim( substr( $request_path, strlen( $home_path ) ), '/' );
+        }
+
+        return $request_path;
     }
 
     /**
