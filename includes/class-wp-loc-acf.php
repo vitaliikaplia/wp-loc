@@ -20,6 +20,7 @@ class WP_LOC_ACF {
     private const FIELD_TRANSLATION_MODES_BY_KEY_OPTION = 'wp_loc_acf_field_translation_modes_by_key';
     private static array $deferred_container_sync = [];
     private static bool $processing_deferred_container_sync = false;
+    private static bool $processing_entity_field_sync = false;
 
     private const ACFML_MODE_DEFAULTS = [
         'text' => [
@@ -324,6 +325,10 @@ class WP_LOC_ACF {
             }
         }
 
+        if ( ( ! is_array( $field_groups ) || empty( $field_groups ) ) && $this->get_user_entity_id( $context_post_id ) ) {
+            $field_groups = $this->get_user_field_groups();
+        }
+
         if ( ! is_array( $field_groups ) || empty( $field_groups ) ) {
             return [];
         }
@@ -345,6 +350,48 @@ class WP_LOC_ACF {
         }
 
         return $runtime_fields;
+    }
+
+    private function get_user_entity_id( $post_id ): ?int {
+        if ( is_string( $post_id ) && preg_match( '/^user_(\d+)$/', $post_id, $matches ) ) {
+            $resolved = (int) $matches[1];
+
+            return $resolved > 0 ? $resolved : null;
+        }
+
+        return null;
+    }
+
+    private function get_user_field_groups(): array {
+        if ( ! function_exists( 'acf_get_field_groups' ) ) {
+            return [];
+        }
+
+        $field_groups = acf_get_field_groups();
+
+        if ( ! is_array( $field_groups ) ) {
+            return [];
+        }
+
+        return array_values( array_filter( $field_groups, function( $field_group ): bool {
+            if ( ! is_array( $field_group ) || empty( $field_group['location'] ) || ! is_array( $field_group['location'] ) ) {
+                return false;
+            }
+
+            foreach ( $field_group['location'] as $location_group ) {
+                if ( ! is_array( $location_group ) ) {
+                    continue;
+                }
+
+                foreach ( $location_group as $location_rule ) {
+                    if ( is_array( $location_rule ) && ( $location_rule['param'] ?? '' ) === 'user_form' ) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        } ) );
     }
 
     private function get_runtime_field_modes( $post_id ): array {
@@ -1177,6 +1224,73 @@ class WP_LOC_ACF {
         return $this->normalize_field_translation_settings( $field );
     }
 
+    private function is_readonly_translated_options_field( $post_id, array $field ): bool {
+        if ( ! is_string( $post_id ) || ! $this->is_translated_options_post_id( $post_id ) ) {
+            return false;
+        }
+
+        return $this->get_translation_mode( $field ) === 'shared';
+    }
+
+    private function is_post_translation_source( int $post_id ): bool {
+        $post = get_post( $post_id );
+
+        if ( ! $post instanceof \WP_Post || ! $this->is_translatable_post_type_for_acf( $post->post_type ) ) {
+            return true;
+        }
+
+        $element_type = WP_LOC_DB::post_element_type( $post->post_type );
+        $trid = WP_LOC::instance()->db->get_trid( $post_id, $element_type );
+
+        if ( ! $trid ) {
+            return true;
+        }
+
+        $translations = WP_LOC::instance()->db->get_element_translations( $trid, $element_type );
+        $current_lang = WP_LOC::instance()->db->get_element_language( $post_id, $element_type );
+
+        if ( ! $current_lang || empty( $translations[ $current_lang ] ) ) {
+            return true;
+        }
+
+        return empty( $translations[ $current_lang ]->source_language_code );
+    }
+
+    private function is_term_translation_source( int $term_id, string $taxonomy ): bool {
+        if ( ! WP_LOC_Terms::is_translatable( $taxonomy ) ) {
+            return true;
+        }
+
+        $translations = WP_LOC_Terms::get_term_translations( $term_id, $taxonomy );
+        $current_lang = WP_LOC_Terms::get_term_language( $term_id, $taxonomy );
+
+        if ( ! $current_lang || empty( $translations[ $current_lang ] ) ) {
+            return true;
+        }
+
+        return empty( $translations[ $current_lang ]->source_language_code );
+    }
+
+    private function is_readonly_translated_entity_field( $post_id, array $field ): bool {
+        if ( self::$processing_entity_field_sync ) {
+            return false;
+        }
+
+        if ( $this->get_translation_mode( $field ) !== 'shared' ) {
+            return false;
+        }
+
+        $term_context = $this->get_term_context( $post_id );
+
+        if ( $term_context ) {
+            return ! $this->is_term_translation_source( $term_context['term_id'], $term_context['taxonomy'] );
+        }
+
+        $post_entity_id = $this->get_post_entity_id( $post_id );
+
+        return $post_entity_id ? ! $this->is_post_translation_source( $post_entity_id ) : false;
+    }
+
     private function get_translatable_option_value( string $language, string $field_name, string $base_post_id = 'options' ) {
         $translated_post_id = $this->get_translated_options_post_id( $language, $base_post_id );
         $value = get_option( "{$translated_post_id}_{$field_name}", false );
@@ -1254,6 +1368,54 @@ class WP_LOC_ACF {
         return $meta;
     }
 
+    private function build_user_meta( int $user_id ): array {
+        $all_meta = get_user_meta( $user_id );
+        $meta = [];
+
+        foreach ( $all_meta as $key => $value ) {
+            $meta[ $key ] = $value[0] ?? '';
+        }
+
+        return $meta;
+    }
+
+    private function get_language_meta_suffix( string $language ): string {
+        return WP_LOC_DB::to_db_language_code( $language ) ?: $language;
+    }
+
+    private function get_user_translated_meta_key( string $field_name, string $language ): string {
+        return $field_name . '_' . $this->get_language_meta_suffix( $language );
+    }
+
+    private function get_user_acf_context_language(): string {
+        return $this->get_context_language();
+    }
+
+    private function is_user_translatable_field( array $field ): bool {
+        return ! empty( $field['name'] ) && $this->get_translation_mode( $field ) === 'translatable';
+    }
+
+    private function get_user_field_reference( int $user_id, string $field_name ): ?string {
+        $reference = get_user_meta( $user_id, "_{$field_name}", true );
+
+        return is_string( $reference ) && $reference !== '' ? $reference : null;
+    }
+
+    private function persist_user_translated_value( int $user_id, string $language, array $field, $value ): void {
+        if ( empty( $field['name'] ) ) {
+            return;
+        }
+
+        $field_name = (string) $field['name'];
+        $translated_key = $this->get_user_translated_meta_key( $field_name, $language );
+
+        update_user_meta( $user_id, $translated_key, $value );
+
+        if ( ! empty( $field['key'] ) ) {
+            update_user_meta( $user_id, "_{$translated_key}", (string) $field['key'] );
+        }
+    }
+
     public function __construct() {
         add_action( 'add_meta_boxes', [ $this, 'register_field_group_mode_meta_box' ] );
         add_action( 'acf/render_field_settings', [ $this, 'add_translation_mode_setting' ] );
@@ -1268,6 +1430,11 @@ class WP_LOC_ACF {
         add_filter( 'acf/update_value', [ $this, 'handle_update_value' ], 10, 3 );
         add_filter( 'acf/update_value/type=nav_menu', [ $this, 'normalize_nav_menu_field_value_on_save' ], 20, 3 );
         add_filter( 'acf/load_field', [ $this, 'handle_load_field' ] );
+        add_filter( 'acf/load_field/type=nav_menu', [ $this, 'filter_nav_menu_field_choices' ], 30 );
+        add_filter( 'acf/fields/post_object/query', [ $this, 'filter_post_choice_query' ], 20, 3 );
+        add_filter( 'acf/fields/page_link/query', [ $this, 'filter_post_choice_query' ], 20, 3 );
+        add_filter( 'acf/fields/relationship/query', [ $this, 'filter_post_choice_query' ], 20, 3 );
+        add_filter( 'acf/fields/taxonomy/query', [ $this, 'filter_taxonomy_choice_query' ], 20, 3 );
         add_filter( 'acf/pre_load_meta', [ $this, 'handle_pre_load_meta' ], 10, 2 );
         add_filter( 'acf/pre_load_value', [ $this, 'handle_pre_load_value' ], 10, 3 );
         add_filter( 'acf/load_value/type=nav_menu', [ $this, 'translate_nav_menu_field_value' ], 20, 3 );
@@ -1275,12 +1442,138 @@ class WP_LOC_ACF {
         add_action( 'acf/update_field_group', [ $this, 'save_translatable_fields_config' ], 20 );
         add_filter( 'manage_acf-field-group_posts_columns', [ $this, 'add_field_group_mode_column' ], 11 );
         add_action( 'manage_acf-field-group_posts_custom_column', [ $this, 'render_field_group_mode_column' ], 10, 2 );
+        add_action( 'personal_options', [ $this, 'render_user_profile_language_field' ] );
+        add_action( 'show_user_profile', [ $this, 'render_user_profile_language_field' ] );
+        add_action( 'edit_user_profile', [ $this, 'render_user_profile_language_field' ] );
+        add_filter( 'wp_redirect', [ $this, 'preserve_user_profile_language_redirect' ], 10, 2 );
+    }
+
+    public function render_user_profile_language_field(): void {
+        if ( ! is_admin() ) {
+            return;
+        }
+
+        $language = $this->get_user_acf_context_language();
+
+        if ( ! $language ) {
+            return;
+        }
+
+        printf(
+            '<input type="hidden" name="wp_loc_edit_lang" value="%s">',
+            esc_attr( $language )
+        );
+    }
+
+    public function preserve_user_profile_language_redirect( string $location, int $status ): string {
+        unset( $status );
+
+        if ( empty( $_POST['wp_loc_edit_lang'] ) || ! is_scalar( $_POST['wp_loc_edit_lang'] ) ) {
+            return $location;
+        }
+
+        if ( strpos( $location, 'profile.php' ) === false && strpos( $location, 'user-edit.php' ) === false ) {
+            return $location;
+        }
+
+        $language = WP_LOC_Routing::normalize_language_context( sanitize_text_field( wp_unslash( (string) $_POST['wp_loc_edit_lang'] ) ) );
+
+        if ( ! $language ) {
+            return $location;
+        }
+
+        return add_query_arg( 'wp_loc_lang', $language, $location );
     }
 
     private function get_context_language(): string {
+        $request_language = $this->get_requested_language_context();
+
+        if ( $request_language ) {
+            return $request_language;
+        }
+
         return WP_LOC_Routing::is_frontend_ajax_request() || ! is_admin()
             ? wp_loc_get_current_lang()
             : wp_loc_get_admin_lang();
+    }
+
+    private function get_requested_language_context(): ?string {
+        foreach ( [ 'wp_loc_edit_lang', 'wpml_edit_lang', 'wp_loc_lang', 'lang', 'wpml_lang', '_wpml_lang' ] as $key ) {
+            if ( empty( $_REQUEST[ $key ] ) || ! is_scalar( $_REQUEST[ $key ] ) ) {
+                continue;
+            }
+
+            $language = WP_LOC_Routing::normalize_language_context( sanitize_text_field( wp_unslash( (string) $_REQUEST[ $key ] ) ) );
+
+            if ( $language ) {
+                return $language;
+            }
+        }
+
+        return null;
+    }
+
+    private function get_acf_query_context_language( $post_id = null ): string {
+        if ( $post_id === null || $post_id === '' ) {
+            $post_id = $this->get_current_admin_acf_post_id();
+        }
+
+        $post_entity_id = $this->get_post_entity_id( $post_id );
+        if ( $post_entity_id ) {
+            $post_lang = $this->get_post_language( $post_entity_id );
+            if ( $post_lang ) {
+                return $post_lang;
+            }
+        }
+
+        $term_context = $this->get_term_context( $post_id );
+        if ( $term_context ) {
+            $term_lang = WP_LOC_Terms::get_term_language( $term_context['term_id'], $term_context['taxonomy'] );
+            if ( $term_lang ) {
+                return $term_lang;
+            }
+        }
+
+        if ( $this->is_options_post_id( $post_id ) ) {
+            $options_lang = $this->get_options_post_id_language( $post_id );
+            if ( $options_lang ) {
+                return $options_lang;
+            }
+        }
+
+        return $this->get_context_language();
+    }
+
+    private function get_post_types_from_acf_query_args( array $args ): array {
+        $post_type = $args['post_type'] ?? [];
+
+        if ( empty( $post_type ) || $post_type === 'any' ) {
+            $post_type = get_post_types( [ 'public' => true ], 'names' );
+        }
+
+        if ( is_string( $post_type ) ) {
+            $post_type = [ $post_type ];
+        }
+
+        if ( ! is_array( $post_type ) ) {
+            return [];
+        }
+
+        return array_values( array_filter( array_map( 'sanitize_key', $post_type ) ) );
+    }
+
+    private function get_taxonomies_from_acf_field( array $field, array $args = [] ): array {
+        $taxonomy = $args['taxonomy'] ?? ( $field['taxonomy'] ?? [] );
+
+        if ( is_string( $taxonomy ) ) {
+            $taxonomy = [ $taxonomy ];
+        }
+
+        if ( ! is_array( $taxonomy ) || empty( $taxonomy ) ) {
+            return [];
+        }
+
+        return array_values( array_filter( array_map( 'sanitize_key', $taxonomy ) ) );
     }
 
     private function get_post_entity_id( $post_id ): ?int {
@@ -1329,6 +1622,62 @@ class WP_LOC_ACF {
         ];
     }
 
+    private function get_current_admin_acf_post_id() {
+        if ( ! is_admin() ) {
+            return null;
+        }
+
+        foreach ( [ '_acf_post_id', 'post_id', 'post', 'post_ID' ] as $key ) {
+            if ( isset( $_POST[ $key ] ) && is_scalar( $_POST[ $key ] ) ) {
+                $value = sanitize_text_field( wp_unslash( (string) $_POST[ $key ] ) );
+                return is_numeric( $value ) ? (int) $value : $value;
+            }
+
+            if ( isset( $_GET[ $key ] ) && is_scalar( $_GET[ $key ] ) ) {
+                $value = sanitize_text_field( wp_unslash( (string) $_GET[ $key ] ) );
+                return is_numeric( $value ) ? (int) $value : $value;
+            }
+        }
+
+        if ( isset( $_GET['tag_ID'], $_GET['taxonomy'] ) && is_scalar( $_GET['tag_ID'] ) && is_scalar( $_GET['taxonomy'] ) ) {
+            $term_id = (int) $_GET['tag_ID'];
+            $taxonomy = sanitize_key( wp_unslash( (string) $_GET['taxonomy'] ) );
+
+            if ( $term_id > 0 && taxonomy_exists( $taxonomy ) ) {
+                return "{$taxonomy}_{$term_id}";
+            }
+        }
+
+        if ( empty( $_GET['page'] ) || ! is_scalar( $_GET['page'] ) ) {
+            return null;
+        }
+
+        $page = sanitize_key( wp_unslash( (string) $_GET['page'] ) );
+        if ( ! function_exists( 'acf_get_options_pages' ) ) {
+            return null;
+        }
+
+        foreach ( (array) acf_get_options_pages() as $options_page ) {
+            $menu_slug = isset( $options_page['menu_slug'] ) ? sanitize_key( (string) $options_page['menu_slug'] ) : '';
+
+            if ( $menu_slug !== $page ) {
+                continue;
+            }
+
+            $base_post_id = ! empty( $options_page['post_id'] ) && is_string( $options_page['post_id'] )
+                ? $options_page['post_id']
+                : 'options';
+            $current_language = $this->get_context_language();
+            $default_language = WP_LOC_Languages::get_default_language();
+
+            return $current_language && $current_language !== $default_language
+                ? $this->get_translated_options_post_id( $current_language, $base_post_id )
+                : $base_post_id;
+        }
+
+        return null;
+    }
+
     private function get_term_acf_post_id( int $term_id, string $taxonomy ): string {
         return $taxonomy . '_' . $term_id;
     }
@@ -1350,6 +1699,10 @@ class WP_LOC_ACF {
 
     private function sync_shared_term_field_value( int $term_id, string $taxonomy, array $field, $value ): void {
         if ( empty( $field['key'] ) || ! function_exists( 'acf_update_value' ) ) {
+            return;
+        }
+
+        if ( ! $this->is_term_translation_source( $term_id, $taxonomy ) ) {
             return;
         }
 
@@ -1377,12 +1730,17 @@ class WP_LOC_ACF {
             $target_value = $this->map_field_value_to_language( $value, $field, $target_lang );
 
             $syncing[ $target_key ] = true;
+            $was_processing = self::$processing_entity_field_sync;
+            self::$processing_entity_field_sync = true;
+
             if ( in_array( (string) ( $field['type'] ?? '' ), [ 'group', 'clone' ], true ) ) {
                 $this->persist_entity_meta_value_manually( 'term', $target_id, $field, $target_value );
             } else {
                 acf_update_value( $target_value, $this->get_term_acf_post_id( $target_id, $taxonomy ), $field );
                 $this->finalize_container_root_value_after_update( $this->get_term_acf_post_id( $target_id, $taxonomy ), $field, $target_value );
             }
+
+            self::$processing_entity_field_sync = $was_processing;
 
             if ( $this->is_row_container_field( $field ) ) {
                 $this->sync_row_container_structure_from_term_source( $term_id, $target_id, $field );
@@ -1400,6 +1758,10 @@ class WP_LOC_ACF {
 
     private function sync_copy_once_term_field_value( int $term_id, string $taxonomy, array $field, $value ): void {
         if ( empty( $field['key'] ) || empty( $field['name'] ) || ! function_exists( 'acf_update_value' ) ) {
+            return;
+        }
+
+        if ( ! $this->is_term_translation_source( $term_id, $taxonomy ) ) {
             return;
         }
 
@@ -1427,12 +1789,17 @@ class WP_LOC_ACF {
             $target_value = $this->map_field_value_to_language( $value, $field, $target_lang );
 
             $syncing[ $target_key ] = true;
+            $was_processing = self::$processing_entity_field_sync;
+            self::$processing_entity_field_sync = true;
+
             if ( in_array( (string) ( $field['type'] ?? '' ), [ 'group', 'clone' ], true ) ) {
                 $this->persist_entity_meta_value_manually( 'term', $target_id, $field, $target_value );
             } else {
                 acf_update_value( $target_value, $this->get_term_acf_post_id( $target_id, $taxonomy ), $field );
                 $this->finalize_container_root_value_after_update( $this->get_term_acf_post_id( $target_id, $taxonomy ), $field, $target_value );
             }
+
+            self::$processing_entity_field_sync = $was_processing;
 
             if ( $this->is_row_container_field( $field ) ) {
                 $this->sync_row_container_structure_from_term_source( $term_id, $target_id, $field );
@@ -1473,12 +1840,12 @@ class WP_LOC_ACF {
         return WP_LOC_Terms::get_term_translation( $term_id, $taxonomy, $source_lang );
     }
 
-    private function get_term_shared_source_id( int $term_id, string $taxonomy, array $field ): ?int {
+    private function get_term_shared_source_id( int $term_id, string $taxonomy, array $field, bool $ignore_existing_value = false ): ?int {
         if ( empty( $field['name'] ) ) {
             return null;
         }
 
-        if ( metadata_exists( 'term', $term_id, $field['name'] ) ) {
+        if ( ! $ignore_existing_value && metadata_exists( 'term', $term_id, $field['name'] ) ) {
             return null;
         }
 
@@ -1562,6 +1929,10 @@ class WP_LOC_ACF {
             return;
         }
 
+        if ( ! $this->is_post_translation_source( $post_id ) ) {
+            return;
+        }
+
         $field = $this->get_canonical_field_definition( $field );
         $row_container = $this->get_row_container_ancestor_field( $field );
 
@@ -1586,12 +1957,17 @@ class WP_LOC_ACF {
             $target_value = $this->map_field_value_to_language( $value, $field, $target_lang );
 
             $syncing[ $target_key ] = true;
+            $was_processing = self::$processing_entity_field_sync;
+            self::$processing_entity_field_sync = true;
+
             if ( in_array( (string) ( $field['type'] ?? '' ), [ 'group', 'clone' ], true ) ) {
                 $this->persist_entity_meta_value_manually( 'post', $target_id, $field, $target_value );
             } else {
                 acf_update_value( $target_value, $target_id, $field );
                 $this->finalize_container_root_value_after_update( $target_id, $field, $target_value );
             }
+
+            self::$processing_entity_field_sync = $was_processing;
 
             if ( $this->is_row_container_field( $field ) ) {
                 $this->sync_row_container_structure_from_post_source( $post_id, $target_id, $field );
@@ -1609,6 +1985,10 @@ class WP_LOC_ACF {
 
     private function sync_copy_once_post_field_value( int $post_id, array $field, $value ): void {
         if ( empty( $field['key'] ) || empty( $field['name'] ) || ! function_exists( 'acf_update_value' ) ) {
+            return;
+        }
+
+        if ( ! $this->is_post_translation_source( $post_id ) ) {
             return;
         }
 
@@ -1636,12 +2016,17 @@ class WP_LOC_ACF {
             $target_value = $this->map_field_value_to_language( $value, $field, $target_lang );
 
             $syncing[ $target_key ] = true;
+            $was_processing = self::$processing_entity_field_sync;
+            self::$processing_entity_field_sync = true;
+
             if ( in_array( (string) ( $field['type'] ?? '' ), [ 'group', 'clone' ], true ) ) {
                 $this->persist_entity_meta_value_manually( 'post', $target_id, $field, $target_value );
             } else {
                 acf_update_value( $target_value, $target_id, $field );
                 $this->finalize_container_root_value_after_update( $target_id, $field, $target_value );
             }
+
+            self::$processing_entity_field_sync = $was_processing;
 
             if ( $this->is_row_container_field( $field ) ) {
                 $this->sync_row_container_structure_from_post_source( $post_id, $target_id, $field );
@@ -1699,7 +2084,7 @@ class WP_LOC_ACF {
         return null;
     }
 
-    private function get_post_shared_source_id( int $post_id, array $field ): ?int {
+    private function get_post_shared_source_id( int $post_id, array $field, bool $ignore_existing_value = false ): ?int {
         $post = get_post( $post_id );
 
         if ( ! $post instanceof \WP_Post || ! $this->is_translatable_post_type_for_acf( $post->post_type ) ) {
@@ -1710,7 +2095,7 @@ class WP_LOC_ACF {
             return null;
         }
 
-        if ( metadata_exists( 'post', $post_id, $field['name'] ) ) {
+        if ( ! $ignore_existing_value && metadata_exists( 'post', $post_id, $field['name'] ) ) {
             return null;
         }
 
@@ -1953,39 +2338,50 @@ class WP_LOC_ACF {
      * Handle saving ACF field values — route to language-specific option for translatable fields
      */
     public function handle_pre_update_value( $null, $value, $post_id, array $field ) {
-        if ( ! is_array( $field ) || ! isset( $field['name'] ) || ! is_string( $post_id ) ) {
+        if ( ! is_array( $field ) || ! isset( $field['name'] ) ) {
             return $null;
         }
 
-        if ( ! $this->is_translated_options_post_id( $post_id ) ) {
+        $canonical_field = $this->get_canonical_field_definition( $field );
+        $user_id = $this->get_user_entity_id( $post_id );
+
+        if ( $user_id && $this->is_user_translatable_field( $canonical_field ) ) {
+            $language = $this->get_user_acf_context_language();
+            $default_language = WP_LOC_Languages::get_default_language();
+
+            if ( $language && $language !== $default_language ) {
+                $this->persist_user_translated_value( $user_id, $language, $canonical_field, $value );
+                return true;
+            }
+        }
+
+        if ( $this->is_readonly_translated_entity_field( $post_id, $canonical_field ) ) {
+            return true;
+        }
+
+        if ( ! is_string( $post_id ) || ! $this->is_translated_options_post_id( $post_id ) ) {
             return $null;
         }
 
-        $deferred_container = $this->get_deferred_container_ancestor_field( $field );
+        if ( $this->is_readonly_translated_options_field( $post_id, $canonical_field ) ) {
+            return true;
+        }
+
+        $deferred_container = $this->get_deferred_container_ancestor_field( $canonical_field );
 
         if ( ! $deferred_container ) {
             return $null;
         }
 
-        $is_container_root = ( $deferred_container['key'] ?? '' ) === ( $field['key'] ?? '' );
+        $is_container_root = ( $deferred_container['key'] ?? '' ) === ( $canonical_field['key'] ?? '' );
 
         if ( ! $is_container_root ) {
             return true;
         }
 
-        $canonical_field = $field;
-
-        if ( ! empty( $field['key'] ) && function_exists( 'acf_get_field' ) ) {
-            $resolved_field = acf_get_field( $field['key'] );
-
-            if ( is_array( $resolved_field ) ) {
-                $canonical_field = $this->normalize_field_translation_settings( $resolved_field );
-            }
-        }
-
         $translation_mode = $this->get_translation_mode( $canonical_field );
 
-        if ( in_array( $translation_mode, [ 'none', 'shared' ], true ) ) {
+        if ( $translation_mode === 'none' ) {
             $base_post_id = $this->get_base_options_post_id( $post_id );
             $default_language = WP_LOC_Languages::get_default_language();
             $base_value = $this->map_field_value_to_language( $value, $canonical_field, $default_language );
@@ -2008,23 +2404,22 @@ class WP_LOC_ACF {
     public function handle_update_value( $value, $post_id, array $field ) {
         if ( ! is_array( $field ) || ! isset( $field['name'] ) ) return $value;
 
-        $translation_mode = $this->get_translation_mode( $field );
-        $deferred_container = $this->get_deferred_container_ancestor_field( $field );
-        $row_container = $this->get_row_container_ancestor_field( $field );
-        $is_container_root = $deferred_container && ( $deferred_container['key'] ?? '' ) === ( $field['key'] ?? '' );
-        $canonical_field = $field;
+        $canonical_field = $this->get_canonical_field_definition( $field );
+        $translation_mode = $this->get_translation_mode( $canonical_field );
+        $deferred_container = $this->get_deferred_container_ancestor_field( $canonical_field );
+        $is_container_root = $deferred_container && ( $deferred_container['key'] ?? '' ) === ( $canonical_field['key'] ?? '' );
 
-        if ( ! empty( $field['key'] ) && function_exists( 'acf_get_field' ) ) {
-            $resolved_field = acf_get_field( $field['key'] );
+        if ( $this->is_readonly_translated_entity_field( $post_id, $canonical_field ) ) {
+            return $value;
+        }
 
-            if ( is_array( $resolved_field ) ) {
-                $canonical_field = $this->normalize_field_translation_settings( $resolved_field );
-            }
+        if ( $this->is_readonly_translated_options_field( $post_id, $canonical_field ) ) {
+            return null;
         }
 
         if ( $deferred_container && $this->is_options_post_id( $post_id ) && $this->is_translated_options_post_id( $post_id ) ) {
             if ( $is_container_root ) {
-                if ( in_array( $translation_mode, [ 'none', 'shared' ], true ) ) {
+                if ( $translation_mode === 'none' ) {
                     $base_post_id = $this->get_base_options_post_id( $post_id );
                     $default_language = WP_LOC_Languages::get_default_language();
                     $base_value = $this->map_field_value_to_language( $value, $canonical_field, $default_language );
@@ -2041,7 +2436,7 @@ class WP_LOC_ACF {
         }
 
         if ( $deferred_container ) {
-            $this->queue_deferred_container_sync( $post_id, $field, $value );
+            $this->queue_deferred_container_sync( $post_id, $canonical_field, $value );
         }
 
         $term_context = $this->get_term_context( $post_id );
@@ -2052,9 +2447,9 @@ class WP_LOC_ACF {
             }
 
             if ( in_array( $translation_mode, [ 'none', 'shared' ], true ) ) {
-                $this->sync_shared_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $field, $value );
+                $this->sync_shared_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $canonical_field, $value );
             } elseif ( $translation_mode === 'copy_once' ) {
-                $this->sync_copy_once_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $field, $value );
+                $this->sync_copy_once_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $canonical_field, $value );
             }
 
             return $value;
@@ -2068,9 +2463,9 @@ class WP_LOC_ACF {
             }
 
             if ( $post_entity_id && in_array( $translation_mode, [ 'none', 'shared' ], true ) ) {
-                $this->sync_shared_post_field_value( $post_entity_id, $field, $value );
+                $this->sync_shared_post_field_value( $post_entity_id, $canonical_field, $value );
             } elseif ( $post_entity_id && $translation_mode === 'copy_once' ) {
-                $this->sync_copy_once_post_field_value( $post_entity_id, $field, $value );
+                $this->sync_copy_once_post_field_value( $post_entity_id, $canonical_field, $value );
             }
 
             return $value;
@@ -2079,10 +2474,10 @@ class WP_LOC_ACF {
         if ( $translation_mode === 'none' && $this->is_translated_options_post_id( $post_id ) ) {
             $base_post_id = $this->get_base_options_post_id( $post_id );
             $default_language = WP_LOC_Languages::get_default_language();
-            $base_value = $this->map_field_value_to_language( $value, $field, $default_language );
+            $base_value = $this->map_field_value_to_language( $value, $canonical_field, $default_language );
 
             if ( $base_post_id ) {
-                $this->persist_options_value_to_base_post_id( $base_post_id, $field, $base_value );
+                $this->persist_options_value_to_base_post_id( $base_post_id, $canonical_field, $base_value );
             }
 
             return null;
@@ -2094,18 +2489,6 @@ class WP_LOC_ACF {
 
         if ( in_array( $translation_mode, [ 'translatable', 'copy_once' ], true ) ) {
             return $value;
-        }
-
-        if ( $translation_mode === 'shared' && $this->is_translated_options_post_id( $post_id ) ) {
-            $base_post_id = $this->get_base_options_post_id( $post_id );
-            $default_language = WP_LOC_Languages::get_default_language();
-            $base_value = $this->map_field_value_to_language( $value, $field, $default_language );
-
-            if ( $base_post_id ) {
-                $this->persist_options_value_to_base_post_id( $base_post_id, $field, $base_value );
-            }
-
-            return null;
         }
 
         return $value;
@@ -2130,6 +2513,14 @@ class WP_LOC_ACF {
             $field = $queued_field['field'];
             $field = $this->normalize_field_translation_settings( $field );
             $translation_mode = $this->get_translation_mode( $field );
+
+            if ( $this->is_readonly_translated_options_field( $post_id, $field ) ) {
+                continue;
+            }
+
+            if ( $this->is_readonly_translated_entity_field( $post_id, $field ) ) {
+                continue;
+            }
 
             if ( ! in_array( $translation_mode, [ 'none', 'shared', 'copy_once' ], true ) ) {
                 continue;
@@ -2181,7 +2572,7 @@ class WP_LOC_ACF {
                 continue;
             }
 
-            if ( $this->is_translated_options_post_id( $post_id ) && in_array( $translation_mode, [ 'none', 'shared' ], true ) ) {
+            if ( $this->is_translated_options_post_id( $post_id ) && $translation_mode === 'none' ) {
                 $base_post_id = $this->get_base_options_post_id( $post_id );
                 $default_language = WP_LOC_Languages::get_default_language();
                 $base_value = $this->map_field_value_to_language( $value, $field, $default_language );
@@ -2196,7 +2587,7 @@ class WP_LOC_ACF {
     }
 
     /**
-     * Make shared fields readonly for non-default languages
+     * Make shared fields readonly only on translated entities.
      */
     public function handle_load_field( array $field ): array {
         if ( ! is_admin() ) return $field;
@@ -2207,14 +2598,19 @@ class WP_LOC_ACF {
             return $field;
         }
 
-        $admin_lang = wp_loc_get_admin_lang();
-        $default_lang = WP_LOC_Languages::get_default_language();
-
-        if ( $admin_lang === $default_lang ) return $field;
         $translation_mode = $field['translation_mode'] ?? $this->get_translation_mode( $field );
 
-        // Shared field + non-default language → readonly
-        if ( $translation_mode === 'shared' ) {
+        if ( $translation_mode !== 'shared' ) {
+            return $field;
+        }
+
+        $context_post_id = $this->get_current_admin_acf_post_id();
+        $should_disable = $context_post_id !== null && (
+            $this->is_readonly_translated_options_field( $context_post_id, $field )
+            || $this->is_readonly_translated_entity_field( $context_post_id, $field )
+        );
+
+        if ( $should_disable ) {
             $field['readonly'] = 1;
             $field['disabled'] = 1;
             $field['wrapper']['class'] = ( $field['wrapper']['class'] ?? '' ) . ' acf-disabled';
@@ -2224,9 +2620,109 @@ class WP_LOC_ACF {
     }
 
     /**
+     * Keep ACF post picker fields scoped to the current editor language.
+     */
+    public function filter_post_choice_query( array $args, array $field, $post_id ): array {
+        $post_types = $this->get_post_types_from_acf_query_args( $args );
+        $has_translatable_post_type = false;
+
+        foreach ( $post_types as $post_type ) {
+            if ( WP_LOC_Admin_Settings::is_translatable( $post_type ) ) {
+                $has_translatable_post_type = true;
+                break;
+            }
+        }
+
+        if ( ! $has_translatable_post_type ) {
+            return $args;
+        }
+
+        $lang = $this->get_acf_query_context_language( $post_id );
+
+        if ( ! $lang || $lang === 'all' ) {
+            return $args;
+        }
+
+        $args['lang'] = $lang;
+        $args['suppress_filters'] = false;
+
+        return $args;
+    }
+
+    /**
+     * Keep ACF taxonomy picker fields scoped to the current editor language.
+     */
+    public function filter_taxonomy_choice_query( array $args, array $field, $post_id ): array {
+        $taxonomies = $this->get_taxonomies_from_acf_field( $field, $args );
+        $has_translatable_taxonomy = false;
+
+        foreach ( $taxonomies as $taxonomy ) {
+            if ( WP_LOC_Terms::is_translatable( $taxonomy ) ) {
+                $has_translatable_taxonomy = true;
+                break;
+            }
+        }
+
+        if ( ! $has_translatable_taxonomy ) {
+            return $args;
+        }
+
+        $lang = $this->get_acf_query_context_language( $post_id );
+
+        if ( ! $lang || $lang === 'all' ) {
+            return $args;
+        }
+
+        $args['lang'] = $lang;
+
+        return $args;
+    }
+
+    /**
+     * Keep ACF nav menu field choices scoped to the current editor language.
+     */
+    public function filter_nav_menu_field_choices( array $field ): array {
+        if ( empty( $field['choices'] ) || ! is_array( $field['choices'] ) ) {
+            return $field;
+        }
+
+        $lang = $this->get_acf_query_context_language();
+
+        if ( ! $lang || $lang === 'all' ) {
+            return $field;
+        }
+
+        foreach ( $field['choices'] as $menu_id => $label ) {
+            if ( ! is_numeric( $menu_id ) ) {
+                continue;
+            }
+
+            $menu_lang = WP_LOC_Terms::get_term_language( (int) $menu_id, 'nav_menu' );
+
+            if ( $menu_lang && $menu_lang !== $lang ) {
+                unset( $field['choices'][ $menu_id ] );
+            }
+        }
+
+        return $field;
+    }
+
+    /**
      * Load language-specific value for translatable ACF options fields
      */
     public function handle_pre_load_reference( $reference, string $field_name, $post_id ) {
+        if ( $reference === null ) {
+            $user_id = $this->get_user_entity_id( $post_id );
+
+            if ( $user_id ) {
+                $base_reference = $this->get_user_field_reference( $user_id, $field_name );
+
+                if ( $base_reference ) {
+                    return $base_reference;
+                }
+            }
+        }
+
         $term_context = $this->get_term_context( $post_id );
 
         if ( $reference === null && $term_context ) {
@@ -2270,12 +2766,33 @@ class WP_LOC_ACF {
     }
 
     public function handle_pre_load_value( $null, $post_id, array $field ) {
+        $user_id = $this->get_user_entity_id( $post_id );
+
+        if ( $user_id && $this->is_user_translatable_field( $field ) ) {
+            $language = $this->get_user_acf_context_language();
+            $default_language = WP_LOC_Languages::get_default_language();
+
+            if ( $language && $language !== $default_language && ! empty( $field['name'] ) ) {
+                $translated_key = $this->get_user_translated_meta_key( (string) $field['name'], $language );
+
+                if ( metadata_exists( 'user', $user_id, $translated_key ) ) {
+                    return get_user_meta( $user_id, $translated_key, true );
+                }
+            }
+
+            return $null;
+        }
+
         $post_entity_id = $this->get_post_entity_id( $post_id );
         $current_post_lang = $post_entity_id ? $this->get_post_language( $post_entity_id ) : null;
         $options_language = $this->is_options_post_id( $post_id ) ? $this->get_options_post_id_language( $post_id ) : null;
 
         if ( $post_entity_id && in_array( $this->get_translation_mode( $field ), [ 'none', 'shared' ], true ) ) {
-            $source_post_id = $this->get_post_shared_source_id( $post_entity_id, $field );
+            $source_post_id = $this->get_post_shared_source_id(
+                $post_entity_id,
+                $field,
+                $this->get_translation_mode( $field ) === 'shared'
+            );
 
             if ( $source_post_id ) {
                 $source_value = null;
@@ -2313,7 +2830,12 @@ class WP_LOC_ACF {
             $translation_mode = $this->get_translation_mode( $field );
 
             if ( in_array( $translation_mode, [ 'none', 'shared' ], true ) ) {
-                $shared_term_id = $this->get_term_shared_source_id( $term_context['term_id'], $term_context['taxonomy'], $field );
+                $shared_term_id = $this->get_term_shared_source_id(
+                    $term_context['term_id'],
+                    $term_context['taxonomy'],
+                    $field,
+                    $translation_mode === 'shared'
+                );
 
                 if ( $shared_term_id ) {
                     if ( function_exists( 'acf_get_value' ) ) {
@@ -2417,6 +2939,40 @@ class WP_LOC_ACF {
      * Inject localized ACF options meta so get_fields('options') sees translatable fields.
      */
     public function handle_pre_load_meta( $null, $post_id ) {
+        $user_id = $this->get_user_entity_id( $post_id );
+
+        if ( $user_id ) {
+            $meta = $this->build_user_meta( $user_id );
+            $language = $this->get_user_acf_context_language();
+            $default_language = WP_LOC_Languages::get_default_language();
+
+            if ( $language && $language !== $default_language ) {
+                $runtime_fields = $this->get_runtime_fields( $post_id );
+
+                foreach ( $runtime_fields as $field_name => $runtime_field ) {
+                    if ( ! $this->is_user_translatable_field( $runtime_field ) ) {
+                        continue;
+                    }
+
+                    $translated_key = $this->get_user_translated_meta_key( $field_name, $language );
+
+                    if ( metadata_exists( 'user', $user_id, $translated_key ) ) {
+                        $meta[ $field_name ] = get_user_meta( $user_id, $translated_key, true );
+                    }
+
+                    if ( empty( $meta[ "_{$field_name}" ] ) ) {
+                        $reference = $this->get_user_field_reference( $user_id, $field_name );
+
+                        if ( $reference ) {
+                            $meta[ "_{$field_name}" ] = $reference;
+                        }
+                    }
+                }
+            }
+
+            return $meta;
+        }
+
         $term_context = $this->get_term_context( $post_id );
 
         if ( $term_context ) {
@@ -2447,11 +3003,12 @@ class WP_LOC_ACF {
                     }
                 }
 
-                if ( in_array( $mode, [ 'none', 'shared' ], true ) && ! metadata_exists( 'term', $term_context['term_id'], $field_name ) ) {
+                if ( $mode === 'shared' || ( $mode === 'none' && ! metadata_exists( 'term', $term_context['term_id'], $field_name ) ) ) {
                     $shared_term_id = $this->get_term_shared_source_id(
                         $term_context['term_id'],
                         $term_context['taxonomy'],
-                        [ 'name' => $field_name ]
+                        [ 'name' => $field_name ],
+                        $mode === 'shared'
                     );
 
                     if ( $shared_term_id ) {
@@ -2481,12 +3038,16 @@ class WP_LOC_ACF {
             foreach ( $runtime_fields as $field_name => $runtime_field ) {
                 $mode = $this->get_translation_mode( $runtime_field );
 
-                if ( ! in_array( $mode, [ 'none', 'shared', 'copy_once' ], true ) || metadata_exists( 'post', $post_entity_id, $field_name ) ) {
+                if ( ! in_array( $mode, [ 'none', 'shared', 'copy_once' ], true ) ) {
+                    continue;
+                }
+
+                if ( $mode !== 'shared' && metadata_exists( 'post', $post_entity_id, $field_name ) ) {
                     continue;
                 }
 
                 $source_post_id = in_array( $mode, [ 'none', 'shared' ], true )
-                    ? $this->get_post_shared_source_id( $post_entity_id, [ 'name' => $field_name ] )
+                    ? $this->get_post_shared_source_id( $post_entity_id, [ 'name' => $field_name ], $mode === 'shared' )
                     : $this->get_post_copy_once_source_id( $post_entity_id, [ 'name' => $field_name ] );
 
                 if ( ! $source_post_id ) {

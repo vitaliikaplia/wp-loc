@@ -85,6 +85,8 @@
         const details = scan.details || {};
         const languages = scan.languages || {};
         const languageTargets = Array.isArray(scan.language_targets) ? scan.language_targets : [];
+        const defaultSourceCode = languages.default_source_code || '';
+        const defaultCode = languages.default_code || '';
         const legacy = scan.legacy || {};
         const tableRows = Array.isArray(legacy.tables) ? legacy.tables : [];
         const removableTableRows = tableRows.reduce(function(total, item) {
@@ -101,6 +103,7 @@
                 const displayName = lang.display_name || lang.code;
                 const sourceCode = lang.source_code || lang.code;
                 const selectedCode = lang.code || sourceCode;
+                const isDefault = (defaultSourceCode && sourceCode === defaultSourceCode) || (!defaultSourceCode && defaultCode && selectedCode === defaultCode);
                 const targetOptions = languageTargets.map(function(target) {
                     const selected = target.code === selectedCode ? ' selected' : '';
                     return '<option value="' + escapeHtml(target.code) + '"' +
@@ -110,12 +113,13 @@
                     '>' + escapeHtml(target.display_name + ' (' + target.code + ' / ' + target.locale + ')') + '</option>';
                 }).join('');
 
-                return '<li class="wp-loc-db-wizard__language-row">' +
+                return '<li class="wp-loc-db-wizard__language-row' + (isDefault ? ' is-default' : '') + '">' +
                     '<div class="wp-loc-db-wizard__language-source">' +
                         '<strong>' + escapeHtml(displayName) + '</strong>' +
                         '<span>' + escapeHtml(sourceCode) + '</span>' +
                         '<code>' + escapeHtml(lang.locale || lang.code) + '</code>' +
                         '<em class="wp-loc-db-wizard__match wp-loc-db-wizard__match--' + escapeHtml(lang.confidence || 'fallback') + '">' + escapeHtml(confidenceLabel(lang.confidence || 'fallback')) + '</em>' +
+                        (isDefault ? '<em class="wp-loc-db-wizard__default-language">' + escapeHtml(text('defaultLanguage', 'Default language')) + '</em>' : '') +
                     '</div>' +
                     '<label class="wp-loc-db-wizard__language-target">' +
                         '<span>' + escapeHtml(text('adoptAs', 'Adopt as')) + '</span>' +

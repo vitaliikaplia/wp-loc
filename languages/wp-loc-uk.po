@@ -150,6 +150,10 @@ msgstr "Мови збережено."
 msgid "Language \"%s\" deleted."
 msgstr "Мову \"%s\" видалено."
 
+#: includes/class-wp-loc-admin-languages.php:252
+msgid "The default language cannot be deleted."
+msgstr "Мову за замовчуванням не можна видалити."
+
 #: includes/class-wp-loc-admin-languages.php:89
 msgid "Configured languages"
 msgstr "Налаштовані мови"
@@ -344,6 +348,38 @@ msgstr "Переклад контенту"
 #: includes/class-wp-loc-admin-settings.php:61
 msgid "Frontend Language Switcher"
 msgstr "Перемикач мови на фронтенді"
+
+#: includes/class-wp-loc-admin-settings.php:141
+msgid "Switcher usage"
+msgstr "Використання перемикача"
+
+#: includes/class-wp-loc-admin-settings.php:142
+msgid "Add one of these snippets to the theme template where the frontend language switcher should appear."
+msgstr "Додайте один із цих фрагментів у шаблон теми там, де має відображатися перемикач мови на фронтенді."
+
+#: includes/class-wp-loc-admin-settings.php:146
+msgid "Ready-to-render helper"
+msgstr "Готовий helper для виводу"
+
+#: includes/class-wp-loc-admin-settings.php:149
+msgid "Outputs the default WP-LOC switcher markup and follows the switcher settings above."
+msgstr "Виводить стандартну розмітку перемикача WP-LOC і враховує налаштування перемикача вище."
+
+#: includes/class-wp-loc-admin-settings.php:153
+msgid "Custom dropdown pattern"
+msgstr "Кастомний dropdown-патерн"
+
+#: includes/class-wp-loc-admin-settings.php:156
+msgid "Use this pattern when the theme renders the current language separately and prints the other languages in a nested list."
+msgstr "Використовуйте цей патерн, якщо тема окремо виводить поточну мову, а інші мови друкує у вкладеному списку."
+
+#: includes/class-wp-loc-admin-settings.php:161
+msgid "Custom dropdown pattern for Twig"
+msgstr "Кастомний dropdown-патерн для Twig"
+
+#: includes/class-wp-loc-admin-settings.php:164
+msgid "Use this Timber/Twig version when the switcher is rendered from a Twig template."
+msgstr "Використовуйте цю Timber/Twig-версію, якщо перемикач рендериться з Twig-шаблону."
 
 #: includes/class-wp-loc-admin-settings.php:62
 #: includes/class-wp-loc-menu-sync.php:313

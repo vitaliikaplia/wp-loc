@@ -64,6 +64,7 @@ class WP_LOC_DB_Optimization_Wizard {
                 'noTaxonomies' => __( 'No translated taxonomies were found.', 'wp-loc' ),
                 'languagesToAdopt' => __( 'Languages to adopt', 'wp-loc' ),
                 'adoptAs' => __( 'Adopt as', 'wp-loc' ),
+                'defaultLanguage' => __( 'Default language', 'wp-loc' ),
                 'matchExact' => __( 'Exact match', 'wp-loc' ),
                 'matchNormalized' => __( 'Slug normalized', 'wp-loc' ),
                 'matchLocale' => __( 'Locale match', 'wp-loc' ),
@@ -308,11 +309,31 @@ class WP_LOC_DB_Optimization_Wizard {
 
         if ( $imported ) {
             update_option( 'wp_loc_languages', $existing );
+            WP_LOC_Languages::flush();
+        }
+
+        $default_imported = $this->import_default_language_from_scan( $scan, $existing );
+
+        if ( $imported || $default_imported ) {
             update_option( 'wp_loc_flush_rewrite_rules', true );
             WP_LOC_Languages::flush();
         }
 
         return $imported;
+    }
+
+    private function import_default_language_from_scan( array $scan, array $languages ): bool {
+        $default_slug = sanitize_key( (string) ( $scan['languages']['default_code'] ?? '' ) );
+
+        if ( ! $default_slug || empty( $languages[ $default_slug ] ) || empty( $languages[ $default_slug ]['enabled'] ) ) {
+            return false;
+        }
+
+        if ( WP_LOC_Languages::get_default_language() === $default_slug ) {
+            return false;
+        }
+
+        return WP_LOC_Languages::set_default_language( $default_slug );
     }
 
     private function apply_requested_language_mapping( array $scan ): array {
@@ -357,6 +378,11 @@ class WP_LOC_DB_Optimization_Wizard {
                 'confidence'   => 'manual',
             ] );
         }
+
+        $scan['languages']['default_code'] = $this->resolve_default_language_code(
+            $scan['languages']['items'] ?? [],
+            (string) ( $scan['languages']['default_source_code'] ?? '' )
+        );
 
         return $scan;
     }
@@ -448,6 +474,7 @@ class WP_LOC_DB_Optimization_Wizard {
         $items = [];
         $translations_table = $wpdb->prefix . 'icl_translations';
         $display_names = $this->detect_language_display_names();
+        $default_source_code = $this->detect_default_language_code();
 
         if ( $this->table_exists( $translations_table ) ) {
             $codes = $wpdb->get_col( "SELECT DISTINCT language_code FROM {$translations_table} WHERE language_code != '' ORDER BY language_code ASC" );
@@ -472,9 +499,45 @@ class WP_LOC_DB_Optimization_Wizard {
         }
 
         return [
-            'count' => count( $items ),
-            'items' => array_values( $items ),
+            'count'               => count( $items ),
+            'items'               => array_values( $items ),
+            'default_source_code' => $default_source_code,
+            'default_code'        => $this->resolve_default_language_code( array_values( $items ), $default_source_code ),
         ];
+    }
+
+    private function detect_default_language_code(): string {
+        $sitepress_settings = get_option( 'icl_sitepress_settings', [] );
+
+        if ( is_array( $sitepress_settings ) && ! empty( $sitepress_settings['default_language'] ) ) {
+            return sanitize_key( (string) $sitepress_settings['default_language'] );
+        }
+
+        return '';
+    }
+
+    private function resolve_default_language_code( array $languages, string $default_source_code ): string {
+        $default_source_code = sanitize_key( $default_source_code );
+
+        if ( ! $default_source_code ) {
+            return '';
+        }
+
+        foreach ( $languages as $language ) {
+            if ( ! is_array( $language ) ) {
+                continue;
+            }
+
+            $source_code = sanitize_key( (string) ( $language['source_code'] ?? '' ) );
+            $wpml_code = sanitize_key( (string) ( $language['wpml_code'] ?? '' ) );
+            $code = sanitize_key( (string) ( $language['code'] ?? '' ) );
+
+            if ( $default_source_code === $source_code || $default_source_code === $wpml_code || $default_source_code === $code ) {
+                return $code;
+            }
+        }
+
+        return '';
     }
 
     private function add_detected_language( array &$items, string $source_code, string $locale, string $display_name = '' ): void {

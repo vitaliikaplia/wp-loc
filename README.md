@@ -30,9 +30,10 @@ Lightweight multilingual plugin for WordPress.
 - **Frontend/admin query filtering** — translatable posts are filtered by the current language for main, secondary, AJAX, REST, and Gutenberg preview `WP_Query` calls when filters are not suppressed
 - **Frontend AJAX language context** — standard `admin-ajax.php` handlers inherit the current frontend language through compatible cookies, request parameters, and referring URLs
 - **URL structure** — `/ua/page-slug/`, `/en/page-slug/`, default language without prefix
+- **Migrated default language** — the migration wizard preserves the legacy multilingual default language for no-prefix URLs
 - **Admin language switcher** — in the admin bar with flags, cookie-based
-- **Frontend language switcher** — `wp_loc_get_lang_switcher()`, `wp_loc_get_language_switcher_html()`, `wp_loc_the_language_switcher()` with translated post, custom post type, taxonomy, and archive URLs
-- **SEO** — hreflang alternate tags, canonical URLs, proper `<html lang="">`
+- **Frontend language switcher** — `wp_loc_get_lang_switcher()`, `wp_loc_get_language_switcher_html()`, `wp_loc_the_language_switcher()` with translated post, custom post type, taxonomy, author, search, date, paginated, query-filtered, and archive URLs
+- **SEO** — frontend hreflang alternate tags for translated singular, front page, posts page, and taxonomy contexts; canonical URL fallback when no SEO plugin outputs one; proper `<html lang="">`
 - **Yoast SEO compatibility** — localized `wpseo_titles` / `wpseo_social` / `wpseo_rss` options, translated primary category resolution, copied Yoast term SEO meta for translated terms, multilingual sitemap alternate links, stripped category-base compatibility, and Yoast indexable invalidation after multilingual updates
 - **Localized options** — `blogname`, `blogdescription`, `page_on_front`, `page_for_posts` per language, including localized front page / posts page routing
 - **AI settings** — choose OpenAI / Claude / Gemini, store API keys, and enable AI translation for custom menu links during menu sync
@@ -132,6 +133,7 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 ### ACF options pages
 
 - `shared` fields stay on the base ACF options post ID (`options`)
+- Saving translated options, posts, or terms ignores read-only `shared` fields so disabled ACF containers cannot overwrite source-language values
 - `translatable` fields are routed through language-aware ACF options post IDs like `options_en` / `options_ru`
 - `copy_once` container fields inherit from the source language until the translated options page stores its own value
 - Both `get_field( 'field_name', 'options' )` and `get_fields( 'options' )` resolve translated values in the current language context
@@ -140,7 +142,11 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 ### ACF content fields
 
 - The same multilingual ACF logic works for translatable posts/pages, classic editor post screens, Gutenberg page screens, and multilingual term edit screens
+- ACF picker fields for posts, pages, relationships, taxonomies, and nav menus only list choices from the current editor language
+- ACF user profile fields marked as translatable read/write language-suffixed user meta such as `field_name_ru` and `field_name_en`, while the default language keeps the canonical `field_name` meta key
 - `shared` fields resolve the source-language value but map media/post/term/menu references into the current language
+- `shared` fields stay editable on the source-language entity even when that source language is not the site default, and become readonly only on translated entities
+- Saving a translated post or term cannot push readonly `shared` values back into the translation group; shared sync runs from the source-language entity only
 - `copy_once` fields inherit the source-language value until the translated post/term/options page stores its own independent value
 - Container fields such as `group`, `repeater`, `flexible_content`, and `clone` preserve their ACF structure while mapping nested media and relation values per language
 

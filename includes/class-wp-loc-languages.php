@@ -4,6 +4,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class WP_LOC_Languages {
 
+    public const DEFAULT_LANGUAGE_OPTION_KEY = 'wp_loc_default_language';
+
     private static $languages = null;
     private static $default_language = null;
 
@@ -116,6 +118,12 @@ class WP_LOC_Languages {
 
         $resolving = true;
         $system_locale = self::get_raw_option( 'WPLANG', 'en_US' ) ?: 'en_US';
+        $configured_default = sanitize_key( (string) self::get_raw_option( self::DEFAULT_LANGUAGE_OPTION_KEY, '' ) );
+
+        if ( $configured_default && isset( $languages[ $configured_default ] ) && ! empty( $languages[ $configured_default ]['enabled'] ) ) {
+            $resolving = false;
+            return self::$default_language = $configured_default;
+        }
 
         foreach ( $languages as $slug => $data ) {
             $locale = $data['locale'] ?? '';
@@ -127,6 +135,20 @@ class WP_LOC_Languages {
 
         $resolving = false;
         return self::$default_language = ( $languages ? array_key_first( $languages ) : 'en' );
+    }
+
+    public static function set_default_language( string $slug ): bool {
+        $slug = sanitize_key( $slug );
+        $languages = self::get_active_languages();
+
+        if ( ! $slug || ! isset( $languages[ $slug ] ) ) {
+            return false;
+        }
+
+        update_option( self::DEFAULT_LANGUAGE_OPTION_KEY, $slug );
+        self::$default_language = null;
+
+        return true;
     }
 
     private static function get_raw_option( string $option, $default = false ) {

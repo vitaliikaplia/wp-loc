@@ -27,52 +27,77 @@ class WP_LOC_Frontend {
     }
 
     /**
-     * Output hreflang and canonical tags
+     * Output alternate hreflang tags and canonical tags.
      */
     public function output_hreflang_tags(): void {
-        if ( ! is_singular() ) return;
+        if ( is_admin() || is_404() || is_search() ) {
+            return;
+        }
 
-        $post_id = get_queried_object_id();
-        $db = WP_LOC::instance()->db;
-        $element_type = WP_LOC_DB::post_element_type( get_post_type( $post_id ) );
+        $alternates = $this->get_frontend_alternate_links();
 
-        $current_lang = $db->get_element_language( $post_id, $element_type );
-        $trid = $db->get_trid( $post_id, $element_type );
+        foreach ( $alternates as $hreflang => $url ) {
+            echo '<link rel="alternate" hreflang="' . esc_attr( $hreflang ) . '" href="' . esc_url( $url ) . '" />' . "\n";
+        }
 
-        $active = WP_LOC_Languages::get_active_languages();
-        $default = WP_LOC_Languages::get_default_language();
+        if ( is_singular() && ! $this->seo_plugin_outputs_canonical() ) {
+            echo '<link rel="canonical" href="' . esc_url( get_permalink( get_queried_object_id() ) ) . '" />' . "\n";
+        }
+    }
 
-        $translations = [];
+    private function seo_plugin_outputs_canonical(): bool {
+        return defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Frontend' );
+    }
 
-        if ( $trid ) {
-            $all_translations = $db->get_element_translations( $trid, $element_type );
+    private function get_frontend_alternate_links(): array {
+        $switcher = wp_loc_get_lang_switcher();
 
-            foreach ( $all_translations as $slug => $row ) {
-                if ( ! isset( $active[ $slug ] ) ) continue;
+        if ( empty( $switcher ) ) {
+            return [];
+        }
 
-                $translated_post = get_post( $row->element_id );
-                if ( ! $translated_post || $translated_post->post_status !== 'publish' ) continue;
+        $alternates = [];
+        $default_lang = WP_LOC_Languages::get_default_language();
+        $default_url = '';
 
-                $translations[ $slug ] = get_permalink( $row->element_id );
+        foreach ( $switcher as $language ) {
+            $code = sanitize_key( (string) ( $language['code'] ?? '' ) );
+            $url = (string) ( $language['url'] ?? '' );
+
+            if ( ! $code || ! $url ) {
+                continue;
             }
-        } else {
-            if ( $current_lang ) {
-                $translations[ $current_lang ] = get_permalink( $post_id );
+
+            if ( array_key_exists( 'has_translation', $language ) && ! $language['has_translation'] ) {
+                continue;
             }
+
+            if ( $code === $default_lang ) {
+                $default_url = $url;
+            }
+
+            $alternates[ $this->get_hreflang_for_language( $code ) ] = $url;
         }
 
-        // Output hreflang tags
-        foreach ( $translations as $slug => $url ) {
-            echo '<link rel="alternate" hreflang="' . esc_attr( $slug ) . '" href="' . esc_url( $url ) . '" />' . "\n";
+        if ( $default_url ) {
+            $alternates['x-default'] = $default_url;
         }
 
-        // x-default
-        if ( isset( $translations[ $default ] ) ) {
-            echo '<link rel="alternate" hreflang="x-default" href="' . esc_url( $translations[ $default ] ) . '" />' . "\n";
+        return $alternates;
+    }
+
+    private function get_hreflang_for_language( string $language ): string {
+        if ( $language === 'x-default' ) {
+            return 'x-default';
         }
 
-        // Canonical
-        echo '<link rel="canonical" href="' . esc_url( get_permalink( $post_id ) ) . '" />' . "\n";
+        $locale = WP_LOC_Languages::get_language_locale( $language );
+
+        if ( ! $locale ) {
+            return $language;
+        }
+
+        return str_replace( '_', '-', $locale );
     }
 
     /**
@@ -218,9 +243,61 @@ function wp_loc_get_lang_switcher(): array {
     $fallback_to_home = WP_LOC_Admin_Settings::fallback_untranslated_switcher_links_to_home();
 
     // Use raw home URL to avoid the home_url language prefix filter
-    $home = set_url_scheme( get_option( 'home' ) );
+    $home = rtrim( set_url_scheme( get_option( 'home' ) ), '/' );
     $build_home_url = static function ( string $code ) use ( $home, $default ): string {
         return $home . ( $code === $default ? '/' : "/{$code}/" );
+    };
+    $get_current_query_args = static function (): array {
+        $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( (string) $_SERVER['REQUEST_URI'] ) : '/';
+        $query = parse_url( $request_uri, PHP_URL_QUERY );
+
+        if ( ! is_string( $query ) || $query === '' ) {
+            return [];
+        }
+
+        $query_args = [];
+        wp_parse_str( $query, $query_args );
+
+        foreach ( [ 'lang', 'wp_loc_lang', 'wpml_lang', '_wpml_lang', 'icl_language', 'ICL_LANGUAGE_CODE' ] as $language_arg ) {
+            unset( $query_args[ $language_arg ] );
+        }
+
+        return array_filter( $query_args, static fn( $value ): bool => $value !== null && $value !== '' );
+    };
+    $append_current_query_args = static function ( string $url ) use ( $get_current_query_args ): string {
+        $query_args = $get_current_query_args();
+
+        return empty( $query_args ) ? $url : add_query_arg( $query_args, $url );
+    };
+    $get_clean_request_path = static function () use ( $active ): string {
+        $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( (string) $_SERVER['REQUEST_URI'] ) : '/';
+        $uri_path = trim( (string) parse_url( $request_uri, PHP_URL_PATH ), '/' );
+
+        if ( $uri_path === '' ) {
+            return '';
+        }
+
+        $segments = explode( '/', $uri_path );
+        $uri_lang_prefix = array_key_exists( $segments[0] ?? '', $active ) ? $segments[0] : null;
+        $clean_segments = $uri_lang_prefix ? array_slice( $segments, 1 ) : $segments;
+
+        return trim( implode( '/', $clean_segments ), '/' );
+    };
+    $build_url_for_clean_path = static function ( string $code, string $clean_path ) use ( $home, $default, $append_current_query_args ): string {
+        $prefix = ( $code === $default ) ? '' : $code;
+        $full_path = trim( trim( $prefix . '/' . trim( $clean_path, '/' ), '/' ), '/' );
+        $url = $home . ( $full_path ? '/' . $full_path . '/' : '/' );
+
+        return $append_current_query_args( $url );
+    };
+    $add_pagination_to_url = static function ( string $url ): string {
+        $paged = max( (int) get_query_var( 'paged' ), (int) get_query_var( 'page' ) );
+
+        if ( $paged < 2 ) {
+            return $url;
+        }
+
+        return trailingslashit( $url ) . user_trailingslashit( 'page/' . $paged, 'paged' );
     };
     $append_switcher_item = static function ( array &$switcher, string $code, array $data, string $url, bool $has_translation = true ) use ( $current, $hide_current, $hide_untranslated ) : void {
         if ( $hide_current && $code === $current ) {
@@ -249,7 +326,7 @@ function wp_loc_get_lang_switcher(): array {
     // Front page
     if ( is_front_page() ) {
         foreach ( $active as $code => $data ) {
-            $append_switcher_item( $switcher, $code, $data, $build_home_url( $code ) );
+            $append_switcher_item( $switcher, $code, $data, $append_current_query_args( $build_home_url( $code ) ) );
         }
         return $switcher;
     }
@@ -272,7 +349,7 @@ function wp_loc_get_lang_switcher(): array {
                 $url = $build_home_url( $code );
             }
 
-            $append_switcher_item( $switcher, $code, $data, $url, $has_translation );
+            $append_switcher_item( $switcher, $code, $data, $append_current_query_args( $add_pagination_to_url( $url ) ), $has_translation );
         }
 
         return $switcher;
@@ -289,10 +366,23 @@ function wp_loc_get_lang_switcher(): array {
                 $has_translation = (bool) $translated_link || $code === $current;
 
                 if ( $translated_link ) {
-                    $url = $translated_link;
+                    $url = $append_current_query_args( $add_pagination_to_url( $translated_link ) );
                 }
 
                 $append_switcher_item( $switcher, $code, $data, $url, $has_translation );
+            }
+
+            return $switcher;
+        }
+    }
+
+    // Shared WordPress archive contexts: keep the same archive/search path under each language.
+    if ( is_author() || is_search() || is_date() || is_post_type_archive() ) {
+        $clean_path = $get_clean_request_path();
+
+        if ( $clean_path !== '' || is_search() ) {
+            foreach ( $active as $code => $data ) {
+                $append_switcher_item( $switcher, $code, $data, $build_url_for_clean_path( $code, $clean_path ) );
             }
 
             return $switcher;
@@ -326,26 +416,20 @@ function wp_loc_get_lang_switcher(): array {
                 $url = $home . ( $code === $default ? '/' : "/{$code}/" );
             }
 
-            $append_switcher_item( $switcher, $code, $data, $url, $has_translation );
+            $append_switcher_item( $switcher, $code, $data, $append_current_query_args( $url ), $has_translation );
         }
 
         return $switcher;
     }
 
     // Fallback: replace language prefix in current URL
-    $uri_path = trim( parse_url( $_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH ), '/' );
-    $segments = explode( '/', $uri_path );
-    $uri_lang_prefix = array_key_exists( $segments[0] ?? '', $active ) ? $segments[0] : null;
-    $clean_segments = $uri_lang_prefix ? array_slice( $segments, 1 ) : $segments;
-    $clean_path = implode( '/', $clean_segments );
+    $clean_path = $get_clean_request_path();
 
     foreach ( $active as $code => $data ) {
-        $prefix = ( $code === $default ) ? '' : '/' . $code;
-        $full_path = trim( $prefix . '/' . $clean_path, '/' );
-        $url = $home . ( $full_path ? '/' . $full_path . '/' : '/' );
+        $url = $build_url_for_clean_path( $code, $clean_path );
 
         if ( ! $fallback_to_home && ! empty( $clean_path ) ) {
-            $url = $home . ( $full_path ? '/' . $full_path . '/' : '/' );
+            $url = $build_url_for_clean_path( $code, $clean_path );
         } elseif ( $fallback_to_home && ! empty( $clean_path ) ) {
             $url = $build_home_url( $code );
         }

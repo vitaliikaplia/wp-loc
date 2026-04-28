@@ -151,6 +151,10 @@ msgstr "Языки сохранены."
 msgid "Language \"%s\" deleted."
 msgstr "Язык \"%s\" удалён."
 
+#: includes/class-wp-loc-admin-languages.php:252
+msgid "The default language cannot be deleted."
+msgstr "Язык по умолчанию нельзя удалить."
+
 #: includes/class-wp-loc-admin-languages.php:89
 msgid "Configured languages"
 msgstr "Настроенные языки"
@@ -345,6 +349,38 @@ msgstr "Перевод контента"
 #: includes/class-wp-loc-admin-settings.php:61
 msgid "Frontend Language Switcher"
 msgstr "Переключатель языка на фронтенде"
+
+#: includes/class-wp-loc-admin-settings.php:141
+msgid "Switcher usage"
+msgstr "Использование переключателя"
+
+#: includes/class-wp-loc-admin-settings.php:142
+msgid "Add one of these snippets to the theme template where the frontend language switcher should appear."
+msgstr "Добавьте один из этих фрагментов в шаблон темы там, где должен отображаться переключатель языка на фронтенде."
+
+#: includes/class-wp-loc-admin-settings.php:146
+msgid "Ready-to-render helper"
+msgstr "Готовый helper для вывода"
+
+#: includes/class-wp-loc-admin-settings.php:149
+msgid "Outputs the default WP-LOC switcher markup and follows the switcher settings above."
+msgstr "Выводит стандартную разметку переключателя WP-LOC и учитывает настройки переключателя выше."
+
+#: includes/class-wp-loc-admin-settings.php:153
+msgid "Custom dropdown pattern"
+msgstr "Кастомный dropdown-паттерн"
+
+#: includes/class-wp-loc-admin-settings.php:156
+msgid "Use this pattern when the theme renders the current language separately and prints the other languages in a nested list."
+msgstr "Используйте этот паттерн, если тема отдельно выводит текущий язык, а остальные языки печатает во вложенном списке."
+
+#: includes/class-wp-loc-admin-settings.php:161
+msgid "Custom dropdown pattern for Twig"
+msgstr "Кастомный dropdown-паттерн для Twig"
+
+#: includes/class-wp-loc-admin-settings.php:164
+msgid "Use this Timber/Twig version when the switcher is rendered from a Twig template."
+msgstr "Используйте эту Timber/Twig-версию, если переключатель рендерится из Twig-шаблона."
 
 #: includes/class-wp-loc-admin-settings.php:62
 #: includes/class-wp-loc-menu-sync.php:313

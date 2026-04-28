@@ -68,8 +68,8 @@ class WP_LOC_Admin_Languages {
         $table->prepare_items();
         $languages = WP_LOC_Languages::get_languages();
         $enabled_count = count( array_filter( $languages, static fn( $language ) => ! empty( $language['enabled'] ) ) );
-        $default_locale = get_option( 'WPLANG' ) ?: 'en_US';
-        $default_name = WP_LOC_Languages::get_language_display_name( $default_locale );
+        $default_slug = WP_LOC_Languages::get_default_language();
+        $default_name = WP_LOC_Languages::get_display_name( $default_slug );
 
         echo '<div class="wrap wp-loc-languages-page">';
         echo '<h1>' . esc_html__( 'Languages', 'wp-loc' ) . '</h1>';
@@ -124,6 +124,10 @@ class WP_LOC_Admin_Languages {
         $langs = [];
         $slugs = [];
         $display_names = [];
+        $current_languages = WP_LOC_Languages::get_languages();
+        $current_default_slug = WP_LOC_Languages::get_default_language();
+        $current_default_locale = (string) ( $current_languages[ $current_default_slug ]['locale'] ?? '' );
+        $has_explicit_default = get_option( WP_LOC_Languages::DEFAULT_LANGUAGE_OPTION_KEY, '' ) !== '';
 
         foreach ( $_POST['wp_loc_languages'] as $locale => $data ) {
             $slug = sanitize_title( $data['slug'] ?? '' );
@@ -183,6 +187,15 @@ class WP_LOC_Admin_Languages {
 
         update_option( 'wp_loc_languages', $langs );
         WP_LOC_Languages::flush();
+
+        if ( $has_explicit_default && $current_default_locale ) {
+            foreach ( $langs as $slug => $data ) {
+                if ( ( $data['locale'] ?? '' ) === $current_default_locale ) {
+                    WP_LOC_Languages::set_default_language( $slug );
+                    break;
+                }
+            }
+        }
 
         update_option( 'wp_loc_flush_rewrite_rules', true );
 
@@ -248,6 +261,10 @@ class WP_LOC_Admin_Languages {
         }
 
         if ( $slug_to_remove ) {
+            if ( $slug_to_remove === WP_LOC_Languages::get_default_language() ) {
+                wp_die( esc_html__( 'The default language cannot be deleted.', 'wp-loc' ) );
+            }
+
             unset( $languages[ $slug_to_remove ] );
             update_option( 'wp_loc_languages', $languages );
             WP_LOC_Languages::flush();
@@ -305,7 +322,7 @@ class WP_LOC_Languages_List_Table extends WP_List_Table {
 
     public function prepare_items(): void {
         $languages = WP_LOC_Languages::get_languages();
-        $system_locale = get_option( 'WPLANG' ) ?: 'en_US';
+        $default_slug = WP_LOC_Languages::get_default_language();
 
         $items = [];
         $seen_locales = [];
@@ -323,7 +340,7 @@ class WP_LOC_Languages_List_Table extends WP_List_Table {
                 'slug'         => $slug,
                 'display_name' => $data['display_name'] ?? strtoupper( $slug ),
                 'enabled'      => ! empty( $data['enabled'] ),
-                'is_default'   => ( $locale === $system_locale ),
+                'is_default'   => ( $slug === $default_slug ),
             ];
         }
 

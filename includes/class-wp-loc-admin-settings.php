@@ -90,6 +90,120 @@ class WP_LOC_Admin_Settings {
         echo '</nav>';
     }
 
+    private function render_switcher_usage_examples(): void {
+        $helper_code = <<<'PHP'
+<?php
+if ( function_exists( 'wp_loc_the_language_switcher' ) ) {
+    wp_loc_the_language_switcher();
+}
+?>
+PHP;
+
+        $custom_code = <<<'PHP'
+<?php
+$languages = function_exists( 'icl_get_languages' )
+    ? icl_get_languages( 'skip_missing=0&orderby=KEY' )
+    : [];
+
+$current_language = null;
+
+foreach ( $languages as $language ) {
+    if ( ! empty( $language['active'] ) ) {
+        $current_language = $language;
+        break;
+    }
+}
+?>
+
+<?php if ( $current_language ) : ?>
+    <ul class="languageSwitcher">
+        <li>
+            <span><?php echo esc_html( $current_language['native_name'] ?? $current_language['language_code'] ); ?></span>
+
+            <ul>
+                <?php foreach ( $languages as $language ) : ?>
+                    <?php if ( ! empty( $language['active'] ) ) continue; ?>
+
+                    <li>
+                        <a href="<?php echo esc_url( $language['url'] ); ?>" title="<?php echo esc_attr( $language['native_name'] ?? $language['language_code'] ); ?>">
+                            <?php echo esc_html( $language['native_name'] ?? $language['language_code'] ); ?>
+                        </a>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        </li>
+    </ul>
+<?php endif; ?>
+PHP;
+
+        $twig_code = <<<'TWIG'
+{% set languages = wp_loc_languages() %}
+
+{% if current_language and languages %}
+    <ul class="languageSwitcher">
+        <li>
+            <span>{{ current_language.name }}</span>
+
+            <ul>
+                {% for language in languages %}
+                    {% if not language.active %}
+                        <li>
+                            <a href="{{ language.url }}" title="{{ language.name }}">
+                                {{ language.name }}
+                            </a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+            </ul>
+        </li>
+    </ul>
+{% endif %}
+TWIG;
+
+        $examples = [
+            [
+                'title'       => __( 'Ready-to-render helper', 'wp-loc' ),
+                'language'    => 'PHP',
+                'code'        => $helper_code,
+                'description' => __( 'Outputs the default WP-LOC switcher markup and follows the switcher settings above.', 'wp-loc' ),
+            ],
+            [
+                'title'       => __( 'Custom dropdown pattern', 'wp-loc' ),
+                'language'    => 'PHP',
+                'code'        => $custom_code,
+                'description' => __( 'Use this pattern when the theme renders the current language separately and prints the other languages in a nested list.', 'wp-loc' ),
+            ],
+            [
+                'title'       => __( 'Custom dropdown pattern for Twig', 'wp-loc' ),
+                'language'    => 'Twig',
+                'code'        => $twig_code,
+                'description' => __( 'Use this Timber/Twig version when the switcher is rendered from a Twig template.', 'wp-loc' ),
+            ],
+        ];
+
+        ?>
+        <div class="wp-loc-settings-section">
+            <h2><?php esc_html_e( 'Switcher usage', 'wp-loc' ); ?></h2>
+            <p class="description"><?php esc_html_e( 'Add one of these snippets to the theme template where the frontend language switcher should appear.', 'wp-loc' ); ?></p>
+
+            <div class="wp-loc-switcher-examples">
+                <?php foreach ( $examples as $example ) : ?>
+                    <article class="wp-loc-switcher-example">
+                        <div class="wp-loc-switcher-example__body">
+                            <div class="wp-loc-switcher-example__content">
+                                <span class="wp-loc-switcher-example__language"><?php echo esc_html( $example['language'] ); ?></span>
+                                <h3><?php echo esc_html( $example['title'] ); ?></h3>
+                                <p class="description"><?php echo esc_html( $example['description'] ); ?></p>
+                            </div>
+                            <pre class="wp-loc-switcher-example__code"><code><?php echo esc_html( $example['code'] ); ?></code></pre>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php
+    }
+
     /**
      * Filter translatable post types based on saved settings
      */
@@ -787,6 +901,10 @@ class WP_LOC_Admin_Settings {
 
                 <?php submit_button( __( 'Save', 'wp-loc' ) ); ?>
             </form>
+
+            <?php if ( $current_tab === self::TAB_SWITCHER ) : ?>
+                <?php $this->render_switcher_usage_examples(); ?>
+            <?php endif; ?>
         </div>
         <?php
     }

@@ -247,9 +247,16 @@ $wp-loc-db-wizard-row-border: #f0f0f1;
     gap: 10px;
     padding: 10px 0;
 
+    &.is-default {
+      margin: 0 -8px;
+      padding: 10px 8px;
+      background: #f0f6fc;
+      border-left: 3px solid $wp-loc-db-wizard-blue;
+    }
+
     .wp-loc-db-wizard__language-source {
       display: grid;
-      grid-template-columns: minmax(96px, 1fr) auto auto auto;
+      grid-template-columns: minmax(96px, 1fr) auto auto auto auto;
       align-items: center;
       gap: 8px;
       min-width: 0;
@@ -303,6 +310,21 @@ $wp-loc-db-wizard-row-border: #f0f0f1;
       border-color: #dba617;
       background: #fcf9e8;
       color: #8a6500;
+    }
+
+    .wp-loc-db-wizard__default-language {
+      display: inline-flex;
+      align-items: center;
+      min-height: 18px;
+      padding: 0 7px;
+      border: 1px solid #72aee6;
+      border-radius: 3px;
+      background: #fff;
+      color: #0a4b78;
+      font-size: 11px;
+      font-style: normal;
+      font-weight: 700;
+      white-space: nowrap;
     }
   }
 
