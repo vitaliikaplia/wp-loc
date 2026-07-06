@@ -17,6 +17,8 @@ class WP_LOC_Admin_Settings {
     const HIDE_CURRENT_LANGUAGE_OPTION_KEY = 'wp_loc_hide_current_language_switcher';
     const HIDE_UNTRANSLATED_LANGUAGES_OPTION_KEY = 'wp_loc_hide_untranslated_languages_switcher';
     const FALLBACK_UNTRANSLATED_TO_HOME_OPTION_KEY = 'wp_loc_fallback_untranslated_switcher_to_home';
+    const APPEND_SWITCHER_TO_MENU_OPTION_KEY = 'wp_loc_append_switcher_to_menu';
+    const SWITCHER_MENU_LOCATION_OPTION_KEY = 'wp_loc_switcher_menu_location';
     const ENABLE_ACF_COMPAT_OPTION_KEY = 'wp_loc_enable_acf_compat';
     const ENABLE_YOAST_COMPAT_OPTION_KEY = 'wp_loc_enable_yoast_compat';
     const ENABLE_YOAST_SITEMAP_ALTERNATES_OPTION_KEY = 'wp_loc_enable_yoast_sitemap_alternates';
@@ -393,6 +395,16 @@ TWIG;
         return (bool) get_option( self::FALLBACK_UNTRANSLATED_TO_HOME_OPTION_KEY, true );
     }
 
+    public static function should_append_switcher_to_menu(): bool {
+        return (bool) get_option( self::APPEND_SWITCHER_TO_MENU_OPTION_KEY, false );
+    }
+
+    public static function get_switcher_menu_location(): string {
+        $location = sanitize_key( (string) get_option( self::SWITCHER_MENU_LOCATION_OPTION_KEY, 'all' ) );
+
+        return $location ?: 'all';
+    }
+
     public static function should_auto_create_post_translations(): bool {
         return (bool) get_option( self::AUTO_CREATE_POST_TRANSLATIONS_OPTION_KEY, true );
     }
@@ -534,12 +546,16 @@ TWIG;
             $hide_current = isset( $_POST['wp_loc_hide_current_language_switcher'] ) ? 1 : 0;
             $hide_untranslated = isset( $_POST['wp_loc_hide_untranslated_languages_switcher'] ) ? 1 : 0;
             $fallback_untranslated_to_home = isset( $_POST['wp_loc_fallback_untranslated_switcher_to_home'] ) ? 1 : 0;
+            $append_switcher_to_menu = isset( $_POST['wp_loc_append_switcher_to_menu'] ) ? 1 : 0;
+            $switcher_menu_location = isset( $_POST['wp_loc_switcher_menu_location'] ) ? sanitize_key( (string) $_POST['wp_loc_switcher_menu_location'] ) : 'all';
 
             update_option( self::SHOW_FLAGS_OPTION_KEY, $show_flags );
             update_option( self::SHOW_NAMES_OPTION_KEY, $show_names );
             update_option( self::HIDE_CURRENT_LANGUAGE_OPTION_KEY, $hide_current );
             update_option( self::HIDE_UNTRANSLATED_LANGUAGES_OPTION_KEY, $hide_untranslated );
             update_option( self::FALLBACK_UNTRANSLATED_TO_HOME_OPTION_KEY, $fallback_untranslated_to_home );
+            update_option( self::APPEND_SWITCHER_TO_MENU_OPTION_KEY, $append_switcher_to_menu );
+            update_option( self::SWITCHER_MENU_LOCATION_OPTION_KEY, $switcher_menu_location ?: 'all' );
         } elseif ( $current_tab === self::TAB_INTEGRATIONS ) {
             $enable_acf_compat = isset( $_POST['wp_loc_enable_acf_compat'] ) ? 1 : 0;
             $enable_yoast_compat = isset( $_POST['wp_loc_enable_yoast_compat'] ) ? 1 : 0;
@@ -622,6 +638,8 @@ TWIG;
         $hide_current_language = self::hide_current_language_in_switcher();
         $hide_untranslated_languages = self::hide_untranslated_languages_in_switcher();
         $fallback_untranslated_to_home = self::fallback_untranslated_switcher_links_to_home();
+        $append_switcher_to_menu = self::should_append_switcher_to_menu();
+        $switcher_menu_location = self::get_switcher_menu_location();
         $enable_acf_compat = self::is_acf_compat_enabled();
         $enable_yoast_compat = self::is_yoast_compat_enabled();
         $enable_yoast_sitemap_alternates = self::is_yoast_sitemap_alternates_enabled();
@@ -643,6 +661,7 @@ TWIG;
         $openai_models = self::get_openai_models();
         $claude_models = self::get_claude_models();
         $gemini_models = self::get_gemini_models();
+        $menu_locations = get_registered_nav_menus();
 
         ?>
         <div class="wrap wp-loc-settings-page">
@@ -846,6 +865,33 @@ TWIG;
                                         </label>
                                     </fieldset>
                                     <p class="description"><?php esc_html_e( 'These options are especially helpful for projects that prefer a stricter switcher with fewer fallback links.', 'wp-loc' ); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><?php esc_html_e( 'Menu Placement', 'wp-loc' ); ?></th>
+                                <td>
+                                    <fieldset class="wp-loc-settings-stack">
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_append_switcher_to_menu"
+                                                   value="1"
+                                                   <?php checked( $append_switcher_to_menu ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Append the language switcher as the last items of a navigation menu', 'wp-loc' ); ?></span>
+                                        </label>
+                                        <label class="wp-loc-settings-label">
+                                            <span><?php esc_html_e( 'Menu location', 'wp-loc' ); ?></span>
+                                            <select name="wp_loc_switcher_menu_location">
+                                                <option value="all" <?php selected( $switcher_menu_location, 'all' ); ?>><?php esc_html_e( 'All menu locations', 'wp-loc' ); ?></option>
+                                                <?php foreach ( $menu_locations as $location => $label ) : ?>
+                                                    <option value="<?php echo esc_attr( $location ); ?>" <?php selected( $switcher_menu_location, $location ); ?>>
+                                                        <?php echo esc_html( $label . ' (' . $location . ')' ); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </label>
+                                    </fieldset>
+                                    <p class="description"><?php esc_html_e( 'When enabled, WP-LOC injects language links into wp_nav_menu output without creating real menu items in the database.', 'wp-loc' ); ?></p>
                                 </td>
                             </tr>
                         </table>
