@@ -8,6 +8,135 @@
     'use strict';
 
     const i18n = wpLocAdmin && wpLocAdmin.i18n ? wpLocAdmin.i18n : {};
+    const normalizeChromeAiLanguage = function(lang) {
+        const value = String(lang || '').trim().replace(/_/g, '-').toLowerCase();
+        const map = {
+            ua: 'uk',
+            uk: 'uk',
+            en: 'en',
+            ru: 'ru'
+        };
+
+        return map[value] || value.split('-')[0] || value;
+    };
+    const translateWithChromeAI = async function(content, sourceLang, targetLang) {
+        if (!window.isSecureContext) {
+            throw new Error(i18n.chromeAiUnavailable || 'Chrome AI Translate requires a secure context. Open this admin page over HTTPS or localhost in desktop Chrome 138+.');
+        }
+
+        const sourceLanguage = normalizeChromeAiLanguage(sourceLang || (wpLocAdmin && wpLocAdmin.adminLang ? wpLocAdmin.adminLang : ''));
+        const targetLanguage = normalizeChromeAiLanguage(targetLang);
+
+        if ('Translator' in self) {
+            const availability = await self.Translator.availability({
+                sourceLanguage: sourceLanguage,
+                targetLanguage: targetLanguage
+            });
+
+            if (availability === 'unavailable') {
+                throw new Error(i18n.chromeAiUnavailable || 'Chrome AI Translate is not available for this language pair.');
+            }
+
+            if (availability === 'downloadable' || availability === 'downloading') {
+                throw new Error(i18n.chromeAiDownloading || 'Chrome is downloading the local translation model. Please try again when it is ready.');
+            }
+
+            const translator = await self.Translator.create({
+                sourceLanguage: sourceLanguage,
+                targetLanguage: targetLanguage
+            });
+
+            try {
+                return await translator.translate(String(content || ''));
+            } finally {
+                if (translator && typeof translator.destroy === 'function') {
+                    translator.destroy();
+                }
+            }
+        }
+
+        if (self.translation && typeof self.translation.canTranslate === 'function' && typeof self.translation.createTranslator === 'function') {
+            const canTranslate = await self.translation.canTranslate({
+                sourceLanguage: sourceLanguage,
+                targetLanguage: targetLanguage
+            });
+
+            if (canTranslate === 'no') {
+                throw new Error(i18n.chromeAiUnavailable || 'Chrome AI Translate is not available for this language pair.');
+            }
+
+            if (canTranslate === 'after-download') {
+                throw new Error(i18n.chromeAiDownloading || 'Chrome is downloading the local translation model. Please try again when it is ready.');
+            }
+
+            const translator = await self.translation.createTranslator({
+                sourceLanguage: sourceLanguage,
+                targetLanguage: targetLanguage
+            });
+
+            return await translator.translate(String(content || ''));
+        }
+
+        throw new Error(i18n.chromeAiUnavailable || 'Chrome AI Translate is not available. Use desktop Chrome 138+ over HTTPS or localhost, then check chrome://on-device-translation-internals/.');
+    };
+    const translateTextPreservingWhitespace = async function(text, sourceLang, targetLang) {
+        const value = String(text || '');
+        const trimmed = value.trim();
+
+        if (!trimmed) {
+            return value;
+        }
+
+        const leading = value.match(/^\s*/)[0] || '';
+        const trailing = value.match(/\s*$/)[0] || '';
+        const translated = await translateWithChromeAI(trimmed, sourceLang, targetLang);
+
+        return leading + String(translated || '').trim() + trailing;
+    };
+    const translateHtmlWithChromeAI = async function(content, sourceLang, targetLang) {
+        const value = String(content || '');
+
+        if (!value.trim()) {
+            return value;
+        }
+
+        if (!/<[a-z][\s\S]*>/i.test(value)) {
+            return translateWithChromeAI(value, sourceLang, targetLang);
+        }
+
+        const template = document.createElement('template');
+        template.innerHTML = value;
+
+        const skippedTags = ['SCRIPT', 'STYLE', 'CODE', 'PRE', 'TEXTAREA', 'INPUT', 'SELECT', 'OPTION', 'NOSCRIPT'];
+        const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT, {
+            acceptNode: function(node) {
+                if (!node.nodeValue || !node.nodeValue.trim()) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+
+                let parent = node.parentElement;
+                while (parent) {
+                    if (skippedTags.includes(parent.tagName)) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    parent = parent.parentElement;
+                }
+
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        });
+        const nodes = [];
+
+        while (walker.nextNode()) {
+            nodes.push(walker.currentNode);
+        }
+
+        for (const node of nodes) {
+            node.nodeValue = await translateTextPreservingWhitespace(node.nodeValue, sourceLang, targetLang);
+        }
+
+        return template.innerHTML;
+    };
 
     // Languages page — sortable table rows with auto-save
     if ($('.wp-loc-languages-table').length) {
@@ -590,6 +719,8 @@
         const feedback = tool.querySelector('.wp-loc-ai-translate-feedback');
         const targetSelect = tool.querySelector('.wp-loc-ai-target-lang');
         const submitButton = tool.querySelector('.wp-loc-ai-translate-submit');
+        const queueButton = tool.querySelector('.wp-loc-chrome-ai-process-queue');
+        const queueCount = tool.querySelector('.wp-loc-chrome-ai-queue-count');
         const i18n = Object.assign({
             requestFailed: 'Request failed.',
             translateFailed: 'Translation failed.',
@@ -705,11 +836,24 @@
                 setBusy(true);
                 setFeedback(i18n.translating, 'success');
 
+                if (wpLocAdmin.aiEngine === 'chrome_ai') {
+                    translateHtmlWithChromeAI(content, wpLocAdmin.adminLang, targetLang).then(function(translated) {
+                        setEditorContent(translated);
+                        setFeedback(i18n.translationInserted, 'success');
+                    }).catch(function(error) {
+                        setFeedback(error && error.message ? error.message : i18n.translateFailed, 'error');
+                    }).finally(function() {
+                        setBusy(false);
+                    });
+                    return;
+                }
+
                 $.post(wpLocAdmin.ajaxUrl, {
                     action: 'wp_loc_ai_translate',
                     nonce: wpLocAdmin.nonce,
                     content: content,
-                    target_lang: targetLang
+                    target_lang: targetLang,
+                    provider: wpLocAdmin.aiEngine || ''
                 }).done(function(response) {
                     if (!response || !response.success || !response.data || !response.data.content) {
                         const message = response && response.data && response.data.message ? response.data.message : i18n.translateFailed;
@@ -724,6 +868,97 @@
                 }).always(function() {
                     setBusy(false);
                 });
+            });
+        }
+
+        const updateQueueCount = function(counts) {
+            if (!counts) {
+                return;
+            }
+
+            if (queueCount) {
+                queueCount.textContent = (counts.pending || 0) + ' pending, ' + (counts.completed || 0) + ' completed.';
+            }
+
+            if (queueButton) {
+                queueButton.disabled = busy || !counts.pending;
+            }
+        };
+
+        const requestNextQueueItem = function() {
+            return $.post(wpLocAdmin.ajaxUrl, {
+                action: 'wp_loc_chrome_ai_queue_next',
+                nonce: wpLocAdmin.nonce
+            });
+        };
+
+        const saveQueueItem = function(item, fields) {
+            return $.post(wpLocAdmin.ajaxUrl, {
+                action: 'wp_loc_chrome_ai_queue_save',
+                nonce: wpLocAdmin.nonce,
+                item_id: item.id,
+                target_id: item.targetId,
+                fields: fields
+            });
+        };
+
+        const processQueue = async function() {
+            setBusy(true);
+            setFeedback(i18n.translating, 'success');
+
+            try {
+                while (true) {
+                    const nextResponse = await requestNextQueueItem();
+
+                    if (!nextResponse || !nextResponse.success) {
+                        const message = nextResponse && nextResponse.data && nextResponse.data.message ? nextResponse.data.message : i18n.requestFailed;
+                        throw new Error(message);
+                    }
+
+                    updateQueueCount(nextResponse.data.counts);
+
+                    if (!nextResponse.data.item) {
+                        setFeedback(nextResponse.data.message || 'Chrome AI queue is empty.', 'success');
+                        break;
+                    }
+
+                    const item = nextResponse.data.item;
+                    const translatedFields = {};
+
+                    for (const fieldName of Object.keys(item.fields || {})) {
+                        const value = item.fields[fieldName] || '';
+                        if (!value.trim()) {
+                            translatedFields[fieldName] = value;
+                        } else if (fieldName === 'content') {
+                            translatedFields[fieldName] = await translateHtmlWithChromeAI(value, item.sourceLang, item.targetLang);
+                        } else {
+                            translatedFields[fieldName] = await translateWithChromeAI(value, item.sourceLang, item.targetLang);
+                        }
+                    }
+
+                    const saveResponse = await saveQueueItem(item, translatedFields);
+
+                    if (!saveResponse || !saveResponse.success) {
+                        const message = saveResponse && saveResponse.data && saveResponse.data.message ? saveResponse.data.message : i18n.requestFailed;
+                        throw new Error(message);
+                    }
+
+                    updateQueueCount(saveResponse.data.counts);
+                }
+            } catch (error) {
+                setFeedback(error && error.message ? error.message : i18n.requestFailed, 'error');
+            } finally {
+                setBusy(false);
+            }
+        };
+
+        if (queueButton) {
+            queueButton.addEventListener('click', function(event) {
+                event.preventDefault();
+
+                if (!busy) {
+                    processQueue();
+                }
             });
         }
     })();
@@ -1313,6 +1548,45 @@
                 } else if (currentSource === 'list') {
                     payload.current_post_only = '1';
                 }
+            }
+
+            if (wpLocAdmin.aiEngine === 'chrome_ai' && currentEntityType === 'post') {
+                translateWithChromeAI(currentTitle, wpLocAdmin.adminLang, targetLang).then(function(translatedTitle) {
+                    payload.translated_title = translatedTitle;
+
+                    return $.post(wpLocAdmin.ajaxUrl, {
+                        ...payload
+                    });
+                }).then(function(response) {
+                    if (!response || !response.success) {
+                        const message = response && response.data && response.data.message ? response.data.message : i18n.requestFailed;
+                        setStatus(message, 'error');
+                        return;
+                    }
+
+                    setStatus(response.data.message || i18n.titleTranslateSuccess, 'success');
+                    if (currentSource !== 'list' && currentSource === 'gutenberg' && typeof wp !== 'undefined' && wp.data && wp.data.dispatch) {
+                        const postUpdate = {
+                            title: response.data.new_title || currentTitle
+                        };
+
+                        if (response.data.slug_updated && response.data.new_slug) {
+                            postUpdate.slug = response.data.new_slug;
+                        }
+
+                        wp.data.dispatch('core/editor').editPost(postUpdate);
+                    } else if (currentSource !== 'list' && currentSource === 'classic') {
+                        const titleInput = document.getElementById('title');
+                        if (titleInput) {
+                            titleInput.value = response.data.new_title || currentTitle;
+                        }
+                    }
+                }).catch(function(error) {
+                    setStatus(error && error.message ? error.message : i18n.requestFailed, 'error');
+                }).finally(function() {
+                    modal.classList.remove('is-loading');
+                });
+                return;
             }
 
             $.post(wpLocAdmin.ajaxUrl, {

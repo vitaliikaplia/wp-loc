@@ -115,6 +115,7 @@ class WP_LOC_Admin {
             'adminLang'     => $admin_lang,
             'adminLangName' => WP_LOC_Languages::get_display_name( $admin_lang ),
             'adminLangFlag' => WP_LOC_Languages::get_flag_url( $admin_locale ),
+            'aiEngine'      => WP_LOC_Admin_Settings::get_ai_engine(),
             'gutenbergLanguages' => $gutenberg_languages,
             'gutenbergTitleTranslate' => $gutenberg_title_translate,
             'classicTitleTranslate' => $classic_title_translate,
@@ -124,6 +125,8 @@ class WP_LOC_Admin {
             'i18n' => [
                 'requestFailed' => __( 'Request failed.', 'wp-loc' ),
                 'translating' => __( 'Translating...', 'wp-loc' ),
+                'chromeAiUnavailable' => __( 'Chrome AI Translate is not available. Use desktop Chrome 138+ over HTTPS or localhost, then check chrome://on-device-translation-internals/.', 'wp-loc' ),
+                'chromeAiDownloading' => __( 'Chrome is downloading the local translation model. Please try again when it is ready.', 'wp-loc' ),
                 'previewRefreshed' => __( 'Preview refreshed.', 'wp-loc' ),
                 'menuSyncComplete' => __( 'Menu sync complete.', 'wp-loc' ),
                 'testing' => __( 'Testing...', 'wp-loc' ),
@@ -935,7 +938,9 @@ class WP_LOC_Admin {
             wp_send_json_error( [ 'message' => __( 'Translation post was not found for the selected language.', 'wp-loc' ) ], 404 );
         }
 
-        $translated_title = WP_LOC_AI::translate_content( $source_title, WP_LOC_AI::get_target_language_name( $target_lang ) );
+        $translated_title = isset( $_POST['translated_title'] )
+            ? trim( wp_strip_all_tags( wp_unslash( (string) $_POST['translated_title'] ) ) )
+            : WP_LOC_AI::translate_content( $source_title, WP_LOC_AI::get_target_language_name( $target_lang ) );
         $translated_title = trim( wp_strip_all_tags( $translated_title ) );
 
         if ( $translated_title === '' ) {

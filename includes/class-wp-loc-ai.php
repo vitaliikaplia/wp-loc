@@ -18,6 +18,7 @@ class WP_LOC_AI {
         $response = match ( $provider ) {
             'claude' => self::get_claude_response( $prompt, null, $api_key, $model ),
             'gemini' => self::get_gemini_response( $prompt, null, $api_key, $model ),
+            'chrome_ai' => new WP_Error( 'wp_loc_ai_chrome_browser_only', __( 'Chrome AI Translate runs in Chrome and cannot be tested from PHP.', 'wp-loc' ) ),
             default  => self::get_openai_response( $prompt, null, $api_key, $model ),
         };
 
@@ -59,24 +60,25 @@ class WP_LOC_AI {
         return WP_LOC_Languages::get_language_display_name( $locale );
     }
 
-    public static function get_response( string $prompt, ?string $system = null ) {
-        $engine = WP_LOC_Admin_Settings::get_ai_engine();
+    public static function get_response( string $prompt, ?string $system = null, ?string $provider = null ) {
+        $engine = $provider ? sanitize_key( $provider ) : WP_LOC_Admin_Settings::get_ai_engine();
 
         return match ( $engine ) {
             'claude' => self::get_claude_response( $prompt, $system ),
             'gemini' => self::get_gemini_response( $prompt, $system ),
+            'chrome_ai' => new WP_Error( 'wp_loc_ai_chrome_browser_only', __( 'Chrome AI Translate runs in Chrome. Use the browser queue processor or admin UI.', 'wp-loc' ) ),
             default  => self::get_openai_response( $prompt, $system ),
         };
     }
 
-    public static function translate_content( string $content, string $target_lang ): string {
+    public static function translate_content( string $content, string $target_lang, ?string $provider = null ): string {
         $prompt = sprintf(
             'Translate the following content into natural %1$s. The source may be a short CTA, menu label, button text, sentence, or HTML fragment. Always translate the text itself when possible, even if it is very short. Preserve all HTML formatting and structure exactly when it exists. Do not add explanations. Return only the translated result wrapped in <result></result>. Content: %2$s',
             $target_lang,
             $content
         );
 
-        $result = self::run_translation_prompt( $prompt );
+        $result = self::run_translation_prompt( $prompt, $provider );
 
         if ( self::should_retry_same_text_translation( $content, $result ) ) {
             $retry_prompt = sprintf(
@@ -85,7 +87,7 @@ class WP_LOC_AI {
                 $content
             );
 
-            $retry_result = self::run_translation_prompt( $retry_prompt );
+            $retry_result = self::run_translation_prompt( $retry_prompt, $provider );
 
             if ( $retry_result !== '' ) {
                 $result = $retry_result;
@@ -131,8 +133,8 @@ class WP_LOC_AI {
         return false;
     }
 
-    private static function run_translation_prompt( string $prompt ): string {
-        $response = self::get_response( $prompt );
+    private static function run_translation_prompt( string $prompt, ?string $provider = null ): string {
+        $response = self::get_response( $prompt, null, $provider );
 
         if ( is_wp_error( $response ) || ! is_string( $response ) ) {
             return '';

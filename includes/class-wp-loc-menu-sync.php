@@ -11,13 +11,17 @@ class WP_LOC_Menu_Sync {
     private const CONFIG_ACTION_WRITE_CURRENT = 'write-current-config';
     private const CONFIG_ACTION_WRITE_FROM_WPML = 'write-from-wpml-config';
     private const CONFIG_ACTION_DELETE_WPML = 'delete-wpml-config';
+    private const CHROME_QUEUE_ACTION_PREPARE = 'prepare-chrome-ai-queue';
 
     public function __construct() {
         add_action( 'admin_menu', [ $this, 'add_menu' ], 15 );
         add_action( 'admin_init', [ $this, 'handle_config_actions' ] );
+        add_action( 'admin_init', [ $this, 'handle_chrome_queue_actions' ] );
         add_action( 'wp_ajax_wp_loc_menu_sync_preview', [ $this, 'ajax_preview' ] );
         add_action( 'wp_ajax_wp_loc_menu_sync_apply', [ $this, 'ajax_apply' ] );
         add_action( 'wp_ajax_wp_loc_ai_translate', [ $this, 'ajax_ai_translate' ] );
+        add_action( 'wp_ajax_wp_loc_chrome_ai_queue_next', [ $this, 'ajax_chrome_ai_queue_next' ] );
+        add_action( 'wp_ajax_wp_loc_chrome_ai_queue_save', [ $this, 'ajax_chrome_ai_queue_save' ] );
     }
 
     public function add_menu(): void {
@@ -121,6 +125,108 @@ class WP_LOC_Menu_Sync {
         exit;
     }
 
+    public function handle_chrome_queue_actions(): void {
+        if ( ! $this->is_tools_page_request() || strtoupper( $_SERVER['REQUEST_METHOD'] ?? '' ) !== 'POST' ) {
+            return;
+        }
+
+        $action = isset( $_POST['wp_loc_chrome_queue_action'] ) ? sanitize_key( (string) $_POST['wp_loc_chrome_queue_action'] ) : '';
+
+        if ( $action !== self::CHROME_QUEUE_ACTION_PREPARE ) {
+            return;
+        }
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+
+        check_admin_referer( 'wp_loc_prepare_chrome_ai_queue', 'wp_loc_prepare_chrome_ai_queue_nonce' );
+
+        $source_lang = isset( $_POST['wp_loc_chrome_source_lang'] ) ? sanitize_key( (string) $_POST['wp_loc_chrome_source_lang'] ) : '';
+        $target_lang = isset( $_POST['wp_loc_chrome_target_lang'] ) ? sanitize_key( (string) $_POST['wp_loc_chrome_target_lang'] ) : '';
+        $post_type = isset( $_POST['wp_loc_chrome_post_type'] ) ? sanitize_key( (string) $_POST['wp_loc_chrome_post_type'] ) : 'post';
+        $limit = isset( $_POST['wp_loc_chrome_limit'] ) ? max( 1, min( 100, (int) $_POST['wp_loc_chrome_limit'] ) ) : 5;
+        $fields = isset( $_POST['wp_loc_chrome_fields'] ) && is_array( $_POST['wp_loc_chrome_fields'] )
+            ? array_map( 'sanitize_key', (array) $_POST['wp_loc_chrome_fields'] )
+            : [ 'title', 'content', 'excerpt' ];
+
+        $result = $this->prepare_chrome_ai_queue( $source_lang, $target_lang, $post_type, $limit, $fields );
+
+        $redirect_args = [
+            'page' => self::PAGE_SLUG,
+            'tab' => self::TAB_AI_TRANSLATE,
+            'wp_loc_chrome_prepared' => is_wp_error( $result ) ? 0 : (int) $result['queued'],
+        ];
+
+        if ( is_wp_error( $result ) ) {
+            $redirect_args['wp_loc_chrome_error'] = rawurlencode( $result->get_error_message() );
+        }
+
+        wp_safe_redirect( add_query_arg( $redirect_args, admin_url( 'admin.php' ) ) );
+        exit;
+    }
+
+    private function prepare_chrome_ai_queue( string $source_lang, string $target_lang, string $post_type, int $limit, array $fields ) {
+        $active_languages = WP_LOC_Languages::get_active_languages();
+
+        if ( ! $source_lang || ! isset( $active_languages[ $source_lang ] ) ) {
+            return new WP_Error( 'wp_loc_source_language_missing', __( 'Select a source language.', 'wp-loc' ) );
+        }
+
+        if ( ! $target_lang || ! isset( $active_languages[ $target_lang ] ) || $target_lang === $source_lang ) {
+            return new WP_Error( 'wp_loc_target_language_missing', __( 'Select a different target language.', 'wp-loc' ) );
+        }
+
+        if ( ! WP_LOC_Admin_Settings::is_translatable( $post_type ) ) {
+            return new WP_Error( 'wp_loc_post_type_not_translatable', __( 'Selected post type is not translatable.', 'wp-loc' ) );
+        }
+
+        $db = WP_LOC::instance()->db;
+        $element_type = WP_LOC_DB::post_element_type( $post_type );
+        $table = $db->get_table();
+        $db_lang = WP_LOC_DB::to_db_language_code( $source_lang ) ?: $source_lang;
+
+        global $wpdb;
+
+        $post_ids = $wpdb->get_col( $wpdb->prepare(
+            "SELECT p.ID
+             FROM {$wpdb->posts} p
+             INNER JOIN {$table} t ON p.ID = t.element_id AND t.element_type = %s
+             WHERE p.post_type = %s
+               AND p.post_status IN ('publish', 'draft', 'pending', 'private', 'future')
+               AND t.language_code = %s
+             ORDER BY p.post_date DESC
+             LIMIT %d",
+            $element_type,
+            $post_type,
+            $db_lang,
+            $limit
+        ) );
+
+        $queued = 0;
+
+        foreach ( array_map( 'intval', $post_ids ) as $post_id ) {
+            $result = WP_LOC::instance()->translation_service->translate_post(
+                $post_id,
+                $target_lang,
+                [
+                    'provider' => WP_LOC_Translation_Service::PROVIDER_CHROME_AI,
+                    'fields' => $fields,
+                    'source_lang' => $source_lang,
+                ]
+            );
+
+            if ( ! is_wp_error( $result ) && ! empty( $result['queued'] ) ) {
+                $queued++;
+            }
+        }
+
+        return [
+            'queued' => $queued,
+            'matched' => count( $post_ids ),
+        ];
+    }
+
     public function ajax_preview(): void {
         $this->assert_ajax_permissions();
 
@@ -162,7 +268,8 @@ class WP_LOC_Menu_Sync {
             wp_send_json_error( [ 'message' => __( 'Select a target language.', 'wp-loc' ) ], 400 );
         }
 
-        $translated = WP_LOC_AI::translate_content( $content, WP_LOC_AI::get_target_language_name( $target_lang ) );
+        $provider = isset( $_POST['provider'] ) ? sanitize_key( (string) $_POST['provider'] ) : WP_LOC_Admin_Settings::get_ai_engine();
+        $translated = WP_LOC_AI::translate_content( $content, WP_LOC_AI::get_target_language_name( $target_lang ), $provider );
 
         if ( $translated === '' ) {
             wp_send_json_error( [ 'message' => __( 'Translation failed.', 'wp-loc' ) ], 500 );
@@ -171,6 +278,61 @@ class WP_LOC_Menu_Sync {
         wp_send_json_success( [
             'content' => $translated,
             'message' => __( 'Translation inserted into the editor.', 'wp-loc' ),
+        ] );
+    }
+
+    public function ajax_chrome_ai_queue_next(): void {
+        $this->assert_ajax_permissions();
+
+        $item = WP_LOC_Translation_Service::get_next_chrome_ai_queue_item();
+
+        if ( ! $item ) {
+            wp_send_json_success( [
+                'item' => null,
+                'counts' => WP_LOC_Translation_Service::get_queue_counts(),
+                'message' => __( 'Chrome AI queue is empty.', 'wp-loc' ),
+            ] );
+        }
+
+        $payload = WP_LOC::instance()->translation_service->get_queue_item_payload( $item );
+
+        if ( empty( $payload ) ) {
+            WP_LOC_Translation_Service::mark_chrome_ai_queue_item_complete( (string) ( $item['id'] ?? '' ) );
+            wp_send_json_error( [ 'message' => __( 'Queue item source post was not found.', 'wp-loc' ) ], 404 );
+        }
+
+        wp_send_json_success( [
+            'item' => $payload,
+            'counts' => WP_LOC_Translation_Service::get_queue_counts(),
+        ] );
+    }
+
+    public function ajax_chrome_ai_queue_save(): void {
+        $this->assert_ajax_permissions();
+
+        $item_id = isset( $_POST['item_id'] ) ? sanitize_text_field( (string) $_POST['item_id'] ) : '';
+        $target_id = isset( $_POST['target_id'] ) ? (int) $_POST['target_id'] : 0;
+        $fields = isset( $_POST['fields'] ) && is_array( $_POST['fields'] ) ? wp_unslash( $_POST['fields'] ) : [];
+
+        if ( ! $item_id || ! $target_id || empty( $fields ) ) {
+            wp_send_json_error( [ 'message' => __( 'Missing translated queue payload.', 'wp-loc' ) ], 400 );
+        }
+
+        if ( ! current_user_can( 'edit_post', $target_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'You do not have permission to edit the translation post.', 'wp-loc' ) ], 403 );
+        }
+
+        $result = WP_LOC::instance()->translation_service->save_translated_fields( $target_id, (array) $fields );
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
+        }
+
+        WP_LOC_Translation_Service::mark_chrome_ai_queue_item_complete( $item_id );
+
+        wp_send_json_success( [
+            'message' => __( 'Chrome AI queue item saved.', 'wp-loc' ),
+            'counts' => WP_LOC_Translation_Service::get_queue_counts(),
         ] );
     }
 
@@ -340,10 +502,74 @@ class WP_LOC_Menu_Sync {
 
     private function get_ai_translate_html(): string {
         $active_languages = WP_LOC_Languages::get_active_languages();
+        $translatable_post_types = get_post_types( [ 'show_ui' => true ], 'objects' );
+        $configured_post_types = (array) get_option( WP_LOC_Admin_Settings::OPTION_KEY, [ 'post', 'page' ] );
 
         ob_start();
         ?>
         <div class="wp-loc-ai-translate-tool">
+            <?php if ( isset( $_GET['wp_loc_chrome_prepared'] ) ) : ?>
+                <div class="notice notice-success inline">
+                    <p><?php echo esc_html( sprintf( __( '%d Chrome AI translation jobs prepared.', 'wp-loc' ), (int) $_GET['wp_loc_chrome_prepared'] ) ); ?></p>
+                </div>
+            <?php endif; ?>
+
+            <?php if ( ! empty( $_GET['wp_loc_chrome_error'] ) ) : ?>
+                <div class="notice notice-error inline">
+                    <p><?php echo esc_html( sanitize_text_field( wp_unslash( (string) $_GET['wp_loc_chrome_error'] ) ) ); ?></p>
+                </div>
+            <?php endif; ?>
+
+            <div class="wp-loc-chrome-ai-prepare">
+                <h2><?php esc_html_e( 'Prepare Chrome AI translations', 'wp-loc' ); ?></h2>
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '&tab=' . self::TAB_AI_TRANSLATE ) ); ?>">
+                    <?php wp_nonce_field( 'wp_loc_prepare_chrome_ai_queue', 'wp_loc_prepare_chrome_ai_queue_nonce' ); ?>
+                    <input type="hidden" name="wp_loc_chrome_queue_action" value="<?php echo esc_attr( self::CHROME_QUEUE_ACTION_PREPARE ); ?>" />
+                    <div class="wp-loc-ai-translate-actions">
+                        <label>
+                            <span class="screen-reader-text"><?php esc_html_e( 'Source language', 'wp-loc' ); ?></span>
+                            <select name="wp_loc_chrome_source_lang">
+                                <?php foreach ( $active_languages as $lang => $data ) : ?>
+                                    <option value="<?php echo esc_attr( $lang ); ?>" <?php selected( $lang, WP_LOC_Languages::get_default_language() ); ?>>
+                                        <?php echo esc_html( sprintf( __( 'From: %s', 'wp-loc' ), WP_LOC_Languages::get_display_name( $lang ) ) ); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>
+                            <span class="screen-reader-text"><?php esc_html_e( 'Target language', 'wp-loc' ); ?></span>
+                            <select name="wp_loc_chrome_target_lang">
+                                <?php foreach ( $active_languages as $lang => $data ) : ?>
+                                    <option value="<?php echo esc_attr( $lang ); ?>">
+                                        <?php echo esc_html( sprintf( __( 'To: %s', 'wp-loc' ), WP_LOC_Languages::get_display_name( $lang ) ) ); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>
+                            <span class="screen-reader-text"><?php esc_html_e( 'Post type', 'wp-loc' ); ?></span>
+                            <select name="wp_loc_chrome_post_type">
+                                <?php foreach ( $translatable_post_types as $type => $object ) : ?>
+                                    <?php if ( ! in_array( $type, $configured_post_types, true ) ) continue; ?>
+                                    <option value="<?php echo esc_attr( $type ); ?>"><?php echo esc_html( $object->labels->name . ' (' . $type . ')' ); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>
+                            <span><?php esc_html_e( 'Limit', 'wp-loc' ); ?></span>
+                            <input type="number" name="wp_loc_chrome_limit" value="5" min="1" max="100" class="small-text" />
+                        </label>
+                        <button type="submit" class="button button-secondary"><?php esc_html_e( 'Prepare queue', 'wp-loc' ); ?></button>
+                    </div>
+                    <fieldset class="wp-loc-ai-translate-actions">
+                        <label><input type="checkbox" name="wp_loc_chrome_fields[]" value="title" checked /> <?php esc_html_e( 'Title', 'wp-loc' ); ?></label>
+                        <label><input type="checkbox" name="wp_loc_chrome_fields[]" value="content" checked /> <?php esc_html_e( 'Content', 'wp-loc' ); ?></label>
+                        <label><input type="checkbox" name="wp_loc_chrome_fields[]" value="excerpt" checked /> <?php esc_html_e( 'Excerpt', 'wp-loc' ); ?></label>
+                    </fieldset>
+                    <p class="description"><?php esc_html_e( 'This creates missing translation drafts, copies content and media, and queues the selected fields for local Chrome AI processing.', 'wp-loc' ); ?></p>
+                </form>
+            </div>
+
             <div class="wp-loc-ai-translate-editor">
                 <?php
                 wp_editor(
@@ -371,6 +597,22 @@ class WP_LOC_Menu_Sync {
             </div>
 
             <div class="wp-loc-menu-sync-feedback wp-loc-ai-translate-feedback" aria-live="polite"></div>
+
+            <?php $queue_counts = WP_LOC_Translation_Service::get_queue_counts(); ?>
+            <div class="wp-loc-ai-translate-actions wp-loc-chrome-ai-queue">
+                <button type="button" class="button wp-loc-chrome-ai-process-queue" <?php disabled( $queue_counts['pending'] === 0 ); ?>>
+                    <?php esc_html_e( 'Process Chrome AI queue', 'wp-loc' ); ?>
+                </button>
+                <span class="description wp-loc-chrome-ai-queue-count">
+                    <?php
+                    echo esc_html( sprintf(
+                        __( '%1$d pending, %2$d completed.', 'wp-loc' ),
+                        (int) $queue_counts['pending'],
+                        (int) $queue_counts['completed']
+                    ) );
+                    ?>
+                </span>
+            </div>
         </div>
         <?php
 

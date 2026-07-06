@@ -431,7 +431,7 @@ TWIG;
 
     public static function get_ai_engine(): string {
         $engine = (string) get_option( self::AI_ENGINE_OPTION_KEY, 'openai' );
-        $allowed = [ 'openai', 'claude', 'gemini' ];
+        $allowed = [ 'openai', 'claude', 'gemini', 'chrome_ai' ];
 
         return in_array( $engine, $allowed, true ) ? $engine : 'openai';
     }
@@ -550,7 +550,7 @@ TWIG;
             update_option( self::ENABLE_YOAST_SITEMAP_ALTERNATES_OPTION_KEY, $enable_yoast_sitemap_alternates );
         } elseif ( $current_tab === self::TAB_AI ) {
             $ai_engine = isset( $_POST['wp_loc_ai_engine'] ) ? sanitize_key( (string) $_POST['wp_loc_ai_engine'] ) : 'openai';
-            if ( ! in_array( $ai_engine, [ 'openai', 'claude', 'gemini' ], true ) ) {
+            if ( ! in_array( $ai_engine, [ 'openai', 'claude', 'gemini', 'chrome_ai' ], true ) ) {
                 $ai_engine = 'openai';
             }
 
@@ -638,6 +638,7 @@ TWIG;
             'openai' => __( 'OpenAI', 'wp-loc' ),
             'claude' => __( 'Claude', 'wp-loc' ),
             'gemini' => __( 'Gemini', 'wp-loc' ),
+            'chrome_ai' => __( 'Chrome AI Translate (local browser)', 'wp-loc' ),
         ];
         $openai_models = self::get_openai_models();
         $claude_models = self::get_claude_models();
@@ -908,6 +909,7 @@ TWIG;
                                         <?php endforeach; ?>
                                     </select>
                                     <p class="description"><?php esc_html_e( 'Select which AI engine should be used for automatic translation.', 'wp-loc' ); ?></p>
+                                    <p class="description"><?php esc_html_e( 'Chrome AI Translate runs locally in supported desktop Chrome browsers. WP-CLI can prepare jobs for it, but the actual translation must be processed in Chrome.', 'wp-loc' ); ?></p>
                                 </td>
                             </tr>
                             <tr>
@@ -995,8 +997,15 @@ TWIG;
         $api_key = isset( $_POST['api_key'] ) ? sanitize_text_field( trim( (string) $_POST['api_key'] ) ) : '';
         $model = isset( $_POST['model'] ) ? sanitize_text_field( trim( (string) $_POST['model'] ) ) : '';
 
-        if ( ! in_array( $provider, [ 'openai', 'claude', 'gemini' ], true ) ) {
+        if ( ! in_array( $provider, [ 'openai', 'claude', 'gemini', 'chrome_ai' ], true ) ) {
             wp_send_json_error( [ 'message' => __( 'Unknown AI provider.', 'wp-loc' ) ], 400 );
+        }
+
+        if ( $provider === 'chrome_ai' ) {
+            wp_send_json_success( [
+                'provider' => $provider,
+                'message' => __( 'Chrome AI Translate is tested in the browser when you run a translation.', 'wp-loc' ),
+            ] );
         }
 
         $result = WP_LOC_AI::test_provider( $provider, $api_key, $model );
