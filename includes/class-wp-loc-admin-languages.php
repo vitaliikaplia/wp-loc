@@ -10,6 +10,7 @@ class WP_LOC_Admin_Languages {
 
     public function __construct() {
         add_action( 'admin_menu', [ $this, 'add_menu' ] );
+        add_action( 'admin_init', [ $this, 'handle_add_language' ] );
         add_action( 'admin_init', [ $this, 'handle_save' ] );
         add_action( 'admin_init', [ $this, 'handle_delete' ] );
 
@@ -83,6 +84,18 @@ class WP_LOC_Admin_Languages {
             echo '<div class="notice notice-warning is-dismissible"><p>' . sprintf( esc_html__( 'Language "%s" deleted.', 'wp-loc' ), esc_html( $_GET['deleted'] ) ) . '</p></div>';
         }
 
+        if ( ! empty( $_GET['added'] ) ) {
+            echo '<div class="notice notice-success is-dismissible"><p>' . sprintf( esc_html__( 'Language "%s" added.', 'wp-loc' ), esc_html( $_GET['added'] ) ) . '</p></div>';
+        }
+
+        if ( ! empty( $_GET['wp_loc_language_error'] ) ) {
+            echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( sanitize_text_field( wp_unslash( (string) $_GET['wp_loc_language_error'] ) ) ) . '</p></div>';
+        }
+
+        if ( self::is_language_installer_enabled() ) {
+            $this->render_add_language_form();
+        }
+
         echo '<div class="wp-loc-menu-sync-summary wp-loc-languages-summary">';
         echo '<div class="wp-loc-menu-sync-summary-card">';
         echo '<span class="wp-loc-menu-sync-summary-value">' . esc_html( (string) count( $languages ) ) . '</span>';
@@ -112,6 +125,180 @@ class WP_LOC_Admin_Languages {
         echo '</form>';
 
         echo '</div>';
+    }
+
+    public function handle_add_language(): void {
+        if ( $_SERVER['REQUEST_METHOD'] !== 'POST' || ( $_POST['wp_loc_language_action'] ?? '' ) !== 'add_language' ) {
+            return;
+        }
+
+        if ( ! self::is_language_installer_enabled() ) {
+            wp_die( esc_html__( 'Language installer is disabled for this site.', 'wp-loc' ) );
+        }
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'You do not have permission to add languages.', 'wp-loc' ) );
+        }
+
+        if ( ! check_admin_referer( 'wp_loc_add_language', '_wp_loc_add_language_nonce' ) ) {
+            wp_die( 'Security check failed.' );
+        }
+
+        $locale = isset( $_POST['wp_loc_new_language'] ) ? sanitize_text_field( (string) $_POST['wp_loc_new_language'] ) : '';
+
+        if ( $locale === '' ) {
+            $this->redirect_language_error( __( 'Select a language to add.', 'wp-loc' ) );
+        }
+
+        $languages = WP_LOC_Languages::get_languages();
+
+        foreach ( $languages as $language ) {
+            if ( ( $language['locale'] ?? '' ) === $locale ) {
+                $this->redirect_language_error( __( 'This language is already configured.', 'wp-loc' ) );
+            }
+        }
+
+        if ( ! in_array( $locale, WP_LOC_Languages::get_installed_locales(), true ) ) {
+            $installed = $this->install_language_pack( $locale );
+
+            if ( is_wp_error( $installed ) ) {
+                $this->redirect_language_error( $installed->get_error_message() );
+            }
+        }
+
+        $slug = $this->get_unique_language_slug( WP_LOC_Languages::locale_to_slug( $locale ), $languages );
+
+        $languages[ $slug ] = [
+            'locale'       => $locale,
+            'enabled'      => true,
+            'display_name' => WP_LOC_Languages::get_language_display_name( $locale ),
+            'wpml_code'    => WP_LOC_Language_Registry::wpml_code_from_locale( $locale ),
+        ];
+
+        update_option( 'wp_loc_languages', $languages );
+        update_option( 'wp_loc_flush_rewrite_rules', true );
+        WP_LOC_Languages::flush();
+
+        wp_safe_redirect( add_query_arg( 'added', rawurlencode( $locale ), admin_url( 'admin.php?page=wp-loc' ) ) );
+        exit;
+    }
+
+    private static function is_language_installer_enabled(): bool {
+        $enabled = defined( 'WP_LOC_ENABLE_LANGUAGE_INSTALLER' )
+            ? (bool) WP_LOC_ENABLE_LANGUAGE_INSTALLER
+            : true;
+
+        return (bool) apply_filters( 'wp_loc_enable_language_installer', $enabled );
+    }
+
+    private function render_add_language_form(): void {
+        $languages = $this->get_addable_languages();
+
+        echo '<div class="wp-loc-languages-card wp-loc-add-language-card">';
+        echo '<h2>' . esc_html__( 'Add language', 'wp-loc' ) . '</h2>';
+
+        if ( empty( $languages ) ) {
+            echo '<p class="description">' . esc_html__( 'All installed and available WordPress languages are already configured.', 'wp-loc' ) . '</p>';
+            echo '</div>';
+            return;
+        }
+
+        echo '<form method="post" action="' . esc_url( admin_url( 'admin.php?page=wp-loc' ) ) . '" class="wp-loc-add-language-form">';
+        wp_nonce_field( 'wp_loc_add_language', '_wp_loc_add_language_nonce' );
+        echo '<input type="hidden" name="wp_loc_language_action" value="add_language" />';
+        echo '<label for="wp-loc-new-language" class="screen-reader-text">' . esc_html__( 'Language', 'wp-loc' ) . '</label>';
+        echo '<select id="wp-loc-new-language" name="wp_loc_new_language">';
+
+        foreach ( $languages as $locale => $label ) {
+            echo '<option value="' . esc_attr( $locale ) . '">' . esc_html( $label ) . '</option>';
+        }
+
+        echo '</select> ';
+        submit_button( __( 'Add language', 'wp-loc' ), 'secondary', 'submit', false );
+        echo '<p class="description">' . esc_html__( 'This installs the WordPress language pack if needed and adds the language to WP-LOC without changing the site default language.', 'wp-loc' ) . '</p>';
+        echo '</form>';
+        echo '</div>';
+    }
+
+    private function get_addable_languages(): array {
+        $configured_locales = array_map(
+            static fn( $language ) => (string) ( $language['locale'] ?? '' ),
+            WP_LOC_Languages::get_languages()
+        );
+
+        $languages = [];
+
+        foreach ( WP_LOC_Languages::get_installed_locales() as $locale ) {
+            if ( in_array( $locale, $configured_locales, true ) ) {
+                continue;
+            }
+
+            $languages[ $locale ] = sprintf(
+                '%s (%s)',
+                WP_LOC_Languages::get_language_display_name( $locale ),
+                $locale
+            );
+        }
+
+        if ( ! function_exists( 'wp_get_available_translations' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/translation-install.php';
+        }
+
+        foreach ( wp_get_available_translations() as $locale => $translation ) {
+            if ( in_array( $locale, $configured_locales, true ) || isset( $languages[ $locale ] ) ) {
+                continue;
+            }
+
+            $native = isset( $translation['native_name'] ) ? (string) $translation['native_name'] : WP_LOC_Languages::get_language_display_name( $locale );
+            $english = isset( $translation['english_name'] ) ? (string) $translation['english_name'] : '';
+            $languages[ $locale ] = $english && $english !== $native
+                ? sprintf( '%1$s / %2$s (%3$s)', $native, $english, $locale )
+                : sprintf( '%1$s (%2$s)', $native, $locale );
+        }
+
+        natcasesort( $languages );
+
+        return $languages;
+    }
+
+    private function install_language_pack( string $locale ) {
+        if ( $locale === 'en_US' ) {
+            return true;
+        }
+
+        if ( ! function_exists( 'wp_download_language_pack' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/translation-install.php';
+        }
+
+        $result = wp_download_language_pack( $locale );
+
+        if ( is_wp_error( $result ) ) {
+            return $result;
+        }
+
+        if ( ! $result ) {
+            return new WP_Error( 'wp_loc_language_install_failed', __( 'The language pack could not be installed.', 'wp-loc' ) );
+        }
+
+        return true;
+    }
+
+    private function get_unique_language_slug( string $slug, array $languages ): string {
+        $base = sanitize_title( $slug ) ?: 'lang';
+        $slug = $base;
+        $index = 2;
+
+        while ( isset( $languages[ $slug ] ) ) {
+            $slug = $base . '-' . $index;
+            $index++;
+        }
+
+        return $slug;
+    }
+
+    private function redirect_language_error( string $message ): void {
+        wp_safe_redirect( add_query_arg( 'wp_loc_language_error', rawurlencode( $message ), admin_url( 'admin.php?page=wp-loc' ) ) );
+        exit;
     }
 
     public function handle_save(): void {

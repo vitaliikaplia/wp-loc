@@ -89,6 +89,10 @@ class WP_LOC_Languages {
                     ? WP_LOC_Language_Registry::wpml_code_from_locale( (string) ( $language['locale'] ?? $slug ) )
                     : ( $slug === 'ua' ? 'uk' : sanitize_key( (string) $slug ) );
             }
+
+            if ( is_array( $language ) && empty( $language['display_name'] ) ) {
+                $language['display_name'] = self::get_language_display_name( (string) ( $language['locale'] ?? $slug ) );
+            }
         }
         unset( $language );
 
@@ -313,12 +317,16 @@ class WP_LOC_Languages {
 
         if ( ! isset( $langs[ $slug ] ) ) {
             $langs[ $slug ] = [
-                'locale'    => $new ?: 'en_US',
-                'enabled'   => true,
-                'wpml_code' => class_exists( 'WP_LOC_Language_Registry' ) ? WP_LOC_Language_Registry::wpml_code_from_locale( $new ?: 'en_US' ) : $slug,
+                'locale'       => $new ?: 'en_US',
+                'enabled'      => true,
+                'display_name' => self::get_language_display_name( $new ?: 'en_US' ),
+                'wpml_code'    => class_exists( 'WP_LOC_Language_Registry' ) ? WP_LOC_Language_Registry::wpml_code_from_locale( $new ?: 'en_US' ) : $slug,
             ];
         } else {
             $langs[ $slug ]['enabled'] = true;
+            if ( empty( $langs[ $slug ]['display_name'] ) ) {
+                $langs[ $slug ]['display_name'] = self::get_language_display_name( $new ?: 'en_US' );
+            }
             if ( empty( $langs[ $slug ]['wpml_code'] ) ) {
                 $langs[ $slug ]['wpml_code'] = class_exists( 'WP_LOC_Language_Registry' ) ? WP_LOC_Language_Registry::wpml_code_from_locale( $new ?: 'en_US' ) : $slug;
             }
