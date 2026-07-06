@@ -25,6 +25,7 @@ class WP_LOC {
     public $db_optimization_wizard;
     public $github_updater;
     public $ai;
+    public $translation_service;
     public $yoast;
     public $duplicate_post;
 
@@ -58,6 +59,7 @@ class WP_LOC {
             'class-wp-loc-timber',
             'class-wp-loc-menus',
             'class-wp-loc-ai',
+            'class-wp-loc-translation-service',
             'class-wp-loc-menu-sync',
             'class-wp-loc-db-optimization-wizard',
             'class-wp-loc-github-updater',
@@ -92,6 +94,7 @@ class WP_LOC {
         $this->timber          = new WP_LOC_Timber();
         $this->menus           = new WP_LOC_Menus();
         $this->ai              = new WP_LOC_AI();
+        $this->translation_service = new WP_LOC_Translation_Service();
         $this->github_updater  = new WP_LOC_GitHub_Updater();
 
         if ( ( defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Meta' ) ) && WP_LOC_Admin_Settings::is_yoast_compat_enabled() ) {
