@@ -79,6 +79,13 @@ add_action( 'plugins_loaded', function () {
     WP_LOC::instance();
 } );
 
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+    add_action( 'plugins_loaded', function () {
+        require_once WP_LOC_PATH . 'includes/class-wp-loc-cli.php';
+        WP_CLI::add_command( 'wp-loc translate', 'WP_LOC_CLI' );
+    }, 20 );
+}
+
 add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), function ( array $links ): array {
     $links[] = '<a href="' . admin_url( 'admin.php?page=wp-loc-settings' ) . '">' . __( 'Settings', 'wp-loc' ) . '</a>';
 

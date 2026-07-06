@@ -30,9 +30,74 @@ class WP_LOC_Menus {
         add_filter( 'option_wp_page_for_privacy_policy', [ $this, 'filter_nav_menu_page_option' ], 20 );
         add_filter( 'posts_join', [ $this, 'filter_nav_menu_posts_join' ], 20, 2 );
         add_filter( 'posts_where', [ $this, 'filter_nav_menu_posts_where' ], 20, 2 );
+        add_filter( 'wp_nav_menu_items', [ $this, 'append_language_switcher_to_menu' ], 20, 2 );
 
         add_action( 'admin_footer', [ $this, 'inject_nav_menu_form_fields' ] );
         add_filter( 'get_user_option_nav_menu_recently_edited', [ $this, 'filter_recently_edited_menu' ], 10, 3 );
+    }
+
+    public function append_language_switcher_to_menu( string $items, $args ): string {
+        if ( is_admin() || ! WP_LOC_Admin_Settings::should_append_switcher_to_menu() ) {
+            return $items;
+        }
+
+        $configured_location = WP_LOC_Admin_Settings::get_switcher_menu_location();
+        $theme_location = isset( $args->theme_location ) ? sanitize_key( (string) $args->theme_location ) : '';
+
+        if ( $configured_location !== 'all' && $theme_location !== $configured_location ) {
+            return $items;
+        }
+
+        return $items . $this->get_language_switcher_menu_items();
+    }
+
+    private function get_language_switcher_menu_items(): string {
+        if ( ! function_exists( 'wp_loc_get_lang_switcher' ) ) {
+            return '';
+        }
+
+        $languages = wp_loc_get_lang_switcher();
+
+        if ( empty( $languages ) ) {
+            return '';
+        }
+
+        $show_flags = WP_LOC_Admin_Settings::show_switcher_flags();
+        $show_names = WP_LOC_Admin_Settings::show_switcher_names();
+        $html = '';
+
+        foreach ( $languages as $language ) {
+            if ( empty( $language['url'] ) ) {
+                continue;
+            }
+
+            $classes = [ 'menu-item', 'wp-loc-menu-language-item', 'wp-loc-menu-language-item-' . sanitize_html_class( (string) ( $language['code'] ?? '' ) ) ];
+
+            if ( ! empty( $language['active'] ) ) {
+                $classes[] = 'current-menu-item';
+                $classes[] = 'wp-loc-current-language';
+            }
+
+            $html .= '<li class="' . esc_attr( implode( ' ', array_filter( $classes ) ) ) . '">';
+            $html .= '<a href="' . esc_url( (string) $language['url'] ) . '">';
+
+            if ( $show_flags && ! empty( $language['flag'] ) ) {
+                $html .= '<img class="wp-loc-menu-language-flag" src="' . esc_url( (string) $language['flag'] ) . '" alt="' . esc_attr( (string) $language['name'] ) . '" />';
+                if ( $show_names ) {
+                    $html .= ' ';
+                }
+            }
+
+            if ( $show_names ) {
+                $html .= '<span class="wp-loc-menu-language-name">' . esc_html( (string) $language['name'] ) . '</span>';
+            } else {
+                $html .= '<span class="screen-reader-text">' . esc_html( (string) $language['name'] ) . '</span>';
+            }
+
+            $html .= '</a></li>';
+        }
+
+        return $html;
     }
 
     private function is_nav_menus_screen(): bool {
