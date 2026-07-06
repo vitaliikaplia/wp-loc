@@ -269,6 +269,18 @@ class WP_LOC_Content {
                 $translated_thumb = $db->get_element_translation( (int) $thumbnail_id, $attachment_element_type, $lang_slug );
                 set_post_thumbnail( $duplicate_id, $translated_thumb ?: $thumbnail_id );
             }
+
+            if ( WP_LOC_Admin_Settings::should_auto_translate_post_translations() && isset( WP_LOC::instance()->translation_service ) ) {
+                WP_LOC::instance()->translation_service->translate_post(
+                    $post_id,
+                    $lang_slug,
+                    [
+                        'provider' => WP_LOC_Admin_Settings::get_auto_translate_provider(),
+                        'fields' => [ 'title', 'content', 'excerpt' ],
+                        'source_lang' => $current_lang,
+                    ]
+                );
+            }
         }
 
         self::$creating_translations = false;

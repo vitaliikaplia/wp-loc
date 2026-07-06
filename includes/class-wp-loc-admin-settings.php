@@ -7,6 +7,8 @@ class WP_LOC_Admin_Settings {
     const OPTION_KEY = 'wp_loc_translatable_post_types';
     const TAXONOMIES_OPTION_KEY = 'wp_loc_translatable_taxonomies';
     const AUTO_CREATE_POST_TRANSLATIONS_OPTION_KEY = 'wp_loc_auto_create_post_translations';
+    const AUTO_TRANSLATE_POST_TRANSLATIONS_OPTION_KEY = 'wp_loc_auto_translate_post_translations';
+    const AUTO_TRANSLATE_PROVIDER_OPTION_KEY = 'wp_loc_auto_translate_provider';
     const AUTO_CREATE_TERM_TRANSLATIONS_OPTION_KEY = 'wp_loc_auto_create_term_translations';
     const AUTO_CREATE_MENU_TRANSLATIONS_OPTION_KEY = 'wp_loc_auto_create_menu_translations';
     const SYNC_POST_TAXONOMIES_OPTION_KEY = 'wp_loc_sync_post_taxonomies';
@@ -409,6 +411,17 @@ TWIG;
         return (bool) get_option( self::AUTO_CREATE_POST_TRANSLATIONS_OPTION_KEY, true );
     }
 
+    public static function should_auto_translate_post_translations(): bool {
+        return (bool) get_option( self::AUTO_TRANSLATE_POST_TRANSLATIONS_OPTION_KEY, false );
+    }
+
+    public static function get_auto_translate_provider(): string {
+        $provider = (string) get_option( self::AUTO_TRANSLATE_PROVIDER_OPTION_KEY, self::get_ai_engine() );
+        $allowed = [ 'openai', 'claude', 'gemini', 'chrome_ai' ];
+
+        return in_array( $provider, $allowed, true ) ? $provider : self::get_ai_engine();
+    }
+
     public static function should_auto_create_term_translations(): bool {
         return (bool) get_option( self::AUTO_CREATE_TERM_TRANSLATIONS_OPTION_KEY, true );
     }
@@ -524,6 +537,11 @@ TWIG;
             $selected = isset( $_POST['wp_loc_post_types'] ) ? array_map( 'sanitize_key', (array) $_POST['wp_loc_post_types'] ) : [];
             $selected_taxonomies = isset( $_POST['wp_loc_taxonomies'] ) ? array_map( 'sanitize_key', (array) $_POST['wp_loc_taxonomies'] ) : [];
             $auto_create_posts = isset( $_POST['wp_loc_auto_create_post_translations'] ) ? 1 : 0;
+            $auto_translate_posts = isset( $_POST['wp_loc_auto_translate_post_translations'], $_POST['wp_loc_auto_translate_confirm'] ) ? 1 : 0;
+            $auto_translate_provider = isset( $_POST['wp_loc_auto_translate_provider'] ) ? sanitize_key( (string) $_POST['wp_loc_auto_translate_provider'] ) : self::get_ai_engine();
+            if ( ! in_array( $auto_translate_provider, [ 'openai', 'claude', 'gemini', 'chrome_ai' ], true ) ) {
+                $auto_translate_provider = self::get_ai_engine();
+            }
             $auto_create_terms = isset( $_POST['wp_loc_auto_create_term_translations'] ) ? 1 : 0;
             $auto_create_menus = isset( $_POST['wp_loc_auto_create_menu_translations'] ) ? 1 : 0;
             $sync_post_taxonomies = isset( $_POST['wp_loc_sync_post_taxonomies'] ) ? 1 : 0;
@@ -534,6 +552,8 @@ TWIG;
             update_option( self::OPTION_KEY, $selected );
             update_option( self::TAXONOMIES_OPTION_KEY, $selected_taxonomies );
             update_option( self::AUTO_CREATE_POST_TRANSLATIONS_OPTION_KEY, $auto_create_posts );
+            update_option( self::AUTO_TRANSLATE_POST_TRANSLATIONS_OPTION_KEY, $auto_translate_posts );
+            update_option( self::AUTO_TRANSLATE_PROVIDER_OPTION_KEY, $auto_translate_provider );
             update_option( self::AUTO_CREATE_TERM_TRANSLATIONS_OPTION_KEY, $auto_create_terms );
             update_option( self::AUTO_CREATE_MENU_TRANSLATIONS_OPTION_KEY, $auto_create_menus );
             update_option( self::SYNC_POST_TAXONOMIES_OPTION_KEY, $sync_post_taxonomies );
@@ -643,6 +663,8 @@ TWIG;
         $enable_acf_compat = self::is_acf_compat_enabled();
         $enable_yoast_compat = self::is_yoast_compat_enabled();
         $enable_yoast_sitemap_alternates = self::is_yoast_sitemap_alternates_enabled();
+        $auto_translate_posts = self::should_auto_translate_post_translations();
+        $auto_translate_provider = self::get_auto_translate_provider();
         $ai_engine = self::get_ai_engine();
         $openai_api_key = self::get_openai_api_key();
         $openai_model = self::get_openai_model();
@@ -693,6 +715,31 @@ TWIG;
                                                    <?php checked( $auto_create_posts ); ?>
                                             />
                                             <span><?php esc_html_e( 'Automatically create sibling post and page translations when a new source entry is saved', 'wp-loc' ); ?></span>
+                                        </label>
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_auto_translate_post_translations"
+                                                   value="1"
+                                                   <?php checked( $auto_translate_posts ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Automatically translate newly created sibling posts after duplication', 'wp-loc' ); ?></span>
+                                        </label>
+                                        <label class="wp-loc-settings-label">
+                                            <span><?php esc_html_e( 'Auto-translation provider', 'wp-loc' ); ?></span>
+                                            <select name="wp_loc_auto_translate_provider">
+                                                <?php foreach ( $ai_engines as $engine_key => $engine_label ) : ?>
+                                                    <option value="<?php echo esc_attr( $engine_key ); ?>" <?php selected( $auto_translate_provider, $engine_key ); ?>>
+                                                        <?php echo esc_html( $engine_label ); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </label>
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_auto_translate_confirm"
+                                                   value="1"
+                                            />
+                                            <span><?php esc_html_e( 'I confirm this provider may be used automatically when new translations are created. Cloud providers may incur API costs; Chrome AI jobs are queued for local browser processing.', 'wp-loc' ); ?></span>
                                         </label>
                                         <label class="wp-loc-settings-label">
                                             <input type="checkbox"
