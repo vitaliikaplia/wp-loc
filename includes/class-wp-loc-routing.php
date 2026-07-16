@@ -72,8 +72,19 @@ class WP_LOC_Routing {
      * Handle request: resolve pagename + lang to correct post
      */
     public function handle_request( array $query_vars ): array {
+        // A search on the language front URL (/{lang}/?s=...) is a search request,
+        // not the front page: mapping it to page_id would 404 it. An empty ?s= is
+        // left to core parse_query, which resolves the (language-filtered)
+        // page_on_front itself — same as it does for the default language.
+        $is_search_request = isset( $query_vars['s'] );
+
         // Language front page
         if ( ! empty( $query_vars['lang'] ) && ! empty( $query_vars['is_lang_front'] ) ) {
+            if ( $is_search_request ) {
+                unset( $query_vars['is_lang_front'] );
+                return $query_vars;
+            }
+
             $query_vars['page_id'] = get_option( 'page_on_front' );
             unset( $query_vars['pagename'] );
             return $query_vars;
@@ -93,7 +104,7 @@ class WP_LOC_Routing {
             $query_vars['lang'] = $uri_lang;
         }
 
-        if ( $uri_lang && ( $uri === $uri_lang || $uri === $uri_lang . '/' ) ) {
+        if ( $uri_lang && ( $uri === $uri_lang || $uri === $uri_lang . '/' ) && ! $is_search_request ) {
             $query_vars['is_lang_front'] = 1;
             $query_vars['page_id'] = get_option( 'page_on_front' );
             unset( $query_vars['pagename'] );
