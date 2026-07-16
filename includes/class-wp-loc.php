@@ -75,6 +75,11 @@ class WP_LOC {
         if ( class_exists( 'ACF' ) && WP_LOC_Admin_Settings::is_acf_compat_enabled() ) {
             require_once WP_LOC_PATH . 'includes/class-wp-loc-acf.php';
         }
+
+        if ( defined( 'WP_CLI' ) && WP_CLI ) {
+            require_once WP_LOC_PATH . 'includes/class-wp-loc-cli-backfill.php';
+            WP_CLI::add_command( 'wp-loc', 'WP_LOC_CLI_Backfill' );
+        }
     }
 
     private function init_modules() {
