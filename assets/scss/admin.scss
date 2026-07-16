@@ -387,7 +387,30 @@ $transition-speed: .15s;
 
 .wp-loc-t-published .wp-loc-pencil { color: $color-wp-blue; }
 .wp-loc-t-draft     .wp-loc-pencil { color: $color-warning; }
-.wp-loc-t-missing                 { opacity: .35; }
+
+.wp-loc-t-missing {
+  cursor: pointer;
+
+  .wp-loc-flag    { opacity: .35; }
+  .wp-loc-pencil  { color: $color-wp-blue; font-weight: 700; }
+
+  &.is-loading {
+    cursor: progress;
+
+    .wp-loc-flag   { opacity: .15; }
+    .wp-loc-pencil { opacity: .5; }
+  }
+}
+
+.wp-loc-t-no-lang {
+  color: $color-warning;
+  font-size: 14px;
+  line-height: 20px;
+  margin-right: 4px;
+  cursor: help;
+  width: auto;
+  padding: 0 2px;
+}
 
 .column-wp_loc_translations {
   width: 110px;

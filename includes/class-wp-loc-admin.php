@@ -1203,6 +1203,15 @@ class WP_LOC_Admin {
 
             $db = WP_LOC::instance()->db;
             $element_type = WP_LOC_DB::post_element_type( $post_type );
+            $current_lang = $db->get_element_language( $post_id, $element_type );
+
+            // No language at all — render only the warning, no flag/+ links
+            // (there is no source content to translate from yet).
+            if ( ! $current_lang ) {
+                $tip = esc_attr__( 'Language not assigned. Use Quick Edit or Bulk Edit to set a language.', 'wp-loc' );
+                echo '<span class="wp-loc-t wp-loc-t-no-lang" title="' . $tip . '" aria-label="' . $tip . '">⚠</span>';
+                return;
+            }
 
             $items = [];
             foreach ( $other_langs as $slug => $data ) {
@@ -1221,7 +1230,13 @@ class WP_LOC_Admin {
                     $cls = $is_published ? 'wp-loc-t-published' : 'wp-loc-t-draft';
                     $items[] = '<a href="' . esc_url( $edit_link ) . '" class="wp-loc-t ' . $cls . '" title="' . esc_attr__( 'Edit translation', 'wp-loc' ) . '">' . $flag_img . $pencil . '</a>';
                 } else {
-                    $items[] = '<span class="wp-loc-t wp-loc-t-missing">' . $flag_img . '</span>';
+                    $create_title = sprintf(
+                        /* translators: %s: language name */
+                        esc_attr__( 'Create %s translation', 'wp-loc' ),
+                        WP_LOC_Languages::get_display_name( $slug )
+                    );
+                    $plus = '<span class="wp-loc-pencil">+</span>';
+                    $items[] = '<a href="#" class="wp-loc-t wp-loc-t-missing wp-loc-create-translation-link" data-post-id="' . esc_attr( $post_id ) . '" data-lang="' . esc_attr( $slug ) . '" title="' . $create_title . '" aria-label="' . $create_title . '">' . $flag_img . $plus . '</a>';
                 }
             }
 

@@ -148,6 +148,38 @@
         });
     });
 
+    // Post list "Translations" column — clicking a missing-language flag creates a translation
+    $(document).on('click', '.wp-loc-create-translation-link', function(e) {
+        e.preventDefault();
+
+        const $link = $(this);
+        if ($link.hasClass('is-loading')) return;
+
+        const postId = $link.data('post-id');
+        const lang = $link.data('lang');
+        if (!postId || !lang) return;
+
+        $link.addClass('is-loading');
+
+        $.post(wpLocAdmin.ajaxUrl, {
+            action: 'wp_loc_create_translation',
+            nonce: wpLocAdmin.nonce,
+            post_id: postId,
+            lang: lang
+        }, function(response) {
+            if (response && response.success && response.data && response.data.edit_url) {
+                window.location.href = response.data.edit_url;
+                return;
+            }
+            $link.removeClass('is-loading');
+            const msg = (response && response.data && response.data.message) || wpLocAdmin.i18n.requestFailed;
+            window.alert(msg);
+        }).fail(function() {
+            $link.removeClass('is-loading');
+            window.alert(wpLocAdmin.i18n.requestFailed);
+        });
+    });
+
     // Term edit screen — create single translation via AJAX
     $(document).on('click', '.wp-loc-create-single-term-translation', function() {
         const $btn = $(this);
