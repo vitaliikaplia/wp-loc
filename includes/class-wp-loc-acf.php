@@ -2592,31 +2592,48 @@ class WP_LOC_ACF {
     public function handle_load_field( array $field ): array {
         if ( ! is_admin() ) return $field;
 
-        $field = $this->normalize_field_translation_settings( $field );
+        static $loading_keys = [];
+        $guard_key = (string) ( $field['key'] ?? $field['name'] ?? '' );
 
-        if ( ! isset( $field['name'] ) ) {
+        if ( $guard_key !== '' && isset( $loading_keys[ $guard_key ] ) ) {
             return $field;
         }
 
-        $translation_mode = $field['translation_mode'] ?? $this->get_translation_mode( $field );
+        if ( $guard_key !== '' ) {
+            $loading_keys[ $guard_key ] = true;
+        }
 
-        if ( $translation_mode !== 'shared' ) {
+        try {
+            $field = $this->normalize_field_translation_settings( $field );
+
+            if ( ! isset( $field['name'] ) ) {
+                return $field;
+            }
+
+            $translation_mode = $field['translation_mode'] ?? $this->get_translation_mode( $field );
+
+            if ( $translation_mode !== 'shared' ) {
+                return $field;
+            }
+
+            $context_post_id = $this->get_current_admin_acf_post_id();
+            $should_disable = $context_post_id !== null && (
+                $this->is_readonly_translated_options_field( $context_post_id, $field )
+                || $this->is_readonly_translated_entity_field( $context_post_id, $field )
+            );
+
+            if ( $should_disable ) {
+                $field['readonly'] = 1;
+                $field['disabled'] = 1;
+                $field['wrapper']['class'] = ( $field['wrapper']['class'] ?? '' ) . ' acf-disabled';
+            }
+
             return $field;
+        } finally {
+            if ( $guard_key !== '' ) {
+                unset( $loading_keys[ $guard_key ] );
+            }
         }
-
-        $context_post_id = $this->get_current_admin_acf_post_id();
-        $should_disable = $context_post_id !== null && (
-            $this->is_readonly_translated_options_field( $context_post_id, $field )
-            || $this->is_readonly_translated_entity_field( $context_post_id, $field )
-        );
-
-        if ( $should_disable ) {
-            $field['readonly'] = 1;
-            $field['disabled'] = 1;
-            $field['wrapper']['class'] = ( $field['wrapper']['class'] ?? '' ) . ' acf-disabled';
-        }
-
-        return $field;
     }
 
     /**
@@ -3418,12 +3435,41 @@ class WP_LOC_ACF {
             }
         }
 
-        if ( function_exists( 'acf_get_field' ) ) {
-            $parent_field = acf_get_field( $parent );
+        // Walk up the ancestor chain WITHOUT firing the `acf/load_field`
+        // filter. Using acf_get_field() here re-enters handle_load_field()
+        // and, for repeater/flexible-content parents, reloads every sub-field
+        // — each of which walks back up to the same parent — causing infinite
+        // recursion. A raw getter returns the parent field (with its own
+        // `parent` key) without triggering any load hooks.
+        $parent_field = $this->get_raw_field_without_load_filter( $parent );
 
-            if ( is_array( $parent_field ) ) {
-                return $this->get_field_group_for_field( $parent_field );
-            }
+        if ( is_array( $parent_field ) ) {
+            return $this->get_field_group_for_field( $parent_field );
+        }
+
+        return null;
+    }
+
+    /**
+     * Fetch a field by key/ID without applying the `acf/load_field` filter.
+     *
+     * @param int|string $id Field key or ID.
+     */
+    private function get_raw_field_without_load_filter( $id ): ?array {
+        if (
+            function_exists( 'acf_is_local_field' ) &&
+            function_exists( 'acf_get_local_field' ) &&
+            acf_is_local_field( $id )
+        ) {
+            $field = acf_get_local_field( $id );
+
+            return is_array( $field ) ? $field : null;
+        }
+
+        if ( function_exists( 'acf_get_raw_field' ) ) {
+            $field = acf_get_raw_field( $id );
+
+            return is_array( $field ) ? $field : null;
         }
 
         return null;
