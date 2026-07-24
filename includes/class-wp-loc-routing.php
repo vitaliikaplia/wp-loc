@@ -116,7 +116,13 @@ class WP_LOC_Routing {
         }
 
         if ( isset( $query_vars['name'] ) && $effective_lang ) {
-            $post_id = $this->resolve_pagename_to_post_id( (string) $query_vars['name'], $effective_lang, $active_languages );
+            // A CPT rewrite rule already fixed the post type (e.g. product/%slug%),
+            // so the look-up must not match same-slug posts of other types.
+            $requested_post_types = ! empty( $query_vars['post_type'] )
+                ? array_map( 'strval', (array) $query_vars['post_type'] )
+                : null;
+
+            $post_id = $this->resolve_pagename_to_post_id( (string) $query_vars['name'], $effective_lang, $active_languages, $requested_post_types );
 
             if ( $post_id ) {
                 $query_vars = $this->set_resolved_singular_query_vars( $query_vars, $post_id );
@@ -149,7 +155,7 @@ class WP_LOC_Routing {
     /**
      * Resolve a pagename to the correct post ID in the requested language.
      */
-    private function resolve_pagename_to_post_id( string $pagename, string $lang_slug, array $active_languages ): ?int {
+    private function resolve_pagename_to_post_id( string $pagename, string $lang_slug, array $active_languages, ?array $restrict_post_types = null ): ?int {
         if ( ! isset( $active_languages[ $lang_slug ] ) ) {
             return null;
         }
@@ -165,6 +171,16 @@ class WP_LOC_Routing {
         // including non-public types (mail-log, sms-log, patterns, …) — leaking them
         // as front singles (e.g. /test/ surfacing a mail-log row named "test").
         $viewable_post_types = array_values( array_filter( get_post_types( [], 'names' ), 'is_post_type_viewable' ) );
+
+        // Attachments are "viewable" but core never routes them by bare slug (only via
+        // the attachment/attachment_id query vars), so a media slug must not hijack
+        // the look-up — e.g. /product/2/ rendering an image named "2" instead of the
+        // product (or a 404).
+        $viewable_post_types = array_values( array_diff( $viewable_post_types, [ 'attachment' ] ) );
+
+        if ( $restrict_post_types !== null ) {
+            $viewable_post_types = array_values( array_intersect( $viewable_post_types, $restrict_post_types ) );
+        }
 
         if ( empty( $viewable_post_types ) ) {
             return null;
