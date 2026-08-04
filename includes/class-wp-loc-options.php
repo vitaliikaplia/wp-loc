@@ -155,7 +155,8 @@ class WP_LOC_Options {
 
         [ $has_localized_value, $localized_value ] = self::get_localized_option_value( $option, $current_lang );
 
-        if ( $has_localized_value && self::is_valid_localized_page_option_value( $option, $localized_value ) ) {
+        // An empty translation falls back to the default-language value.
+        if ( $has_localized_value && $localized_value !== '' && self::is_valid_localized_page_option_value( $option, $localized_value ) ) {
             return $localized_value;
         }
 
