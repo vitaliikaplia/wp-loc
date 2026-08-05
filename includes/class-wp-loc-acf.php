@@ -2446,7 +2446,7 @@ class WP_LOC_ACF {
                 return $value;
             }
 
-            if ( in_array( $translation_mode, [ 'none', 'shared' ], true ) ) {
+            if ( $translation_mode === 'shared' ) {
                 $this->sync_shared_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $canonical_field, $value );
             } elseif ( $translation_mode === 'copy_once' ) {
                 $this->sync_copy_once_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $canonical_field, $value );
@@ -2462,7 +2462,7 @@ class WP_LOC_ACF {
                 return $value;
             }
 
-            if ( $post_entity_id && in_array( $translation_mode, [ 'none', 'shared' ], true ) ) {
+            if ( $post_entity_id && $translation_mode === 'shared' ) {
                 $this->sync_shared_post_field_value( $post_entity_id, $canonical_field, $value );
             } elseif ( $post_entity_id && $translation_mode === 'copy_once' ) {
                 $this->sync_copy_once_post_field_value( $post_entity_id, $canonical_field, $value );
@@ -2547,7 +2547,7 @@ class WP_LOC_ACF {
             $term_context = $this->get_term_context( $post_id );
 
             if ( $term_context ) {
-                if ( in_array( $translation_mode, [ 'none', 'shared' ], true ) ) {
+                if ( $translation_mode === 'shared' ) {
                     $this->sync_shared_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $field, $value );
                 } elseif ( $translation_mode === 'copy_once' ) {
                     $this->sync_copy_once_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $field, $value );
@@ -2563,7 +2563,7 @@ class WP_LOC_ACF {
                     continue;
                 }
 
-                if ( in_array( $translation_mode, [ 'none', 'shared' ], true ) ) {
+                if ( $translation_mode === 'shared' ) {
                     $this->sync_shared_post_field_value( $post_entity_id, $field, $value );
                 } elseif ( $translation_mode === 'copy_once' ) {
                     $this->sync_copy_once_post_field_value( $post_entity_id, $field, $value );
@@ -2592,31 +2592,48 @@ class WP_LOC_ACF {
     public function handle_load_field( array $field ): array {
         if ( ! is_admin() ) return $field;
 
-        $field = $this->normalize_field_translation_settings( $field );
+        static $loading_keys = [];
+        $guard_key = (string) ( $field['key'] ?? $field['name'] ?? '' );
 
-        if ( ! isset( $field['name'] ) ) {
+        if ( $guard_key !== '' && isset( $loading_keys[ $guard_key ] ) ) {
             return $field;
         }
 
-        $translation_mode = $field['translation_mode'] ?? $this->get_translation_mode( $field );
+        if ( $guard_key !== '' ) {
+            $loading_keys[ $guard_key ] = true;
+        }
 
-        if ( $translation_mode !== 'shared' ) {
+        try {
+            $field = $this->normalize_field_translation_settings( $field );
+
+            if ( ! isset( $field['name'] ) ) {
+                return $field;
+            }
+
+            $translation_mode = $field['translation_mode'] ?? $this->get_translation_mode( $field );
+
+            if ( $translation_mode !== 'shared' ) {
+                return $field;
+            }
+
+            $context_post_id = $this->get_current_admin_acf_post_id();
+            $should_disable = $context_post_id !== null && (
+                $this->is_readonly_translated_options_field( $context_post_id, $field )
+                || $this->is_readonly_translated_entity_field( $context_post_id, $field )
+            );
+
+            if ( $should_disable ) {
+                $field['readonly'] = 1;
+                $field['disabled'] = 1;
+                $field['wrapper']['class'] = ( $field['wrapper']['class'] ?? '' ) . ' acf-disabled';
+            }
+
             return $field;
+        } finally {
+            if ( $guard_key !== '' ) {
+                unset( $loading_keys[ $guard_key ] );
+            }
         }
-
-        $context_post_id = $this->get_current_admin_acf_post_id();
-        $should_disable = $context_post_id !== null && (
-            $this->is_readonly_translated_options_field( $context_post_id, $field )
-            || $this->is_readonly_translated_entity_field( $context_post_id, $field )
-        );
-
-        if ( $should_disable ) {
-            $field['readonly'] = 1;
-            $field['disabled'] = 1;
-            $field['wrapper']['class'] = ( $field['wrapper']['class'] ?? '' ) . ' acf-disabled';
-        }
-
-        return $field;
     }
 
     /**
@@ -2870,6 +2887,36 @@ class WP_LOC_ACF {
         }
 
         $translation_mode = $this->get_translation_mode( $field );
+
+        // A leaf field inside a translatable/copy_once container resolves to its own (usually
+        // 'none') mode, which would wrongly fall back to the base language below. ACF rebuilds a
+        // container by loading each flattened sub-field (e.g. {repeater}_0_label) via
+        // acf_get_value(), so detect a translatable container ancestor and read the sub-value
+        // from the translated options store instead of the base.
+        if ( $this->is_translated_options_post_id( $post_id ) && $options_language ) {
+            $container_ancestor = $this->get_deferred_container_ancestor_field( $field );
+            $ancestor_is_self = $container_ancestor && ( $container_ancestor['key'] ?? '' ) === ( $field['key'] ?? '' );
+
+            if ( $container_ancestor && ! $ancestor_is_self
+                && in_array( $this->get_translation_mode( $container_ancestor ), [ 'translatable', 'copy_once' ], true ) ) {
+                $base_post_id = $this->get_base_options_post_id( $post_id );
+
+                if ( $base_post_id ) {
+                    $value = $this->get_translatable_option_value( $options_language, (string) $field['name'], $base_post_id );
+
+                    if ( $value !== false ) {
+                        return $value;
+                    }
+
+                    // No translated sub-value stored yet — fall back to the base (copy behaviour).
+                    return $this->map_field_value_to_language(
+                        get_option( "{$base_post_id}_{$field['name']}", null ),
+                        $field,
+                        $options_language
+                    );
+                }
+            }
+        }
 
         if ( in_array( $translation_mode, [ 'none', 'shared' ], true ) && $this->is_translated_options_post_id( $post_id ) ) {
             $base_post_id = $this->get_base_options_post_id( $post_id );
@@ -3418,12 +3465,41 @@ class WP_LOC_ACF {
             }
         }
 
-        if ( function_exists( 'acf_get_field' ) ) {
-            $parent_field = acf_get_field( $parent );
+        // Walk up the ancestor chain WITHOUT firing the `acf/load_field`
+        // filter. Using acf_get_field() here re-enters handle_load_field()
+        // and, for repeater/flexible-content parents, reloads every sub-field
+        // — each of which walks back up to the same parent — causing infinite
+        // recursion. A raw getter returns the parent field (with its own
+        // `parent` key) without triggering any load hooks.
+        $parent_field = $this->get_raw_field_without_load_filter( $parent );
 
-            if ( is_array( $parent_field ) ) {
-                return $this->get_field_group_for_field( $parent_field );
-            }
+        if ( is_array( $parent_field ) ) {
+            return $this->get_field_group_for_field( $parent_field );
+        }
+
+        return null;
+    }
+
+    /**
+     * Fetch a field by key/ID without applying the `acf/load_field` filter.
+     *
+     * @param int|string $id Field key or ID.
+     */
+    private function get_raw_field_without_load_filter( $id ): ?array {
+        if (
+            function_exists( 'acf_is_local_field' ) &&
+            function_exists( 'acf_get_local_field' ) &&
+            acf_is_local_field( $id )
+        ) {
+            $field = acf_get_local_field( $id );
+
+            return is_array( $field ) ? $field : null;
+        }
+
+        if ( function_exists( 'acf_get_raw_field' ) ) {
+            $field = acf_get_raw_field( $id );
+
+            return is_array( $field ) ? $field : null;
         }
 
         return null;

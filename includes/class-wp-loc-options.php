@@ -155,7 +155,8 @@ class WP_LOC_Options {
 
         [ $has_localized_value, $localized_value ] = self::get_localized_option_value( $option, $current_lang );
 
-        if ( $has_localized_value && self::is_valid_localized_page_option_value( $option, $localized_value ) ) {
+        // An empty translation falls back to the default-language value.
+        if ( $has_localized_value && $localized_value !== '' && self::is_valid_localized_page_option_value( $option, $localized_value ) ) {
             return $localized_value;
         }
 
@@ -291,6 +292,18 @@ class WP_LOC_Options {
         $is_settings = in_array( $screen->id, [ 'options-general', 'options-reading' ], true )
             || $screen->parent_base === 'options-general'
             || str_starts_with( (string) $screen->id, 'settings_page_' );
+
+        /**
+         * Whether the screen edits option values for the current admin language.
+         *
+         * Plugins registering multilingual options on their own settings screens
+         * must opt those screens in, otherwise the fields render the default
+         * language value while saving routes it to the current language.
+         *
+         * @param bool      $is_settings Whether the screen is a settings screen.
+         * @param WP_Screen $screen      Current screen.
+         */
+        $is_settings = (bool) apply_filters( 'wp_loc_is_localized_options_screen', $is_settings, $screen );
         $is_edit = ( $screen->base === 'edit' );
         $is_post_editor = ( $screen->base === 'post' );
 

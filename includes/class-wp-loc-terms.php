@@ -740,6 +740,17 @@ class WP_LOC_Terms {
      * Filter term queries by current language.
      */
     public function filter_terms_clauses( array $clauses, array $taxonomies, array $args ): array {
+        // The {taxonomy}_children hierarchy map is built by _get_term_hierarchy() via a
+        // `fields=id=>parent` query. It MUST include every language — otherwise the cached
+        // parent→child map ends up single-language and the other language's subcategories
+        // vanish from the admin term list and from child_of / get_term_children queries.
+        // Skip the language filter for that build by its query signature, independent of
+        // call-stack depth (the backtrace check in should_skip_terms_filter() is only a
+        // fragile fallback and can miss when the rebuild is triggered deep in the stack).
+        if ( ( $args['fields'] ?? '' ) === 'id=>parent' ) {
+            return $clauses;
+        }
+
         if ( empty( $taxonomies ) || $this->should_skip_terms_filter() ) {
             return $clauses;
         }
@@ -1757,6 +1768,14 @@ class WP_LOC_Terms {
         if ( self::$adjusting_term || self::$query_filter_suspension_depth > 0 || ! $term instanceof \WP_Term ) return $term;
         if ( is_admin() ) return $term;
         if ( ! $taxonomy || ! self::is_translatable( $taxonomy ) ) return $term;
+
+        // Never remap while WP builds the {taxonomy}_children hierarchy map
+        // (_get_term_hierarchy hydrates each term via get_term). Remapping ru terms
+        // to their uk siblings there collapses the cached map to a single language,
+        // making the other language's subcategories vanish from the admin list and
+        // from child_of / get_term_children queries. should_skip_terms_filter() also
+        // covers wp_get_object_terms reads, matching filter_terms_clauses().
+        if ( $this->should_skip_terms_filter() ) return $term;
 
         $disable_adjust = apply_filters( 'wpml_disable_term_adjust_id', false, $term );
         if ( $disable_adjust ) return $term;

@@ -11,6 +11,7 @@ class WP_LOC {
     public $routing;
     public $admin;
     public $admin_languages;
+    public $language_editor;
     public $content;
     public $frontend;
     public $options;
@@ -48,6 +49,7 @@ class WP_LOC {
             'class-wp-loc-routing',
             'class-wp-loc-admin',
             'class-wp-loc-admin-languages',
+            'class-wp-loc-admin-language-editor',
             'class-wp-loc-admin-settings',
             'class-wp-loc-content',
             'class-wp-loc-frontend',
@@ -75,6 +77,11 @@ class WP_LOC {
         if ( class_exists( 'ACF' ) && WP_LOC_Admin_Settings::is_acf_compat_enabled() ) {
             require_once WP_LOC_PATH . 'includes/class-wp-loc-acf.php';
         }
+
+        if ( defined( 'WP_CLI' ) && WP_CLI ) {
+            require_once WP_LOC_PATH . 'includes/class-wp-loc-cli-backfill.php';
+            WP_CLI::add_command( 'wp-loc', 'WP_LOC_CLI_Backfill' );
+        }
     }
 
     private function init_modules() {
@@ -101,6 +108,7 @@ class WP_LOC {
         if ( is_admin() ) {
             $this->admin           = new WP_LOC_Admin();
             $this->admin_languages = new WP_LOC_Admin_Languages();
+            $this->language_editor = new WP_LOC_Admin_Language_Editor();
             $this->menu_sync       = new WP_LOC_Menu_Sync();
             $this->db_optimization_wizard = new WP_LOC_DB_Optimization_Wizard();
             $this->duplicate_post  = new WP_LOC_Duplicate_Post();
