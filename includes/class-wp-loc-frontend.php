@@ -40,17 +40,50 @@ class WP_LOC_Frontend {
             echo '<link rel="alternate" hreflang="' . esc_attr( $hreflang ) . '" href="' . esc_url( $url ) . '" />' . "\n";
         }
 
-        if ( is_singular() && ! $this->seo_plugin_outputs_canonical() ) {
+        if ( is_singular() && ! $this->canonical_already_handled() ) {
             echo '<link rel="canonical" href="' . esc_url( get_permalink( get_queried_object_id() ) ) . '" />' . "\n";
         }
     }
 
-    private function seo_plugin_outputs_canonical(): bool {
-        return defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Frontend' );
+    /**
+     * Whether rel="canonical" is already printed for this request by someone else.
+     *
+     * A second canonical tag is never harmless: search engines see two competing
+     * declarations for one URL and may discard both. WordPress core prints one
+     * on every singular request all by itself, and an SEO plugin that wants to
+     * own the tag removes that core hook first — so the hook is a reliable
+     * signal for both cases. The plugin constants cover SEO plugins that keep
+     * the core hook in place and filter its output instead.
+     */
+    private function canonical_already_handled(): bool {
+        $handled = has_action( 'wp_head', 'rel_canonical' ) // WordPress core
+            || defined( 'WPSEO_VERSION' )                  // Yoast SEO
+            || class_exists( 'WPSEO_Frontend' )            // Yoast SEO (legacy)
+            || function_exists( 'aioseo' )                 // All in One SEO
+            || defined( 'AIOSEO_VERSION' )
+            || class_exists( 'RankMath' )                  // Rank Math
+            || defined( 'SEOPRESS_VERSION' )               // SEOPress
+            || defined( 'SLIM_SEO_VER' )                   // Slim SEO
+            || defined( 'THE_SEO_FRAMEWORK_VERSION' );
+
+        /**
+         * Filter whether wp-loc should skip printing its own canonical tag.
+         *
+         * @param bool $handled True when something else owns the canonical tag.
+         */
+        return (bool) apply_filters( 'wp_loc_canonical_already_handled', $handled );
     }
 
+    /**
+     * Build the hreflang map for the current request.
+     *
+     * The switcher is requested in SEO mode: its presentation options (hiding
+     * the current language, hiding untranslated ones, falling back to the home
+     * page, carrying the current query string) exist to keep a header dropdown
+     * usable and would produce invalid annotations here.
+     */
     private function get_frontend_alternate_links(): array {
-        $switcher = wp_loc_get_lang_switcher();
+        $switcher = wp_loc_get_lang_switcher( [ 'seo' => true ] );
 
         if ( empty( $switcher ) ) {
             return [];
@@ -231,16 +264,26 @@ class WP_LOC_Frontend {
 /**
  * Get language switcher data for templates
  *
+ * Two very different consumers share this builder: the visible switcher, where
+ * a dead-end link is worse than an approximate one, and hreflang annotations,
+ * where an approximate URL is invalid data. Pass `[ 'seo' => true ]` to get the
+ * literal picture — no display filtering, no home-page substitution and no
+ * query string — which is the only form search engines accept.
+ *
+ * @param array $args {
+ *     @type bool $seo Build for hreflang annotations instead of the UI switcher.
+ * }
  * @return array [ ['code' => 'uk', 'locale' => 'uk', 'active' => true, 'url' => '...', 'flag' => '...', 'name' => '...'], ... ]
  */
-function wp_loc_get_lang_switcher(): array {
+function wp_loc_get_lang_switcher( array $args = [] ): array {
+    $for_seo = ! empty( $args['seo'] );
     $active = WP_LOC_Languages::get_active_languages();
     $current = wp_loc_get_current_lang();
     $default = WP_LOC_Languages::get_default_language();
     $db = WP_LOC::instance()->db;
-    $hide_current = WP_LOC_Admin_Settings::hide_current_language_in_switcher();
-    $hide_untranslated = WP_LOC_Admin_Settings::hide_untranslated_languages_in_switcher();
-    $fallback_to_home = WP_LOC_Admin_Settings::fallback_untranslated_switcher_links_to_home();
+    $hide_current = ! $for_seo && WP_LOC_Admin_Settings::hide_current_language_in_switcher();
+    $hide_untranslated = ! $for_seo && WP_LOC_Admin_Settings::hide_untranslated_languages_in_switcher();
+    $fallback_to_home = ! $for_seo && WP_LOC_Admin_Settings::fallback_untranslated_switcher_links_to_home();
 
     // Use raw home URL to avoid the home_url language prefix filter
     $home = rtrim( set_url_scheme( get_option( 'home' ) ), '/' );
@@ -264,7 +307,14 @@ function wp_loc_get_lang_switcher(): array {
 
         return array_filter( $query_args, static fn( $value ): bool => $value !== null && $value !== '' );
     };
-    $append_current_query_args = static function ( string $url ) use ( $get_current_query_args ): string {
+    $append_current_query_args = static function ( string $url ) use ( $get_current_query_args, $for_seo ): string {
+        // Sorting, filtering and tracking parameters do not identify a translation:
+        // the annotation has to point at the same canonical URL the SEO plugin
+        // declares, otherwise every alternate looks like a redirect to a crawler.
+        if ( $for_seo ) {
+            return $url;
+        }
+
         $query_args = $get_current_query_args();
 
         return empty( $query_args ) ? $url : add_query_arg( $query_args, $url );
@@ -362,14 +412,33 @@ function wp_loc_get_lang_switcher(): array {
         if ( $queried_term instanceof \WP_Term && WP_LOC_Terms::is_translatable( $queried_term->taxonomy ) ) {
             foreach ( $active as $code => $data ) {
                 $url = $build_home_url( $code );
+
+                // Ask the translation table directly. get_term_url_for_language()
+                // answers with the language home page when a term has no sibling,
+                // so its return value cannot tell "translated" from "missing".
+                $translated_term_id = WP_LOC_Terms::get_term_translation( (int) $queried_term->term_id, $queried_term->taxonomy, $code );
+                $has_translation = (bool) $translated_term_id || $code === $current;
                 $translated_link = WP_LOC_Terms::get_term_url_for_language( (int) $queried_term->term_id, $queried_term->taxonomy, $code );
-                $has_translation = (bool) $translated_link || $code === $current;
 
                 if ( $translated_link ) {
                     $url = $append_current_query_args( $add_pagination_to_url( $translated_link ) );
                 }
 
                 $append_switcher_item( $switcher, $code, $data, $url, $has_translation );
+            }
+
+            return $switcher;
+        }
+
+        // A non-translatable taxonomy has one shared set of terms, and routing
+        // resolves the same term under every language prefix. The archive
+        // therefore exists in each language at the same path.
+        if ( $queried_term instanceof \WP_Term ) {
+            $clean_path = $get_clean_request_path();
+
+            foreach ( $active as $code => $data ) {
+                // $clean_path already carries any /page/N/ segment from the request.
+                $append_switcher_item( $switcher, $code, $data, $build_url_for_clean_path( $code, $clean_path ) );
             }
 
             return $switcher;
@@ -425,14 +494,24 @@ function wp_loc_get_lang_switcher(): array {
     // Fallback: replace language prefix in current URL
     $clean_path = $get_clean_request_path();
 
-    foreach ( $active as $code => $data ) {
-        $url = $build_url_for_clean_path( $code, $clean_path );
+    // Nothing here identified a translation group, so whether the same path
+    // resolves under another language prefix is unknown. A switcher may guess;
+    // an annotation may not, and claiming a language a page does not have is
+    // what makes several pages compete for one language. Self-reference only.
+    if ( $for_seo ) {
+        $data = $active[ $current ] ?? [];
 
-        if ( ! $fallback_to_home && ! empty( $clean_path ) ) {
-            $url = $build_url_for_clean_path( $code, $clean_path );
-        } elseif ( $fallback_to_home && ! empty( $clean_path ) ) {
-            $url = $build_home_url( $code );
+        if ( $data ) {
+            $append_switcher_item( $switcher, $current, $data, $build_url_for_clean_path( $current, $clean_path ) );
         }
+
+        return $switcher;
+    }
+
+    foreach ( $active as $code => $data ) {
+        $url = ( $fallback_to_home && ! empty( $clean_path ) )
+            ? $build_home_url( $code )
+            : $build_url_for_clean_path( $code, $clean_path );
 
         $append_switcher_item( $switcher, $code, $data, $url );
     }
