@@ -92,12 +92,10 @@ class WP_LOC_Frontend {
         }
 
         $locale = WP_LOC_Languages::get_language_locale( $language );
+        $hreflang = $locale ? str_replace( '_', '-', $locale ) : $language;
 
-        if ( ! $locale ) {
-            return $language;
-        }
-
-        return str_replace( '_', '-', $locale );
+        /** Site-level override of the emitted hreflang value (e.g. `en-US` → `en`). */
+        return (string) apply_filters( 'wp_loc_hreflang_code', $hreflang, $language );
     }
 
     /**

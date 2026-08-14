@@ -608,6 +608,17 @@ class WP_LOC_Routing {
         $url_scheme = wp_parse_url( $url, PHP_URL_SCHEME );
         $raw_home = set_url_scheme( get_option( 'home' ), $url_scheme ?: null );
 
+        // A translated front page lives at its language root (/en/), not at its
+        // own page slug (/en/home/) — WP core only collapses the front page of
+        // the CURRENT language context (get_page_link() checks the localized
+        // page_on_front option), so sitemap/breadcrumb/any cross-language
+        // get_permalink() call would otherwise leak the raw slug URL.
+        if ( $post_type === 'page' && (int) $post_id === $this->get_front_page_id_for_language( $post_lang ) ) {
+            $home = rtrim( $raw_home, '/' );
+
+            return $post_lang === $default ? $home . '/' : $home . '/' . $post_lang . '/';
+        }
+
         // Strip any existing language prefix (injected by home_url filter)
         foreach ( WP_LOC_Languages::get_additional_languages() as $lang_code ) {
             $prefixed = rtrim( $raw_home, '/' ) . '/' . $lang_code;
@@ -624,6 +635,39 @@ class WP_LOC_Routing {
 
         // Add the correct prefix for the post's language
         return str_replace( rtrim( $raw_home, '/' ), rtrim( $raw_home, '/' ) . '/' . $post_lang, $url );
+    }
+
+    /** @var array<string,int> front page id per language (memoized per request) */
+    private array $front_page_ids = [];
+
+    /**
+     * The front page id in a given language, resolved through the translation
+     * group. `page_on_front` may be localized to ANY language by
+     * WP_LOC_Options depending on the request context, so the raw option value
+     * is mapped into the target language before use — that keeps the check
+     * context-independent (sitemaps and admin run in another language than the
+     * page being linked).
+     */
+    private function get_front_page_id_for_language( string $lang_code ): int {
+        if ( array_key_exists( $lang_code, $this->front_page_ids ) ) {
+            return $this->front_page_ids[ $lang_code ];
+        }
+
+        $resolved = 0;
+
+        if ( get_option( 'show_on_front' ) === 'page' ) {
+            $front_id = (int) get_option( 'page_on_front' );
+
+            if ( $front_id ) {
+                $resolved = (int) WP_LOC::instance()->db->get_element_translation(
+                    $front_id,
+                    WP_LOC_DB::post_element_type( 'page' ),
+                    $lang_code
+                );
+            }
+        }
+
+        return $this->front_page_ids[ $lang_code ] = $resolved;
     }
 
     /**

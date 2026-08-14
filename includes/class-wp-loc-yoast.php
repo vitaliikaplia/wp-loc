@@ -949,11 +949,10 @@ class WP_LOC_Yoast {
         }
 
         $locale = WP_LOC_Languages::get_language_locale( $lang_code );
-        if ( $locale ) {
-            return str_replace( '_', '-', $locale );
-        }
+        $hreflang = $locale ? str_replace( '_', '-', $locale ) : $lang_code;
 
-        return $lang_code;
+        /** Site-level override of the emitted hreflang value (e.g. `en-US` → `en`). */
+        return (string) apply_filters( 'wp_loc_hreflang_code', $hreflang, $lang_code );
     }
 
     private function backtrace_has_frame( string $class_name, string $method_name ): bool {
