@@ -21,6 +21,8 @@ class WP_LOC_ACF {
     private static array $deferred_container_sync = [];
     private static bool $processing_deferred_container_sync = false;
     private static bool $processing_entity_field_sync = false;
+    private static array $group_lookup_stack = [];
+    private static array $group_lookup_cache = [];
 
     private const ACFML_MODE_DEFAULTS = [
         'text' => [
@@ -3403,6 +3405,24 @@ class WP_LOC_ACF {
         };
     }
 
+    /**
+     * Resolve the field group a field ultimately belongs to.
+     *
+     * Walking up from a sub-field means calling acf_get_field() on its
+     * container, and that re-fires `acf/load_field` for the container — whose
+     * own normalize_field_translation_settings() maps back over its sub_fields,
+     * landing here again with the same parent. Nothing broke that cycle, so any
+     * repeater/group field (an options page reproduces it every time) recursed
+     * until PHP hit the memory limit: the page rendered its metabox title and
+     * died before printing a single field.
+     *
+     * Two guards, in order:
+     *  - a per-parent stack, so a lookup already in progress higher up the call
+     *    chain returns null instead of re-entering;
+     *  - a positive-result cache, so the repeated walks stay cheap. Only
+     *    successful lookups are cached: a null may be the guard talking, and
+     *    storing that would poison the entry for every later caller.
+     */
     private function get_field_group_for_field( array $field ): ?array {
         $parent = $field['parent'] ?? null;
 
@@ -3410,23 +3430,43 @@ class WP_LOC_ACF {
             return null;
         }
 
-        if ( function_exists( 'acf_get_field_group' ) ) {
-            $group = acf_get_field_group( $parent );
-
-            if ( is_array( $group ) && ! empty( $group['key'] ) ) {
-                return $group;
-            }
+        if ( isset( self::$group_lookup_cache[ $parent ] ) ) {
+            return self::$group_lookup_cache[ $parent ];
         }
 
-        if ( function_exists( 'acf_get_field' ) ) {
-            $parent_field = acf_get_field( $parent );
-
-            if ( is_array( $parent_field ) ) {
-                return $this->get_field_group_for_field( $parent_field );
-            }
+        if ( isset( self::$group_lookup_stack[ $parent ] ) ) {
+            return null;
         }
 
-        return null;
+        self::$group_lookup_stack[ $parent ] = true;
+
+        try {
+            $resolved = null;
+
+            if ( function_exists( 'acf_get_field_group' ) ) {
+                $group = acf_get_field_group( $parent );
+
+                if ( is_array( $group ) && ! empty( $group['key'] ) ) {
+                    $resolved = $group;
+                }
+            }
+
+            if ( $resolved === null && function_exists( 'acf_get_field' ) ) {
+                $parent_field = acf_get_field( $parent );
+
+                if ( is_array( $parent_field ) ) {
+                    $resolved = $this->get_field_group_for_field( $parent_field );
+                }
+            }
+        } finally {
+            unset( self::$group_lookup_stack[ $parent ] );
+        }
+
+        if ( is_array( $resolved ) ) {
+            self::$group_lookup_cache[ $parent ] = $resolved;
+        }
+
+        return $resolved;
     }
 
     private function normalize_field_translation_settings( array $field ): array {
