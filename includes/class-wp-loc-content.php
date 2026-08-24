@@ -31,9 +31,16 @@ class WP_LOC_Content {
     /**
      * Build target-language term IDs from relationships that belong to the source language.
      *
-     * @return int[]
+     * Returns NULL when the source post has no terms in the taxonomy at all (or the
+     * lookup failed): with nothing to map or strip, the caller must leave the target
+     * untouched instead of replacing its terms with an empty set. Returns an array
+     * (possibly empty) when the source HAS terms — an empty array then means "no
+     * mappable translations", which legitimately clears the target because a
+     * translated post must never fall back to source-language terms.
+     *
+     * @return int[]|null
      */
-    private function get_translated_post_term_ids( int $post_id, string $taxonomy, string $target_lang, ?string $source_lang = null ): array {
+    private function get_translated_post_term_ids( int $post_id, string $taxonomy, string $target_lang, ?string $source_lang = null ): ?array {
         $source_term_ids = WP_LOC_Terms::without_language_filter(
             static fn() => wp_get_object_terms( $post_id, $taxonomy, [
                 'fields' => 'ids',
@@ -41,13 +48,13 @@ class WP_LOC_Content {
         );
 
         if ( is_wp_error( $source_term_ids ) || empty( $source_term_ids ) ) {
-            return [];
+            return null;
         }
 
         $source_term_ids = array_values( array_unique( array_map( 'intval', $source_term_ids ) ) );
 
         if ( empty( $source_term_ids ) ) {
-            return [];
+            return null;
         }
 
         $target_term_ids = [];
@@ -100,6 +107,18 @@ class WP_LOC_Content {
 
             foreach ( $taxonomies as $taxonomy ) {
                 $target_term_ids = $this->get_translated_post_term_ids( $post_id, $taxonomy, $lang_slug, $source_lang );
+
+                // NULL = the source has no terms in this taxonomy at all. An empty
+                // source set must never be mirrored onto siblings: a save whose
+                // language-scoped editor panel failed to see the assigned terms
+                // submits an empty set, and replicating it silently wiped the
+                // category relationships of every translation in the group
+                // (measured in production). Clearing a sibling on purpose is done
+                // by editing that sibling directly.
+                if ( null === $target_term_ids ) {
+                    continue;
+                }
+
                 $this->assign_post_terms_in_language( $target_post_id, $taxonomy, $target_term_ids, $lang_slug );
             }
         }

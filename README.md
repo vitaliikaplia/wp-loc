@@ -135,6 +135,7 @@ do_action( 'wpml_switch_language', 'uk' ); // restore previous/default context w
 - WordPress's native Insert/edit Link modal is scoped to the language of the post currently being edited, including when ACF opens that native dialog
 - Every translated page selected through localized `page_for_posts` is treated as the posts page by both Classic Editor and Gutenberg, so WordPress shows its native latest-posts notice and applies the normal editor restrictions
 - When shared post attributes are synchronized, changing a translation's status also updates its siblings; permanently deleting any post in a translatable group removes all sibling posts and their `icl_translations` rows
+- Term relationships sync across a post's translation group, but an empty source term set is never mirrored onto siblings — a save that carries no terms for a taxonomy leaves every translation's terms untouched
 
 ### Multilingual menus
 
