@@ -201,16 +201,21 @@ class WP_LOC_Terms {
      * within a request.
      */
     private static function get_rest_edited_post_language(): ?string {
+        // REST_REQUEST is defined during dispatch, while term queries also run
+        // earlier in the same request (init and friends). Answering "no editor
+        // context" for those early calls is right, but it must NEVER be cached:
+        // memoizing it poisoned every later call in the request and left the
+        // block editor with the default-language tree again (measured).
+        if ( ! defined( 'REST_REQUEST' ) || ! REST_REQUEST ) {
+            return null;
+        }
+
         if ( self::$rest_edited_post_language_resolved ) {
             return self::$rest_edited_post_language;
         }
 
         self::$rest_edited_post_language_resolved = true;
         self::$rest_edited_post_language = null;
-
-        if ( ! defined( 'REST_REQUEST' ) || ! REST_REQUEST ) {
-            return null;
-        }
 
         $post_id = 0;
 
