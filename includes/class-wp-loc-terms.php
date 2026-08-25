@@ -11,6 +11,8 @@ class WP_LOC_Terms {
     private static bool $syncing_parent = false;
     private static int $query_filter_suspension_depth = 0;
     private static ?string $term_link_lang_override = null;
+    private static ?string $rest_edited_post_language = null;
+    private static bool $rest_edited_post_language_resolved = false;
 
     public function __construct() {
         add_action( 'created_term', [ $this, 'register_term_language' ], 10, 3 );
@@ -162,8 +164,20 @@ class WP_LOC_Terms {
 
     /**
      * Get current language for term context.
+     *
+     * A block-editor REST request belongs to an editing session, so its context is
+     * the edited post's language — exactly what the classic editor gets from the
+     * admin language. Without that branch REST falls into the frontend language
+     * (is_admin() is false there), which is how a translated post's editor ended
+     * up showing the default-language term tree.
      */
     public static function get_context_language(): string {
+        $editor_lang = self::get_rest_edited_post_language();
+
+        if ( $editor_lang ) {
+            return $editor_lang;
+        }
+
         return WP_LOC_Routing::is_frontend_ajax_request() || ! is_admin()
             ? wp_loc_get_current_lang()
             : wp_loc_get_admin_lang();
@@ -182,8 +196,18 @@ class WP_LOC_Terms {
      * from an explicit ?post= arg when present, otherwise from the editor
      * screen's referer (post.php?post=ID). Returns null outside REST or when no
      * post context can be recovered — callers then fall back to the old context.
+     *
+     * Memoized: `get_term` runs this once per term, and the answer cannot change
+     * within a request.
      */
     private static function get_rest_edited_post_language(): ?string {
+        if ( self::$rest_edited_post_language_resolved ) {
+            return self::$rest_edited_post_language;
+        }
+
+        self::$rest_edited_post_language_resolved = true;
+        self::$rest_edited_post_language = null;
+
         if ( ! defined( 'REST_REQUEST' ) || ! REST_REQUEST ) {
             return null;
         }
@@ -218,7 +242,9 @@ class WP_LOC_Terms {
 
         $lang = WP_LOC::instance()->db->get_element_language( (int) $post->ID, WP_LOC_DB::post_element_type( $post->post_type ) );
 
-        return $lang ?: null;
+        self::$rest_edited_post_language = $lang ?: null;
+
+        return self::$rest_edited_post_language;
     }
 
     /**
@@ -806,12 +832,6 @@ class WP_LOC_Terms {
         }
 
         $lang = $args['lang'] ?? null;
-
-        // Блоковий редактор: дерево термів мусить бути мовою РЕДАГОВАНОГО поста,
-        // а не фронтовою/адмінською (REST — не is_admin()).
-        if ( ! $lang ) {
-            $lang = self::get_rest_edited_post_language();
-        }
 
         if ( ! $lang && $this->is_term_save_request() ) {
             $primary_taxonomy = is_array( $translatable_taxonomies ) ? (string) reset( $translatable_taxonomies ) : '';
@@ -1814,6 +1834,15 @@ class WP_LOC_Terms {
     public function adjust_term_to_current_language( $term, $taxonomy ) {
         if ( self::$adjusting_term || self::$query_filter_suspension_depth > 0 || ! $term instanceof \WP_Term ) return $term;
         if ( is_admin() ) return $term;
+
+        // Block-editor REST requests are an editing session, not frontend output:
+        // the term query is already scoped to the edited post's language, and the
+        // editor must receive the exact terms it asked for. Swapping each term for
+        // its translation here is what made a translated post's category panel show
+        // the default language even once the query itself was scoped correctly —
+        // get_term() re-mapped every row back. The classic editor never adjusts
+        // (is_admin above), so this keeps both editors identical.
+        if ( self::get_rest_edited_post_language() ) return $term;
         if ( ! $taxonomy || ! self::is_translatable( $taxonomy ) ) return $term;
 
         $disable_adjust = apply_filters( 'wpml_disable_term_adjust_id', false, $term );
