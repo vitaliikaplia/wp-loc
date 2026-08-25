@@ -136,6 +136,7 @@ do_action( 'wpml_switch_language', 'uk' ); // restore previous/default context w
 - Every translated page selected through localized `page_for_posts` is treated as the posts page by both Classic Editor and Gutenberg, so WordPress shows its native latest-posts notice and applies the normal editor restrictions
 - When shared post attributes are synchronized, changing a translation's status also updates its siblings; permanently deleting any post in a translatable group removes all sibling posts and their `icl_translations` rows
 - Term relationships sync across a post's translation group, but an empty source term set is never mirrored onto siblings — a save that carries no terms for a taxonomy leaves every translation's terms untouched
+- The block editor's category/tag panels show the term tree in the language of the post being edited (REST taxonomy collections are scoped by the editor's post context, matching the classic editor's behavior)
 
 ### Multilingual menus
 

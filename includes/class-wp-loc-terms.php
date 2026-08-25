@@ -170,6 +170,58 @@ class WP_LOC_Terms {
     }
 
     /**
+     * Language of the post whose block editor issued the current REST request.
+     *
+     * Gutenberg loads taxonomy trees over REST, where is_admin() is false, so the
+     * generic context resolved to the FRONTEND language — a translated post's
+     * editor showed the wrong-language term tree, none of the post's real terms
+     * matched a visible checkbox, and the next save submitted an empty set
+     * (the wipe that 1.8.2's sync guard now contains; the classic editor was
+     * never affected because its metabox renders on a real admin screen).
+     * The terms collection request does not carry the post, so it is recovered
+     * from an explicit ?post= arg when present, otherwise from the editor
+     * screen's referer (post.php?post=ID). Returns null outside REST or when no
+     * post context can be recovered — callers then fall back to the old context.
+     */
+    private static function get_rest_edited_post_language(): ?string {
+        if ( ! defined( 'REST_REQUEST' ) || ! REST_REQUEST ) {
+            return null;
+        }
+
+        $post_id = 0;
+
+        if ( isset( $_GET['post'] ) && is_numeric( $_GET['post'] ) ) {
+            $post_id = (int) $_GET['post'];
+        }
+
+        if ( ! $post_id ) {
+            $referer = wp_get_referer();
+
+            if ( $referer && str_contains( (string) $referer, 'post.php' ) ) {
+                parse_str( (string) wp_parse_url( (string) $referer, PHP_URL_QUERY ), $referer_args );
+
+                if ( ! empty( $referer_args['post'] ) && is_numeric( $referer_args['post'] ) ) {
+                    $post_id = (int) $referer_args['post'];
+                }
+            }
+        }
+
+        if ( ! $post_id ) {
+            return null;
+        }
+
+        $post = get_post( $post_id );
+
+        if ( ! $post instanceof \WP_Post ) {
+            return null;
+        }
+
+        $lang = WP_LOC::instance()->db->get_element_language( (int) $post->ID, WP_LOC_DB::post_element_type( $post->post_type ) );
+
+        return $lang ?: null;
+    }
+
+    /**
      * Build a frontend URL from the raw home option without reapplying the current-language home_url() filter.
      */
     private static function build_raw_frontend_url( string $path = '/', ?string $scheme = null ): string {
@@ -754,6 +806,12 @@ class WP_LOC_Terms {
         }
 
         $lang = $args['lang'] ?? null;
+
+        // Блоковий редактор: дерево термів мусить бути мовою РЕДАГОВАНОГО поста,
+        // а не фронтовою/адмінською (REST — не is_admin()).
+        if ( ! $lang ) {
+            $lang = self::get_rest_edited_post_language();
+        }
 
         if ( ! $lang && $this->is_term_save_request() ) {
             $primary_taxonomy = is_array( $translatable_taxonomies ) ? (string) reset( $translatable_taxonomies ) : '';
