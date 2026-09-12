@@ -678,6 +678,17 @@ class WP_LOC_Terms {
                 $trid,
                 $current_lang
             );
+
+            /**
+             * Fires after a translation copy of a term has been created and linked.
+             *
+             * @param int    $new_term_id  New translation term ID.
+             * @param int    $term_id      Source term ID.
+             * @param string $taxonomy     Taxonomy.
+             * @param string $lang_slug    Language of the new translation.
+             * @param string $current_lang Language of the source term.
+             */
+            do_action( 'wp_loc_term_translation_created', (int) $inserted['term_id'], $term_id, $taxonomy, $lang_slug, $current_lang );
         }
 
         self::$creating_translations = false;
@@ -1522,6 +1533,9 @@ class WP_LOC_Terms {
         $new_term_taxonomy_id = (int) $inserted['term_taxonomy_id'];
 
         $db->set_element_language( $new_term_taxonomy_id, $element_type, $lang_slug, $trid, $source_lang );
+
+        /** This action is documented in includes/class-wp-loc-terms.php */
+        do_action( 'wp_loc_term_translation_created', $new_term_id, $term_id, $taxonomy, $lang_slug, $source_lang );
 
         wp_send_json_success( [
             'edit_url' => self::get_admin_edit_term_url( $new_term_id, $taxonomy, $lang_slug ),

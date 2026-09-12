@@ -161,6 +161,12 @@ Only loads when no other multilingual plugin is active (`ICL_SITEPRESS_VERSION` 
 - `wp_loc_default_multilingual_options` — option names to localize
 - `wp_loc_multilingual_options` — action to register an option as multilingual
 - `wp_loc_duplicate_translation_group` — enable/disable cloning the translation group during Yoast Duplicate Post copies (default: `true`)
+- `wp_loc_post_translation_created` — action `($new_post_id, $source_post_id, $lang, $source_lang)` after a translation copy of a post is created and linked (auto-create and the `+` button)
+- `wp_loc_term_translation_created` — action `($new_term_id, $source_term_id, $taxonomy, $lang, $source_lang)` after a translation copy of a term is created and linked (auto-create and the `+` button)
+- `wp_loc_settings_tabs` — filter `slug => label` of the Settings tabs; add-ons append their own tab
+- `wp_loc_settings_render_{$tab}` — action that renders the body of a non-built-in Settings tab (inside the settings `<form>`)
+- `wp_loc_settings_fields_{$tab}` — action to print extra fields at the bottom of any Settings tab (built-in or add-on)
+- `wp_loc_settings_save_{$tab}` — action after the built-in options of a tab are saved; nonce and `manage_options` already verified
 
 ### AJAX endpoints
 - `wp_loc_create_translation` — create a single translation for a post+language (used by metabox `+` button)

@@ -55,9 +55,26 @@ class WP_LOC_Admin_Settings {
 
     private function get_current_tab(): string {
         $tab = isset( $_GET['tab'] ) ? sanitize_key( (string) $_GET['tab'] ) : self::TAB_CONTENT;
-        $allowed = [ self::TAB_CONTENT, self::TAB_SWITCHER, self::TAB_INTEGRATIONS, self::TAB_AI ];
 
-        return in_array( $tab, $allowed, true ) ? $tab : self::TAB_CONTENT;
+        return isset( $this->get_tabs()[ $tab ] ) ? $tab : self::TAB_CONTENT;
+    }
+
+    /**
+     * Settings tabs as slug => label.
+     *
+     * Add-ons register their own tab through the `wp_loc_settings_tabs` filter and
+     * render it on `wp_loc_settings_render_{$tab}`; extra fields for any tab go on
+     * `wp_loc_settings_fields_{$tab}`, and both are saved on `wp_loc_settings_save_{$tab}`.
+     */
+    private function get_tabs(): array {
+        $tabs = [
+            self::TAB_CONTENT      => __( 'Content Translation', 'wp-loc' ),
+            self::TAB_SWITCHER     => __( 'Frontend Language Switcher', 'wp-loc' ),
+            self::TAB_INTEGRATIONS => __( 'Integrations', 'wp-loc' ),
+            self::TAB_AI           => __( 'AI', 'wp-loc' ),
+        ];
+
+        return (array) apply_filters( 'wp_loc_settings_tabs', $tabs );
     }
 
     private function get_tab_url( string $tab ): string {
@@ -71,12 +88,7 @@ class WP_LOC_Admin_Settings {
     }
 
     private function render_tabs( string $current_tab ): void {
-        $tabs = [
-            self::TAB_CONTENT      => __( 'Content Translation', 'wp-loc' ),
-            self::TAB_SWITCHER     => __( 'Frontend Language Switcher', 'wp-loc' ),
-            self::TAB_INTEGRATIONS => __( 'Integrations', 'wp-loc' ),
-            self::TAB_AI           => __( 'AI', 'wp-loc' ),
-        ];
+        $tabs = $this->get_tabs();
 
         echo '<nav class="nav-tab-wrapper wp-clearfix">';
 
@@ -612,6 +624,12 @@ TWIG;
             }
         }
 
+        /**
+         * Fires after the built-in options of a settings tab are saved. Nonce and
+         * capability are already verified; add-ons persist their own fields here.
+         */
+        do_action( "wp_loc_settings_save_{$current_tab}" );
+
         wp_redirect( add_query_arg( [
             'page'    => 'wp-loc-settings',
             'tab'     => $current_tab,
@@ -1006,9 +1024,13 @@ TWIG;
                             </table>
                         <?php endif; ?>
                     </div>
+                <?php else : ?>
+                    <?php do_action( "wp_loc_settings_render_{$current_tab}" ); ?>
                 <?php endif; ?>
 
-                <?php if ( $current_tab !== self::TAB_AI || $has_ai_models ) : ?>
+                <?php do_action( "wp_loc_settings_fields_{$current_tab}" ); ?>
+
+                <?php if ( $current_tab !== self::TAB_AI || $has_ai_models || has_action( "wp_loc_settings_fields_{$current_tab}" ) ) : ?>
                     <?php submit_button( __( 'Save', 'wp-loc' ) ); ?>
                 <?php endif; ?>
             </form>

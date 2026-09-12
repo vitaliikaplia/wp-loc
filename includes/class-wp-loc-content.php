@@ -352,6 +352,16 @@ class WP_LOC_Content {
                 $translated_thumb = $db->get_element_translation( (int) $thumbnail_id, $attachment_element_type, $lang_slug );
                 set_post_thumbnail( $duplicate_id, $translated_thumb ?: $thumbnail_id );
             }
+
+            /**
+             * Fires after a translation copy of a post has been created and linked.
+             *
+             * @param int    $duplicate_id New translation post ID.
+             * @param int    $post_id      Source post ID.
+             * @param string $lang_slug    Language of the new translation.
+             * @param string $current_lang Language of the source post.
+             */
+            do_action( 'wp_loc_post_translation_created', $duplicate_id, $post_id, $lang_slug, $current_lang );
         }
 
         self::$creating_translations = false;
