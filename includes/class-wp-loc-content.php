@@ -168,6 +168,26 @@ class WP_LOC_Content {
         }
     }
 
+    /**
+     * Write a sibling post with the submitted editor form hidden.
+     *
+     * A sibling write inside the source post's save request fires a nested save_post
+     * for the sibling while $_POST still holds the SOURCE post's form. Handlers that
+     * do not compare $_POST['post_ID'] with the saved ID (All in One SEO's metabox
+     * save) would store the source form onto the sibling. Synced values come from the
+     * saved source post, never from $_POST.
+     */
+    private static function without_submitted_form( callable $write ) {
+        $posted = $_POST;
+        $_POST = [];
+
+        try {
+            return $write();
+        } finally {
+            $_POST = $posted;
+        }
+    }
+
     public function __construct() {
         add_action( 'wp_insert_post', [ $this, 'mark_new_post' ], 10, 3 );
         add_action( 'save_post', [ $this, 'handle_save_post' ], 20, 3 );
@@ -312,7 +332,7 @@ class WP_LOC_Content {
         }
 
         foreach ( $langs_to_create as $lang_slug ) {
-            $duplicate_id = wp_insert_post( [
+            $duplicate_id = self::without_submitted_form( fn() => wp_insert_post( [
                 'post_title'    => $post->post_title,
                 'post_content'  => $post->post_content,
                 'post_excerpt'  => $post->post_excerpt,
@@ -322,7 +342,7 @@ class WP_LOC_Content {
                 'menu_order'    => $post->menu_order,
                 'post_password' => $post->post_password,
                 'post_author'   => $post->post_author,
-            ] );
+            ] ) );
 
             if ( ! $duplicate_id || is_wp_error( $duplicate_id ) ) continue;
 
@@ -351,10 +371,10 @@ class WP_LOC_Content {
 
             // Fix slug — wp_insert_post may have added "-2" because icl_translations
             // registration happens after insert; now that language is set, re-apply original slug
-            wp_update_post( [
+            self::without_submitted_form( fn() => wp_update_post( [
                 'ID'        => $duplicate_id,
                 'post_name' => $post->post_name,
-            ] );
+            ] ) );
 
             /**
              * Fires once a translation draft is fully created: registered in
@@ -419,7 +439,7 @@ class WP_LOC_Content {
                     $update_data['post_parent'] = 0;
                 }
 
-                wp_update_post( $update_data );
+                self::without_submitted_form( fn() => wp_update_post( $update_data ) );
 
                 // Sync page template
                 if ( $page_template !== false ) {
