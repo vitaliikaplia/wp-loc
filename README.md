@@ -31,15 +31,15 @@ Lightweight multilingual plugin for WordPress.
 - **Translatable post type detection** — if compatible translation rows already exist, WP-LOC detects translated custom post types and taxonomies and merges them into runtime settings even when older saved settings are incomplete
 - **Detected translation visibility** — the settings screen shows the number of existing compatible translation records beside each detected post type, so administrators can see why it remains multilingual
 - **Selectable content types** — public post types/taxonomies and custom non-public registered objects can be enabled from settings, while internal WordPress objects and specially handled objects stay excluded
-- **Frontend/admin query filtering** — translatable posts are filtered by the current language for main, secondary, AJAX, REST, and Gutenberg preview `WP_Query` calls when filters are not suppressed
+- **Frontend/admin query filtering** — translatable posts are filtered by the current language for frontend main and secondary queries and frontend AJAX `WP_Query` calls when filters are not suppressed, and admin post lists follow the admin language. REST (including Gutenberg server-side block previews), admin-side AJAX, and other admin queries are scoped to the edited post's language only when the request carries that post's ID (`post`, `post_id`, `post_ID`, or `id`) and are otherwise left unfiltered, so a plain `/wp/v2/posts` request is not language-scoped. Pass `'lang' => 'en'` (an active language slug) in the `WP_Query` args to scope a custom query explicitly, or `'lang' => 'all'` to opt out
 - **Language-scoped link picker** — WordPress's native Insert/edit Link dialog only lists translatable content from the language currently being edited
 - **Frontend AJAX language context** — standard `admin-ajax.php` handlers inherit the current frontend language through request parameters, the referring URL, and compatible cookies, in that order, so AJAX started from a page served by a full-page cache still answers in the language on screen
 - **Runtime language switching** — WPML-style `wpml_switch_language` / `$sitepress->switch_lang()` calls temporarily switch WP-LOC's language and WordPress locale, so background handlers and transactional email flows can render content in a user's preferred language
-- **URL structure** — the default language has no prefix; additional languages use `/{slug}/page-slug/`, for example `/en/page-slug/`
+- **URL structure** — the default language has no prefix; additional languages use `/{slug}/page-slug/`, for example `/en/page-slug/`. A translated front page always links to its language root (`/`, `/en/`), never to its own page slug
 - **Migrated default language** — the migration wizard preserves the legacy multilingual default language for no-prefix URLs
 - **Admin language switcher** — in the admin bar with flags, cookie-based
 - **Frontend language switcher** — `wp_loc_get_lang_switcher()`, `wp_loc_get_language_switcher_html()`, `wp_loc_the_language_switcher()` with translated post, custom post type, taxonomy, author, search, date, paginated, query-filtered, and archive URLs
-- **SEO** — frontend hreflang alternate tags for translated singular, front page, posts page, and taxonomy contexts; canonical URL fallback when no SEO plugin outputs one; proper `<html lang="">`
+- **SEO** — frontend hreflang alternate tags for translated singular, front page, posts page, and taxonomy contexts, with locale-based values (`en-US`, `uk`), an `x-default` entry for the default-language URL, and untranslated targets skipped; emitted codes can be overridden with the `wp_loc_hreflang_code` filter (for example region-less `en`); canonical URL fallback when no SEO plugin outputs one; proper `<html lang="">`
 - **Yoast SEO compatibility** — localized `wpseo_titles` / `wpseo_social` / `wpseo_rss` options, translated primary category resolution, copied Yoast term SEO meta for translated terms, multilingual sitemap alternate links, stripped category-base compatibility, and Yoast indexable invalidation after multilingual updates
 - **Localized options** — `blogname`, `blogdescription`, `page_on_front`, `page_for_posts`, plus options registered through `wp_loc_multilingual_options` or compatible `wpml_multilingual_options`, per language and with localized front page / posts page routing
 - **Custom settings page support** — localized options are displayed and saved correctly on WordPress settings pages, including custom submenu pages under Settings that register option names dynamically
@@ -56,7 +56,7 @@ Lightweight multilingual plugin for WordPress.
 - **ACF container field support** — multilingual behavior for `group`, `repeater`, `flexible_content`, and `clone` fields across options pages, posts/pages, and term edit screens
 - **ACF nav_menu field support** — translated menu values resolve to the correct menu in the current language context
 - **Yoast Duplicate Post integration** — cloning a translatable post also clones its whole translation group; the copies are duplicated through Duplicate Post's own engine and linked together as a new translation group, while Rewrite & Republish is left untouched
-- **Timber integration** — Twig functions `wp_loc_language_switcher()` and `wp_loc_languages()`
+- **Timber integration** — Twig functions `wp_loc_language_switcher()`, `wp_loc_languages()`, `wp_loc_translate()`, and `wp_loc_translations()`, a `current_language` context variable, and localized `site.name` / `site.description` / `site.url`
 - **Activation safety** — on activation, WP-LOC deactivates known conflicting multilingual add-ons instead of deleting them
 - **GitHub updates** — native WordPress plugin updates from the public GitHub repository by comparing the remote `wp-loc.php` `Version:` header on the configured branch
 - **Ukrainian slug** — `uk` locale → `ua` URL slug out of the box
@@ -99,6 +99,9 @@ Lightweight multilingual plugin for WordPress.
 // Get current language
 $lang = wp_loc_get_current_lang(); // 'ua', 'en', 'ru'
 
+// Get current WordPress locale
+$locale = wp_loc_get_current_locale(); // 'uk', 'en_US', 'ru_RU'
+
 // Get language switcher
 $switcher = wp_loc_get_lang_switcher();
 foreach ( $switcher as $lang ) {
@@ -123,21 +126,44 @@ do_action( 'wp_loc_multilingual_options', 'my_custom_option' );
 do_action( 'wpml_multilingual_options', 'my_custom_option' );
 
 // Temporarily switch language for a background/transactional flow
-do_action( 'wpml_switch_language', 'ru' );
+$previous_lang = wp_loc_get_current_lang();
+do_action( 'wpml_switch_language', 'ru' ); // accepts a URL slug ('ua'), a compatible code ('uk'), or a locale ('ru_RU')
 $subject = get_option( 'my_custom_option' ); // reads my_custom_option_ru when available
-do_action( 'wpml_switch_language', 'uk' ); // restore previous/default context when done
+do_action( 'wpml_switch_language', $previous_lang ); // switch back explicitly; passing null restores nothing
+
+// Override an emitted hreflang code (head tags and Yoast sitemap alternates); x-default is never filtered
+add_filter( 'wp_loc_hreflang_code', function ( $hreflang, $lang_slug ) {
+    return $lang_slug === 'en' ? 'en' : $hreflang; // 'en' instead of the locale-derived 'en-US'
+}, 10, 2 );
+
+// Force a code-registered post type / taxonomy to be multilingual
+// (priority 20: WP-LOC rebuilds both lists from saved settings at priority 10)
+add_filter( 'wp_loc_translatable_post_types', fn( $post_types ) => array_merge( $post_types, [ 'event' ] ), 20 );
+add_filter( 'wp_loc_translatable_taxonomies', fn( $taxonomies ) => array_merge( $taxonomies, [ 'event_type' ] ), 20 );
 ```
+
+### Filters and actions
+
+- `wp_loc_translatable_post_types` / `wp_loc_translatable_taxonomies` — filter the multilingual post types / taxonomies. Once **Multilingual > Settings** has been saved, WP-LOC replaces the list at priority `10` with the saved selection plus types detected in existing translation rows, so add your own types at a later priority (for example `20`)
+- `wp_loc_default_multilingual_options` — filter the built-in localized options (`blogname`, `blogdescription`, `page_on_front`, `page_for_posts`); it runs on `init` at priority `5`
+- `wp_loc_multilingual_options` (action) — register one option name as multilingual; the compatible `wpml_multilingual_options` action works the same way
+- `wp_loc_locale_slug_map` — override the locale → URL slug map (for example `uk` → `ua`, `pt_BR` → `pt-br`) used when WP-LOC adds a language from the WordPress Site Language
+- `wp_loc_language_registry` — extend or correct the built-in language code/locale/name/flag registry used for language detection and the Database Optimization Wizard
+- `wp_loc_hreflang_code` — filter `( $hreflang, $lang_slug )` for every emitted `hreflang` value in head tags and Yoast sitemap alternates; `x-default` is not filtered
+- `wp_loc_translation_created` (action) — `( $translation_id, $source_id, $lang_slug )`, fired once a translation draft is fully created
+- `wp_loc_duplicate_translation_group` — return `false` to stop Yoast Duplicate Post copies from cloning the whole translation group
 
 ### Content editor and lifecycle
 
-- Translation drafts are full copies of the source post (content, excerpt, meta, featured image). Once a draft is fully created — by the auto-create-on-save flow or the metabox `+` button — WP-LOC fires `do_action( 'wp_loc_translation_created', $translation_id, $source_id, $lang_slug )`, so a theme can align per-post state (an editor-mode flag, a layout choice) with the source at the moment the translation is born
+- Translations are full copies of the source post (content, excerpt, meta, featured image). The auto-create-on-save flow inserts them as drafts, while the metabox `+` button copies the source's status and date. While shared post attributes are synchronized (the default), every save also aligns the whole group's status, so publishing the source publishes its still-untranslated copies. Once a translation is fully created — by either flow — WP-LOC fires `do_action( 'wp_loc_translation_created', $translation_id, $source_id, $lang_slug )`, so a theme can align per-post state (an editor-mode flag, a layout choice) with the source at the moment the translation is born
 - Post list row actions and Gutenberg/classic editor title controls can translate titles for every post type enabled in **Multilingual > Settings > Content Translation**
 - Term list row actions and term edit controls can translate term names for taxonomies enabled in **Multilingual > Settings > Content Translation**
 - WordPress's native Insert/edit Link modal is scoped to the language of the post currently being edited, including when ACF opens that native dialog
 - Every translated page selected through localized `page_for_posts` is treated as the posts page by both Classic Editor and Gutenberg, so WordPress shows its native latest-posts notice and applies the normal editor restrictions
 - When shared post attributes are synchronized, changing a translation's status also updates its siblings; permanently deleting any post in a translatable group removes all sibling posts and their `icl_translations` rows
 - Term relationships sync across a post's translation group, but an empty source term set is never mirrored onto siblings — a save that carries no terms for a taxonomy leaves every translation's terms untouched
-- The block editor's category/tag panels show the term tree in the language of the post being edited (REST taxonomy collections are scoped by the editor's post context, matching the classic editor's behavior)
+- The block editor's category/tag panels show the term tree in the language of the post being edited (REST taxonomy collections are scoped by the editor's post context, matching the classic editor's behavior). The edited post is recognized from the request's referring `post.php?post=ID` URL, so a `Referrer-Policy` that withholds the full referring URL inside wp-admin (such as `no-referrer` or `strict-origin`) sends the panels back to the default-language tree
+- New source content can only be created while the admin bar language is the site's default language. In any other admin language, **Add New** for translatable post types, adding terms in wp-admin (in any taxonomy), and creating nav menus are refused with *Creating new content is only available in the primary language of the site*; switch the admin bar language back to the default language to add new source entries
 
 ### Multilingual menus
 
@@ -145,6 +171,7 @@ do_action( 'wpml_switch_language', 'uk' ); // restore previous/default context w
 - WP-LOC auto-creates sibling menus in the other active languages
 - Menu locations are assigned from the default-language menu and resolved automatically per language on the frontend
 - Use **Multilingual > Tools > WP Menus Sync** to sync structure/order/options from the default-language menu to translated menus
+- A sync rebuilds each selected translated menu from its default-language source: the translated menu's existing items are deleted and recreated, so manual per-language edits are overwritten. Items linked to posts, pages, or terms take the linked object's title in the target language (custom navigation labels are not carried over), and items whose translatable post or term has no translation in the target language are skipped (the preview lists them as *Skip untranslated linked items*)
 - If **Try to translate custom nav menu links with AI during menu sync** is enabled in **Multilingual > Settings > Content Translation**, custom menu links are translated with the selected AI provider and model during sync; otherwise they are duplicated 1:1 with the same title, URL, and item settings
 - If an AI provider returns a refusal or unusable short-text response for a custom menu link field, WP-LOC keeps the original field value instead of saving the refusal text into the translated menu item
 - Automatic menu creation can be disabled from **Multilingual > Settings > Content Translation** if you prefer to create translated menus manually
@@ -171,6 +198,7 @@ do_action( 'wpml_switch_language', 'uk' ); // restore previous/default context w
 - You can generate a lightweight `wp-loc-config.xml` from the current WP-LOC settings
 - You can also generate `wp-loc-config.xml` from a detected legacy config source
 - Theme-level legacy config files can be removed from the same screen after migration; plugin-level files are shown as read-only
+- Neither `wpml-config.xml` nor the generated `wp-loc-config.xml` is loaded at runtime; this screen only reads them for display and migration. Which post types and taxonomies are multilingual is decided by **Multilingual > Settings > Content Translation** (plus types detected from existing translation rows), so enable the types a config file lists there. A file generated from current settings is written to the active theme's directory; one generated from a legacy source is written next to that source, including inside a plugin's directory
 
 ### Database optimization wizard
 
@@ -185,9 +213,11 @@ do_action( 'wpml_switch_language', 'uk' ); // restore previous/default context w
 
 ### ACF options pages
 
+- Translation modes are set per ACF field group in the **Multilingual Setup** box. **Same fields across languages** and **Different fields across languages** apply ACFML-style defaults per field type (filterable through `acfml_field_group_mode_field_translation_preference`). **Expert**, the default, shows a per-field **Translation preferences** setting: **Don't translate** (`none`, the default), **Copy** (`shared`), **Copy once** (`copy_once`), and **Translate** (`translatable`). Existing ACFML `wpml_cf_preferences` values are honored
 - `shared` fields stay on the base ACF options post ID (`options`)
+- `none` (**Don't translate**) fields keep a single value on the base options post ID that stays editable from every language's options page; a save from a translated options page writes it back to the base post ID, with media/post/term/menu references mapped to the default language
 - Saving translated options, posts, or terms ignores read-only `shared` fields so disabled ACF containers cannot overwrite source-language values
-- `translatable` fields are routed through language-aware ACF options post IDs like `options_en` / `options_ru`
+- `translatable` fields are routed through language-aware ACF options post IDs like `options_en` / `options_ru`; options pages registered with a custom `post_id` get the same suffix (`theme_settings` → `theme_settings_en`). Until a translated options page stores its own value, a `translatable` field (other than a `group`, `repeater`, `flexible_content`, or `clone` container) returns the default-language value
 - `copy_once` container fields inherit from the source language until the translated options page stores its own value
 - Both `get_field( 'field_name', 'options' )` and `get_fields( 'options' )` resolve translated values in the current language context
 - `nav_menu` ACF fields resolve to the translated menu for the current language
@@ -199,6 +229,7 @@ do_action( 'wpml_switch_language', 'uk' ); // restore previous/default context w
 - Custom settings pages under **Settings** receive localized values in the admin when the admin language differs from the default language
 - Frontend AJAX requests to `admin-ajax.php` use the frontend language context, so transactional option reads inside AJAX handlers do not fall back to the default language
 - Code that explicitly calls `do_action( 'wpml_switch_language', $lang )` or `$sitepress->switch_lang( $lang )` temporarily switches WP-LOC's current language and WordPress locale until it is switched back. This is useful for cron jobs, payment webhooks, and transactional emails that need to render content in a user's saved preferred language
+- Localized option values are not applied inside REST API requests: there `get_option()` returns the default-language value even after an explicit `wpml_switch_language` call, so a webhook or endpoint registered as a REST route must read the language-suffixed option row (for example `my_custom_option_ru`) directly
 
 ### ACF content fields
 
@@ -217,10 +248,12 @@ do_action( 'wpml_switch_language', 'uk' ); // restore previous/default context w
 - The Yoast compatibility layer and Yoast sitemap alternate links can be toggled separately in **Multilingual > Settings > Integrations**
 - Global Yoast options such as `wpseo_titles`, `wpseo_social`, and `wpseo_rss` can be localized per language through the same multilingual options model used by WP-LOC
 - Yoast primary category meta is resolved to the translated term in the current post language
+- Yoast canonical and `og:url` values are set to the current-language permalink of the post, term, or post type archive being viewed, and term and post type archive breadcrumbs use the current language's names and links
 - Yoast taxonomy SEO meta is copied into translated terms so translated archives keep their own SEO title/description state
 - A translated term that has no SEO meta of its own falls back to the source term's values. A translated term that *does* have its own keeps it: editing the SEO of any term in a translation group never overwrites its siblings, in either direction
 - Yoast indexables are invalidated after multilingual post, term, and global-option updates so Yoast can rebuild its cached SEO data
-- Yoast XML sitemaps gain `xhtml:link` alternate-language entries for translated posts, pages, terms, and first archive links
+- Yoast caches permalinks in its indexables. After updating WP-LOC to 1.8.0 or newer, run a Yoast reindex once (`wp yoast index --reindex`); otherwise Yoast breadcrumbs can keep linking a translated front page to its old slug URL (for example `/en/home/` instead of `/en/`) from that cache
+- Yoast XML sitemaps gain `xhtml:link` alternate-language entries, plus an `x-default` entry for the default-language URL, for translated posts, pages, terms, and first archive links; `hreflang` values follow the same locale-based codes and `wp_loc_hreflang_code` filter as the frontend tags
 - Yoast `stripcategorybase` rewrites remain compatible with multilingual category slugs
 - Yoast News can reuse the current post language code for publication-language output when the addon is active
 
@@ -231,7 +264,7 @@ do_action( 'wpml_switch_language', 'uk' ); // restore previous/default context w
 - Each sibling is duplicated through Duplicate Post's own engine, so copied meta, taxonomies, attachments, and comments follow your Duplicate Post settings
 - **Rewrite & Republish** is intentionally left untouched — it merges the copy back into the original, which keeps its existing translation links
 - Non-translatable post types are duplicated by Duplicate Post normally, with no translation-group handling
-- The behavior can be disabled per project with the `wp_loc_duplicate_translation_group` filter (return `false`)
+- The behavior can be disabled per project with the `wp_loc_duplicate_translation_group` filter (`$enabled`, `$new_post_id`, `$post`; return `false`). Returning `false` also skips registering the copy itself, so a copy of a translatable post has no language and appears in every language's post list until the translation metabox's **Create translations** button registers it in the current admin language, which also creates translation drafts for the other active languages
 
 ### In Twig (Timber)
 ```twig
@@ -240,7 +273,24 @@ do_action( 'wpml_switch_language', 'uk' ); // restore previous/default context w
 {% for lang in wp_loc_languages() %}
   <a href="{{ lang.url }}" class="{{ lang.active ? 'active' : '' }}">{{ lang.name }}</a>
 {% endfor %}
+
+{# Current language from the Timber context: code, locale, name, flag #}
+<img src="{{ current_language.flag }}" alt=""> {{ current_language.name }}
+
+{# One translation as a Timber post, or null when none exists #}
+{% set en_post = wp_loc_translate(post, 'en') %}
+{% if en_post and en_post.post_status == 'publish' %}
+  <a href="{{ en_post.link }}">{{ en_post.title }}</a>
+{% endif %}
+
+{# Published translations in active languages, keyed by language slug #}
+{% for code, translation in wp_loc_translations(post) %}
+  <a href="{{ translation.link }}">{{ code }}: {{ translation.title }}</a>
+{% endfor %}
 ```
+
+- `wp_loc_translate()` returns the translation whatever its post status, so check the status before linking; `wp_loc_translations()` returns only published posts in active languages, the post's own language included
+- Every Timber context also receives `current_language`, and `site.name`, `site.description`, and `site.url` are replaced with the current language's localized values
 
 ## Taxonomy Notes
 
@@ -258,13 +308,15 @@ do_action( 'wpml_switch_language', 'uk' ); // restore previous/default context w
 - Frontend slug resolution only considers publicly viewable post types, so a non-public object that happens to share a slug cannot surface as a public singular URL
 - Hierarchical page paths are resolved in the requested language before WordPress fallback resolution, so translated parent/child pages can safely reuse the same slugs across languages
 - Custom post type translations with identical slugs across languages resolve to their translated post instead of redirecting back to the default-language post
+- A translatable post or page requested under another language's URL prefix — or without a prefix when it belongs to a non-default language — returns `404`, matching wrong-language term archives; non-translatable post types are served under every prefix
 - Canonical redirects are blocked when WordPress tries to strip or replace an existing non-default language URL prefix
 - The language prefix is applied to `page_link`, `post_link`, and `post_type_link` at priority `9999`, after themes and plugins finish building custom (taxonomy-driven) permalink paths, so translated custom post type URLs keep their target-language path instead of losing the prefix
+- A translated front page's permalink is always its language root (`/`, `/en/`), whichever language context asks for it, so Yoast page sitemap `<loc>` entries, breadcrumbs, and any other cross-language `get_permalink()` call link to `/en/` rather than the page's own slug URL (`/en/home/`, which only redirects there)
 - Compatibility switcher APIs such as `icl_get_languages()` use the same translated URLs as WP-LOC's native switcher helpers
 - Frontend requests persist `wp_loc_current_language`, `wp_loc_current_locale`, `_icl_current_language`, and `wp-wpml_current_language` cookies so same-origin AJAX calls to `admin-ajax.php` keep the expected language context
 - A cookie is only written when its value actually changes. Re-sending an identical cookie would be invisible to the visitor but adds a `Set-Cookie` header, and shared caches treat any response carrying one as personalised — so a CDN would refuse to store it. Since language is resolved from the URL prefix, a returning visitor's requests stay header-clean and remain cacheable at the edge
 - For AJAX, the referring URL is trusted ahead of those cookies. A page served from a full-page cache never runs PHP, so it never sends `Set-Cookie`, and the cookie can still name the language the visitor left one switch ago; the referer always names the page the request actually came from. A same-site referer with no language prefix resolves to the default language, since that is the language served without one. The cookies remain the fallback for requests that arrive with no usable referer, such as under `Referrer-Policy: no-referrer`
-- Language resolution order for AJAX: explicit `lang` request parameter → query var → URL prefix → referring URL → cookies → default language
+- Language resolution order for AJAX: explicit request parameter (`lang`, or the compatible `wp_loc_lang`, `wpml_lang`, `_wpml_lang`, `icl_language`, `ICL_LANGUAGE_CODE`) → query var → URL prefix → referring URL → cookies → default language
 - Language resolution is safe to call from inside an option filter. Resolving the current language itself reads options, so a theme or plugin that registers a broad `pre_option` / `option_*` filter and asks WP-LOC for the current language from inside it — for example through `$sitepress->get_current_language()` — would otherwise send the two into a loop that ends only when PHP runs out of memory. Such a re-entrant call is answered immediately with the default language instead, and the outer call goes on to resolve the real one
 
 ## Compatibility Note
