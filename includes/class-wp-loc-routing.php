@@ -75,6 +75,13 @@ class WP_LOC_Routing {
     public function handle_request( array $query_vars ): array {
         // Language front page
         if ( ! empty( $query_vars['lang'] ) && ! empty( $query_vars['is_lang_front'] ) ) {
+            // A search submitted to the language root (/en/?s=…) is a search, not the front page:
+            // forcing page_on_front here would search inside that single page and show it or 404.
+            if ( isset( $query_vars['s'] ) ) {
+                unset( $query_vars['is_lang_front'], $query_vars['pagename'] );
+                return $query_vars;
+            }
+
             $query_vars['page_id'] = get_option( 'page_on_front' );
             unset( $query_vars['pagename'] );
             return $query_vars;
@@ -95,6 +102,11 @@ class WP_LOC_Routing {
         }
 
         if ( $uri_lang && ( $uri === $uri_lang || $uri === $uri_lang . '/' ) ) {
+            if ( isset( $query_vars['s'] ) ) {
+                unset( $query_vars['pagename'] );
+                return $query_vars;
+            }
+
             $query_vars['is_lang_front'] = 1;
             $query_vars['page_id'] = get_option( 'page_on_front' );
             unset( $query_vars['pagename'] );

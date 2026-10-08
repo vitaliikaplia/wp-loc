@@ -30,6 +30,8 @@ class WP_LOC_Terms {
         add_action( 'admin_notices', [ $this, 'render_protected_term_delete_notice' ] );
         add_action( 'current_screen', [ $this, 'register_admin_ui' ] );
         add_action( 'pre_get_posts', [ $this, 'translate_term_queries' ] );
+        add_action( 'init', [ $this, 'maybe_rebuild_term_hierarchy_cache' ], 999 );
+        add_filter( 'pre_update_option', [ $this, 'keep_term_hierarchy_language_complete' ], 10, 2 );
         add_filter( 'get_terms', [ $this, 'sort_admin_terms_by_default_language_name' ], 10, 4 );
         add_filter( 'terms_clauses', [ $this, 'filter_terms_clauses' ], 10, 3 );
         add_filter( 'wp_unique_term_slug', [ $this, 'allow_duplicate_term_slugs' ], 99, 3 );
@@ -1715,15 +1717,85 @@ class WP_LOC_Terms {
     }
 
     /**
+     * Store {taxonomy}_children with the parents of every language.
+     *
+     * _get_term_hierarchy() builds the option from get_terms( 'fields' => 'id=>parent' ). The SQL filter
+     * skips that lookup, but get_term() still adjusts each row to the context language, so the map
+     * collapses to one language's IDs and get_term_children() — with it the include_children part of
+     * 'cat' queries — finds no child terms in the other languages. Build it from the raw table instead.
+     *
+     * @param mixed  $value  New option value.
+     * @param string $option Option name.
+     * @return mixed
+     */
+    public function keep_term_hierarchy_language_complete( $value, $option ) {
+        if ( ! is_array( $value ) || ! is_string( $option ) || substr( $option, -9 ) !== '_children' ) {
+            return $value;
+        }
+
+        $taxonomy = substr( $option, 0, -9 );
+        if ( ! taxonomy_exists( $taxonomy ) || ! is_taxonomy_hierarchical( $taxonomy ) || ! self::is_translatable( $taxonomy ) ) {
+            return $value;
+        }
+
+        global $wpdb;
+
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT term_id, parent FROM {$wpdb->term_taxonomy} WHERE taxonomy = %s AND parent > 0 ORDER BY term_id ASC",
+            $taxonomy
+        ) );
+
+        $children = [];
+        foreach ( (array) $rows as $row ) {
+            $children[ (int) $row->parent ][] = (int) $row->term_id;
+        }
+
+        return $children;
+    }
+
+    /**
+     * Rebuild the cached term hierarchies ({taxonomy}_children) once per plugin version.
+     *
+     * Hierarchies cached before keep_term_hierarchy_language_complete() existed — by an older WP-LOC
+     * or by another multilingual plugin that scoped term queries to one language — hold a single
+     * language's parents; rebuilding stores them through the filter above.
+     */
+    public function maybe_rebuild_term_hierarchy_cache(): void {
+        if ( get_option( 'wp_loc_term_hierarchy_cache_version' ) === WP_LOC_VERSION ) {
+            return;
+        }
+
+        foreach ( self::get_translatable_taxonomies() as $taxonomy ) {
+            if ( is_taxonomy_hierarchical( $taxonomy ) ) {
+                clean_taxonomy_cache( $taxonomy );
+            }
+        }
+
+        update_option( 'wp_loc_term_hierarchy_cache_version', WP_LOC_VERSION );
+    }
+
+    /**
      * Translate taxonomy-related query vars to the current language.
      */
     public function translate_term_queries( \WP_Query $query ): void {
-        if ( is_admin() || ! $query->is_main_query() ) {
+        // Secondary queries count too (blocks and widgets running their own WP_Query with a term ID
+        // stored on a page duplicated from another language), so the scope follows the frontend post
+        // language filter: frontend and frontend AJAX, never the admin or the block-editor REST layer.
+        if ( is_admin() && ! WP_LOC_Routing::is_frontend_ajax_request() ) {
+            return;
+        }
+
+        if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+            return;
+        }
+
+        // Unfiltered queries (get_posts() defaults) keep the IDs they were given, as the post filter does.
+        if ( ! $query->is_main_query() && $query->get( 'suppress_filters' ) ) {
             return;
         }
 
         $lang = $query->get( 'lang' ) ?: wp_loc_get_current_lang();
-        if ( ! $lang ) {
+        if ( ! $lang || $lang === 'all' ) {
             return;
         }
 
