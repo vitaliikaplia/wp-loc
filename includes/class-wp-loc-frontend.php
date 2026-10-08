@@ -260,7 +260,13 @@ function wp_loc_get_lang_switcher(): array {
             unset( $query_args[ $language_arg ] );
         }
 
-        return array_filter( $query_args, static fn( $value ): bool => $value !== null && $value !== '' );
+        // An empty `s` still matters: `?s=` is the (not yet submitted) search page, and dropping it
+        // would send the switcher to the language home instead of the search page.
+        return array_filter(
+            $query_args,
+            static fn( $value, $key ): bool => $key === 's' || ( $value !== null && $value !== '' ),
+            ARRAY_FILTER_USE_BOTH
+        );
     };
     $append_current_query_args = static function ( string $url ) use ( $get_current_query_args ): string {
         $query_args = $get_current_query_args();
