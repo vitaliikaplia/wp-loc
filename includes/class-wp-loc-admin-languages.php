@@ -144,8 +144,10 @@ class WP_LOC_Admin_Languages {
                 wp_die( sprintf( __( 'Missing display name for locale %s', 'wp-loc' ), esc_html( $locale ) ) );
             }
 
+            // Fold the Greek final sigma: mb_strtolower() only applies it since PHP 8.3,
+            // so the key would otherwise differ between PHP versions.
             $display_name_key = function_exists( 'mb_strtolower' )
-                ? mb_strtolower( $display_name )
+                ? str_replace( 'ς', 'σ', mb_strtolower( $display_name ) )
                 : strtolower( $display_name );
 
             if ( in_array( $display_name_key, $display_names, true ) ) {
