@@ -4,7 +4,12 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class WP_LOC_Frontend {
 
+    /** @var \WeakMap<\WP_Query, array{lang: string, post_types: string[]}> queries and their language scope */
+    private \WeakMap $language_scoped_queries;
+
     public function __construct() {
+        $this->language_scoped_queries = new \WeakMap();
+
         add_filter( 'language_attributes', [ $this, 'html_lang_attribute' ] );
         add_action( 'wp_head', [ $this, 'output_hreflang_tags' ] );
         add_action( 'pre_get_posts', [ $this, 'filter_posts_by_language' ] );
@@ -50,7 +55,9 @@ class WP_LOC_Frontend {
     }
 
     private function get_frontend_alternate_links(): array {
-        $switcher = wp_loc_get_lang_switcher();
+        // Alternates name each language's version of the page itself: no tracking or filter
+        // arguments from this request, and the current language too, even when the switcher hides it.
+        $switcher = wp_loc_get_lang_switcher( [ 'query_args' => false, 'display_settings' => false ] );
 
         if ( empty( $switcher ) ) {
             return [];
@@ -102,10 +109,14 @@ class WP_LOC_Frontend {
      * Filter frontend posts by current language
      */
     public function filter_posts_by_language( \WP_Query $query ): void {
+        // Each run of a query is scoped afresh: a WP_Query object reused for another language
+        // must not keep the conditions of its previous run.
+        unset( $this->language_scoped_queries[ $query ] );
+
         if ( $query->get( 'suppress_filters' ) ) return;
 
         $lang_slug = $query->get( 'lang' ) ?: $this->get_query_context_language();
-        if ( ! $lang_slug || $lang_slug === 'all' ) return;
+        if ( ! is_string( $lang_slug ) || $lang_slug === '' || $lang_slug === 'all' ) return;
 
         $active = WP_LOC_Languages::get_active_languages();
         if ( ! isset( $active[ $lang_slug ] ) ) return;
@@ -121,43 +132,56 @@ class WP_LOC_Frontend {
             return;
         }
 
-        $table = WP_LOC::instance()->db->get_table();
+        $this->language_scoped_queries[ $query ] = [
+            'lang'       => $db_lang,
+            'post_types' => $filterable_post_types,
+        ];
 
-        add_filter( 'posts_join', function ( $join, \WP_Query $filtered_query ) use ( $table, $query, $filterable_post_types ) {
-            if ( $filtered_query !== $query ) {
-                return $join;
-            }
+        // Added on first use, as the per-query closures before them were: after the posts_join and
+        // posts_where callbacks that other code registered at the same priority up to that point.
+        if ( ! has_filter( 'posts_where', [ $this, 'where_post_language' ] ) ) {
+            add_filter( 'posts_join', [ $this, 'join_post_language' ], 10, 2 );
+            add_filter( 'posts_where', [ $this, 'where_post_language' ], 10, 2 );
+        }
+    }
 
-            global $wpdb;
-            if ( strpos( $join, 'wp_loc_ft' ) !== false ) return $join;
-            $element_types = array_map(
-                static fn( string $post_type ): string => 'post_' . $post_type,
-                $filterable_post_types
-            );
-            $quoted_element_types = "'" . implode( "','", array_map( 'esc_sql', $element_types ) ) . "'";
-            $join .= " LEFT JOIN {$table} AS wp_loc_ft
-                ON {$wpdb->posts}.ID = wp_loc_ft.element_id
-                AND wp_loc_ft.element_type IN ({$quoted_element_types})";
+    public function join_post_language( $join, \WP_Query $query ) {
+        if ( ! isset( $this->language_scoped_queries[ $query ] ) || strpos( $join, 'wp_loc_ft' ) !== false ) {
             return $join;
-        }, 10, 2 );
+        }
 
-        add_filter( 'posts_where', function ( $where, \WP_Query $filtered_query ) use ( $db_lang, $query, $filterable_post_types ) {
-            if ( $filtered_query !== $query ) {
-                return $where;
-            }
+        global $wpdb;
+        $table = WP_LOC::instance()->db->get_table();
+        $element_types = array_map(
+            static fn( string $post_type ): string => 'post_' . $post_type,
+            $this->language_scoped_queries[ $query ]['post_types']
+        );
+        $quoted_element_types = "'" . implode( "','", array_map( 'esc_sql', $element_types ) ) . "'";
+        $join .= " LEFT JOIN {$table} AS wp_loc_ft
+            ON {$wpdb->posts}.ID = wp_loc_ft.element_id
+            AND wp_loc_ft.element_type IN ({$quoted_element_types})";
 
-            global $wpdb;
-            $quoted_post_types = "'" . implode( "','", array_map( 'esc_sql', $filterable_post_types ) ) . "'";
-            $where .= $wpdb->prepare(
-                " AND (
-                    {$wpdb->posts}.post_type NOT IN ({$quoted_post_types})
-                    OR wp_loc_ft.language_code = %s
-                    OR wp_loc_ft.element_id IS NULL
-                )",
-                $db_lang
-            );
+        return $join;
+    }
+
+    public function where_post_language( $where, \WP_Query $query ) {
+        if ( ! isset( $this->language_scoped_queries[ $query ] ) ) {
             return $where;
-        }, 10, 2 );
+        }
+
+        global $wpdb;
+        $scope = $this->language_scoped_queries[ $query ];
+        $quoted_post_types = "'" . implode( "','", array_map( 'esc_sql', $scope['post_types'] ) ) . "'";
+        $where .= $wpdb->prepare(
+            " AND (
+                {$wpdb->posts}.post_type NOT IN ({$quoted_post_types})
+                OR wp_loc_ft.language_code = %s
+                OR wp_loc_ft.element_id IS NULL
+            )",
+            $scope['lang']
+        );
+
+        return $where;
     }
 
     private function get_query_context_language(): ?string {
@@ -229,23 +253,35 @@ class WP_LOC_Frontend {
 /**
  * Get language switcher data for templates
  *
+ * @param array $args {
+ *     @type bool $query_args       Carry the request's query arguments (a search, filters) over to
+ *                                  every language's URL. Default true.
+ *     @type bool $display_settings Apply the switcher settings that hide the current language and
+ *                                  untranslated ones. Default true.
+ * }
  * @return array [ ['code' => 'uk', 'locale' => 'uk', 'active' => true, 'url' => '...', 'flag' => '...', 'name' => '...'], ... ]
  */
-function wp_loc_get_lang_switcher(): array {
+function wp_loc_get_lang_switcher( array $args = [] ): array {
+    $args = wp_parse_args( $args, [ 'query_args' => true, 'display_settings' => true ] );
     $active = WP_LOC_Languages::get_active_languages();
     $current = wp_loc_get_current_lang();
     $default = WP_LOC_Languages::get_default_language();
     $db = WP_LOC::instance()->db;
-    $hide_current = WP_LOC_Admin_Settings::hide_current_language_in_switcher();
-    $hide_untranslated = WP_LOC_Admin_Settings::hide_untranslated_languages_in_switcher();
+    $hide_current = $args['display_settings'] && WP_LOC_Admin_Settings::hide_current_language_in_switcher();
+    $hide_untranslated = $args['display_settings'] && WP_LOC_Admin_Settings::hide_untranslated_languages_in_switcher();
     $fallback_to_home = WP_LOC_Admin_Settings::fallback_untranslated_switcher_links_to_home();
+    $keep_query_args = (bool) $args['query_args'];
 
     // Use raw home URL to avoid the home_url language prefix filter
     $home = rtrim( set_url_scheme( get_option( 'home' ) ), '/' );
     $build_home_url = static function ( string $code ) use ( $home, $default ): string {
         return $home . ( $code === $default ? '/' : "/{$code}/" );
     };
-    $get_current_query_args = static function (): array {
+    $get_current_query_args = static function () use ( $keep_query_args ): array {
+        if ( ! $keep_query_args ) {
+            return [];
+        }
+
         $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( (string) $_SERVER['REQUEST_URI'] ) : '/';
         $query = parse_url( $request_uri, PHP_URL_QUERY );
 
@@ -268,10 +304,21 @@ function wp_loc_get_lang_switcher(): array {
             ARRAY_FILTER_USE_BOTH
         );
     };
-    $append_current_query_args = static function ( string $url ) use ( $get_current_query_args ): string {
+    // wp_parse_str() hands back decoded keys and values, and add_query_arg() does not encode them
+    // again: a search for "a&b", "C++" or "#1" would otherwise split, turn into spaces or end the URL.
+    $encode_query_args = static function ( array $query_args ) use ( &$encode_query_args ): array {
+        $encoded = [];
+
+        foreach ( $query_args as $key => $value ) {
+            $encoded[ urlencode( (string) $key ) ] = is_array( $value ) ? $encode_query_args( $value ) : urlencode( (string) $value );
+        }
+
+        return $encoded;
+    };
+    $append_current_query_args = static function ( string $url ) use ( $get_current_query_args, $encode_query_args ): string {
         $query_args = $get_current_query_args();
 
-        return empty( $query_args ) ? $url : add_query_arg( $query_args, $url );
+        return empty( $query_args ) ? $url : add_query_arg( $encode_query_args( $query_args ), $url );
     };
     $get_clean_request_path = static function () use ( $active ): string {
         $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( (string) $_SERVER['REQUEST_URI'] ) : '/';

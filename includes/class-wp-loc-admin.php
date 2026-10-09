@@ -4,7 +4,12 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class WP_LOC_Admin {
 
+    /** @var \WeakMap<\WP_Query, array{lang: string, element_type: string}> admin list queries and their language scope */
+    private \WeakMap $language_scoped_queries;
+
     public function __construct() {
+        $this->language_scoped_queries = new \WeakMap();
+
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
         add_action( 'admin_bar_menu', [ $this, 'admin_bar_lang_switcher' ], 100 );
         add_action( 'admin_init', [ $this, 'handle_lang_switch' ] );
@@ -449,6 +454,11 @@ class WP_LOC_Admin {
      * Filter post list by current admin language
      */
     public function filter_posts_by_language( \WP_Query $query ): void {
+        // The list query can run more than once in a request (WP_Posts_List_Table::prepare_items()
+        // calls wp_edit_posts_query() again); each run is scoped afresh, with the language of the
+        // moment, instead of stacking a second JOIN on the first.
+        unset( $this->language_scoped_queries[ $query ] );
+
         if ( ! is_admin() || ! $query->is_main_query() ) return;
 
         $screen = get_current_screen();
@@ -459,32 +469,42 @@ class WP_LOC_Admin {
 
         if ( ! WP_LOC_Admin_Settings::is_translatable( $post_type ) ) return;
 
-        $lang = WP_LOC_DB::to_db_language_code( self::get_admin_lang() ) ?: self::get_admin_lang();
-        $element_type = WP_LOC_DB::post_element_type( $post_type );
-        $table = WP_LOC::instance()->db->get_table();
+        $this->language_scoped_queries[ $query ] = [
+            'lang'         => WP_LOC_DB::to_db_language_code( self::get_admin_lang() ) ?: self::get_admin_lang(),
+            'element_type' => WP_LOC_DB::post_element_type( $post_type ),
+        ];
 
-        add_filter( 'posts_join', function ( $join, \WP_Query $filtered_query ) use ( $table, $element_type, $query ) {
-            if ( $filtered_query !== $query ) {
-                return $join;
-            }
+        // Added on first use, as the per-query closures before them were: after the posts_join and
+        // posts_where callbacks that other code registered at the same priority up to that point.
+        if ( ! has_filter( 'posts_where', [ $this, 'where_post_language' ] ) ) {
+            add_filter( 'posts_join', [ $this, 'join_post_language' ], 10, 2 );
+            add_filter( 'posts_where', [ $this, 'where_post_language' ], 10, 2 );
+        }
+    }
 
-            global $wpdb;
-            $join .= " LEFT JOIN {$table} AS wp_loc_t ON {$wpdb->posts}.ID = wp_loc_t.element_id AND wp_loc_t.element_type = '" . esc_sql( $element_type ) . "'";
+    public function join_post_language( $join, \WP_Query $query ) {
+        if ( ! isset( $this->language_scoped_queries[ $query ] ) ) {
             return $join;
-        }, 10, 2 );
+        }
 
-        add_filter( 'posts_where', function ( $where, \WP_Query $filtered_query ) use ( $lang, $query ) {
-            if ( $filtered_query !== $query ) {
-                return $where;
-            }
+        global $wpdb;
+        $table = WP_LOC::instance()->db->get_table();
+        $element_type = $this->language_scoped_queries[ $query ]['element_type'];
 
-            global $wpdb;
-            $where .= $wpdb->prepare(
-                " AND (wp_loc_t.language_code = %s OR wp_loc_t.language_code IS NULL)",
-                $lang
-            );
+        return $join . " LEFT JOIN {$table} AS wp_loc_t ON {$wpdb->posts}.ID = wp_loc_t.element_id AND wp_loc_t.element_type = '" . esc_sql( $element_type ) . "'";
+    }
+
+    public function where_post_language( $where, \WP_Query $query ) {
+        if ( ! isset( $this->language_scoped_queries[ $query ] ) ) {
             return $where;
-        }, 10, 2 );
+        }
+
+        global $wpdb;
+
+        return $where . $wpdb->prepare(
+            " AND (wp_loc_t.language_code = %s OR wp_loc_t.language_code IS NULL)",
+            $this->language_scoped_queries[ $query ]['lang']
+        );
     }
 
     /**

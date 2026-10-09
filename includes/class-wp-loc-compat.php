@@ -64,7 +64,8 @@ class WP_LOC_Compat {
         }
 
         $urls = [];
-        foreach ( wp_loc_get_lang_switcher() as $language ) {
+        // WPML lists every active language with its URL; hiding some is the theme's choice here.
+        foreach ( wp_loc_get_lang_switcher( [ 'display_settings' => false ] ) as $language ) {
             $code = sanitize_key( (string) ( $language['code'] ?? '' ) );
             $url = (string) ( $language['url'] ?? '' );
 

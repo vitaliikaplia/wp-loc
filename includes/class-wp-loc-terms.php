@@ -29,7 +29,8 @@ class WP_LOC_Terms {
         add_action( 'wp_ajax_wp_loc_translate_term_name', [ $this, 'ajax_translate_term_name' ] );
         add_action( 'admin_notices', [ $this, 'render_protected_term_delete_notice' ] );
         add_action( 'current_screen', [ $this, 'register_admin_ui' ] );
-        add_action( 'pre_get_posts', [ $this, 'translate_term_queries' ] );
+        // Late, so term IDs that themes and plugins put into the query on pre_get_posts are translated too.
+        add_action( 'pre_get_posts', [ $this, 'translate_term_queries' ], 1000 );
         add_action( 'init', [ $this, 'maybe_rebuild_term_hierarchy_cache' ], 999 );
         add_filter( 'pre_update_option', [ $this, 'keep_term_hierarchy_language_complete' ], 10, 2 );
         add_filter( 'get_terms', [ $this, 'sort_admin_terms_by_default_language_name' ], 10, 4 );
@@ -1761,17 +1762,29 @@ class WP_LOC_Terms {
      * language's parents; rebuilding stores them through the filter above.
      */
     public function maybe_rebuild_term_hierarchy_cache(): void {
-        if ( get_option( 'wp_loc_term_hierarchy_cache_version' ) === WP_LOC_VERSION ) {
-            return;
-        }
+        // The plugin version each taxonomy was last rebuilt for. A taxonomy that is not registered
+        // in this request (WP-CLI with --skip-themes, a theme that registers it late) waits for a
+        // request that has it instead of being marked done with its old hierarchy still cached.
+        $rebuilt = get_option( 'wp_loc_term_hierarchy_cache_version' );
+        $rebuilt = is_array( $rebuilt ) ? $rebuilt : [];
+        $changed = false;
 
         foreach ( self::get_translatable_taxonomies() as $taxonomy ) {
+            if ( ( $rebuilt[ $taxonomy ] ?? null ) === WP_LOC_VERSION || ! taxonomy_exists( $taxonomy ) ) {
+                continue;
+            }
+
             if ( is_taxonomy_hierarchical( $taxonomy ) ) {
                 clean_taxonomy_cache( $taxonomy );
             }
+
+            $rebuilt[ $taxonomy ] = WP_LOC_VERSION;
+            $changed = true;
         }
 
-        update_option( 'wp_loc_term_hierarchy_cache_version', WP_LOC_VERSION );
+        if ( $changed ) {
+            update_option( 'wp_loc_term_hierarchy_cache_version', $rebuilt );
+        }
     }
 
     /**
@@ -1789,13 +1802,11 @@ class WP_LOC_Terms {
             return;
         }
 
-        // Unfiltered queries (get_posts() defaults) keep the IDs they were given, as the post filter does.
-        if ( ! $query->is_main_query() && $query->get( 'suppress_filters' ) ) {
-            return;
-        }
+        // Unfiltered queries (get_posts() defaults) are translated as well: their term look-ups are
+        // language-scoped like any other, so a term ID from another language would match nothing.
 
         $lang = $query->get( 'lang' ) ?: wp_loc_get_current_lang();
-        if ( ! $lang || $lang === 'all' ) {
+        if ( ! is_string( $lang ) || $lang === '' || $lang === 'all' ) {
             return;
         }
 
@@ -1814,7 +1825,12 @@ class WP_LOC_Terms {
         }
 
         $translate_clause = function ( array $clause ) use ( $lang, &$translate_clause ) {
-            if ( isset( $clause['relation'] ) ) {
+            // A nested group, with or without its own 'relation': the test WP_Tax_Query uses.
+            $is_first_order = array_key_exists( 'terms', $clause ) || array_key_exists( 'taxonomy', $clause )
+                || array_key_exists( 'include_children', $clause ) || array_key_exists( 'field', $clause )
+                || array_key_exists( 'operator', $clause );
+
+            if ( ! $is_first_order ) {
                 foreach ( $clause as $key => $value ) {
                     if ( is_array( $value ) ) {
                         $clause[ $key ] = $translate_clause( $value );
@@ -1824,14 +1840,12 @@ class WP_LOC_Terms {
                 return $clause;
             }
 
-            $taxonomy = $clause['taxonomy'] ?? '';
-            $field = $clause['field'] ?? 'term_id';
+            $taxonomy = is_string( $clause['taxonomy'] ?? null ) ? $clause['taxonomy'] : '';
+            $field = strtolower( (string) ( $clause['field'] ?? 'term_id' ) );
 
-            if ( ! $taxonomy || ! self::is_translatable( $taxonomy ) ) {
-                return $clause;
-            }
-
-            if ( ! in_array( $field, [ 'term_id', 'id' ], true ) ) {
+            // Slugs and names are looked up in the query's language already; anything else that
+            // WP_Tax_Query does not know is a term ID to it.
+            if ( ! $taxonomy || ! self::is_translatable( $taxonomy ) || in_array( $field, [ 'slug', 'name' ], true ) ) {
                 return $clause;
             }
 
@@ -1839,7 +1853,9 @@ class WP_LOC_Terms {
             $translated_terms = [];
 
             foreach ( $terms as $term_id ) {
-                $translated_terms[] = self::get_term_translation( $term_id, $taxonomy, $lang ) ?: $term_id;
+                $translated_terms[] = $field === 'term_taxonomy_id'
+                    ? ( WP_LOC::instance()->db->get_element_translation( $term_id, WP_LOC_DB::tax_element_type( $taxonomy ), $lang ) ?: $term_id )
+                    : ( self::get_term_translation( $term_id, $taxonomy, $lang ) ?: $term_id );
             }
 
             $clause['terms'] = $translated_terms;

@@ -19,6 +19,7 @@ class WP_LOC_Routing {
         add_filter( 'rewrite_rules_array', [ $this, 'add_rewrite_rules' ] );
         add_filter( 'query_vars', [ $this, 'register_query_vars' ] );
         add_filter( 'request', [ $this, 'handle_request' ] );
+        add_action( 'parse_query', [ $this, 'correct_language_front_paging' ] );
         add_action( 'init', [ $this, 'bootstrap_ajax_language_context' ], 0 );
         add_action( 'template_redirect', [ $this, 'redirect_language_front_trailing_slash' ], 0 );
         add_action( 'template_redirect', [ $this, 'set_locale' ], 1 );
@@ -63,9 +64,10 @@ class WP_LOC_Routing {
      * Register lang query vars
      */
     public function register_query_vars( array $vars ): array {
+        // is_lang_front has to be public for the ^{lang}/?$ rewrite rule to pass it on;
+        // wp_loc_invalid_term_lang is set by handle_request() only, never read from the URL.
         $vars[] = 'lang';
         $vars[] = 'is_lang_front';
-        $vars[] = 'wp_loc_invalid_term_lang';
         return $vars;
     }
 
@@ -73,23 +75,23 @@ class WP_LOC_Routing {
      * Handle request: resolve pagename + lang to correct post
      */
     public function handle_request( array $query_vars ): array {
-        // Language front page
-        if ( ! empty( $query_vars['lang'] ) && ! empty( $query_vars['is_lang_front'] ) ) {
-            // A search submitted to the language root (/en/?s=…) is a search, not the front page:
-            // forcing page_on_front here would search inside that single page and show it or 404.
-            if ( isset( $query_vars['s'] ) ) {
-                unset( $query_vars['is_lang_front'], $query_vars['pagename'] );
-                return $query_vars;
-            }
+        $active_languages = WP_LOC_Languages::get_active_languages();
 
-            $query_vars['page_id'] = get_option( 'page_on_front' );
-            unset( $query_vars['pagename'] );
-            return $query_vars;
+        // lang is a public query var, so the URL can make it anything: ?lang[]=en arrives as an
+        // array and ?lang=uk as a DB code, while the post and term filters and get_current_lang()
+        // expect an active language slug. A value that names no active language is dropped.
+        if ( isset( $query_vars['lang'] ) && $query_vars['lang'] !== 'all' ) {
+            $lang = is_scalar( $query_vars['lang'] ) ? self::normalize_language_context( (string) $query_vars['lang'] ) : null;
+
+            if ( $lang ) {
+                $query_vars['lang'] = $lang;
+            } else {
+                unset( $query_vars['lang'] );
+            }
         }
 
-        $active_languages = WP_LOC_Languages::get_active_languages();
         $uri_lang = null;
-        $uri = trim( parse_url( $_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH ), '/' );
+        $uri = trim( (string) parse_url( $_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH ), '/' );
         $parts = explode( '/', $uri );
         $first = $parts[0] ?? '';
 
@@ -101,25 +103,36 @@ class WP_LOC_Routing {
             $query_vars['lang'] = $uri_lang;
         }
 
-        if ( $uri_lang && ( $uri === $uri_lang || $uri === $uri_lang . '/' ) ) {
-            if ( isset( $query_vars['s'] ) ) {
-                unset( $query_vars['pagename'] );
-                return $query_vars;
+        // Without the ^{lang}/?$ rule (rewrite rules not flushed yet) the language root itself
+        // arrives as a page path named after the language.
+        if ( $uri_lang && $uri === $uri_lang && ( $query_vars['pagename'] ?? null ) === $uri_lang ) {
+            unset( $query_vars['pagename'] );
+        }
+
+        if ( $this->is_language_front_request( $query_vars ) ) {
+            $query_vars['is_lang_front'] = 1;
+            unset( $query_vars['pagename'] );
+
+            if ( get_option( 'show_on_front' ) === 'page' && get_option( 'page_on_front' ) ) {
+                $query_vars['page_id'] = get_option( 'page_on_front' );
             }
 
-            $query_vars['is_lang_front'] = 1;
-            $query_vars['page_id'] = get_option( 'page_on_front' );
-            unset( $query_vars['pagename'] );
             return $query_vars;
         }
 
-        $effective_lang = isset( $query_vars['lang'] ) && $query_vars['lang']
-            ? (string) $query_vars['lang']
+        // Anything else on a language root — a search (/en/?s=…), a shortlink (/en/?p=ID),
+        // ?cat=, ?page_id= — is that request, not the front page, and keeps canonical redirects.
+        unset( $query_vars['is_lang_front'] );
+
+        $effective_lang = isset( $query_vars['lang'] ) && is_string( $query_vars['lang'] ) && $query_vars['lang'] !== ''
+            ? $query_vars['lang']
             : WP_LOC_Languages::get_default_language();
 
         // Resolve pagename with language
-        if ( isset( $query_vars['pagename'] ) && $effective_lang ) {
-            $post_id = $this->resolve_pagename_to_post_id( (string) $query_vars['pagename'], $effective_lang, $active_languages );
+        $pagename = self::get_string_query_var( $query_vars, 'pagename' );
+
+        if ( $pagename !== '' && $effective_lang ) {
+            $post_id = $this->resolve_pagename_to_post_id( $pagename, $effective_lang, $active_languages );
 
             if ( $post_id ) {
                 $query_vars = $this->set_resolved_singular_query_vars( $query_vars, $post_id );
@@ -127,8 +140,10 @@ class WP_LOC_Routing {
             }
         }
 
-        if ( isset( $query_vars['name'] ) && $effective_lang ) {
-            $post_id = $this->resolve_pagename_to_post_id( (string) $query_vars['name'], $effective_lang, $active_languages );
+        $name = self::get_string_query_var( $query_vars, 'name' );
+
+        if ( $name !== '' && $effective_lang ) {
+            $post_id = $this->resolve_pagename_to_post_id( $name, $effective_lang, $active_languages );
 
             if ( $post_id ) {
                 $query_vars = $this->set_resolved_singular_query_vars( $query_vars, $post_id );
@@ -138,6 +153,47 @@ class WP_LOC_Routing {
         $query_vars = $this->resolve_translated_term_request( $query_vars, $effective_lang );
 
         return $query_vars;
+    }
+
+    /**
+     * Whether a request names a language and nothing else that picks content — the test WP_Query
+     * itself uses before it shows page_on_front, which the extra lang key would always fail.
+     * So /en/, /en/page/2/ and /?lang=en are the front page, while /en/?p=ID, /en/?s=… and
+     * /en/?cat=ID are the post, the search and the category they ask for, as on the site root.
+     */
+    private function is_language_front_request( array $query_vars ): bool {
+        if ( empty( $query_vars['lang'] ) || $query_vars['lang'] === 'all' ) {
+            return false;
+        }
+
+        // Some rewrite rules set an empty pagename; WP_Query ignores it too.
+        if ( isset( $query_vars['pagename'] ) && $query_vars['pagename'] === '' ) {
+            unset( $query_vars['pagename'] );
+        }
+
+        return ! array_diff( array_keys( $query_vars ), [ 'lang', 'is_lang_front', 'preview', 'page', 'paged', 'cpage', 'embed' ] );
+    }
+
+    /**
+     * Page a language front page the way WP_Query pages its own: /{lang}/page/2/ is page 2 of
+     * page_on_front, held in 'page' rather than 'paged'. Setting 'page' in handle_request()
+     * instead would make WP::handle_404() reject a front page without <!--nextpage-->.
+     */
+    public function correct_language_front_paging( \WP_Query $query ): void {
+        if ( ! $query->is_main_query() || ! $query->get( 'is_lang_front' ) || ! $query->get( 'page_id' ) || ! $query->get( 'paged' ) ) {
+            return;
+        }
+
+        $query->set( 'page', $query->get( 'paged' ) );
+        $query->set( 'paged', '' );
+    }
+
+    /**
+     * A request query var as a string. Public query vars come straight from the URL, so ?name[]=x
+     * makes one an array, which none of the routing here can use.
+     */
+    private static function get_string_query_var( array $query_vars, string $key ): string {
+        return isset( $query_vars[ $key ] ) && is_scalar( $query_vars[ $key ] ) ? (string) $query_vars[ $key ] : '';
     }
 
     private function set_resolved_singular_query_vars( array $query_vars, int $post_id ): array {
@@ -302,21 +358,23 @@ class WP_LOC_Routing {
         $taxonomies_to_check = [];
 
         if ( isset( $query_vars['category_name'] ) ) {
-            $taxonomies_to_check['category'] = (string) $query_vars['category_name'];
+            $taxonomies_to_check['category'] = self::get_string_query_var( $query_vars, 'category_name' );
         }
 
         if ( isset( $query_vars['tag'] ) ) {
-            $taxonomies_to_check['post_tag'] = (string) $query_vars['tag'];
+            $taxonomies_to_check['post_tag'] = self::get_string_query_var( $query_vars, 'tag' );
         }
 
         foreach ( WP_LOC_Terms::get_translatable_taxonomies() as $taxonomy ) {
             if ( isset( $query_vars[ $taxonomy ] ) ) {
-                $taxonomies_to_check[ $taxonomy ] = (string) $query_vars[ $taxonomy ];
+                $taxonomies_to_check[ $taxonomy ] = self::get_string_query_var( $query_vars, $taxonomy );
             }
         }
 
-        if ( isset( $query_vars['taxonomy'], $query_vars['term'] ) ) {
-            $taxonomies_to_check[ (string) $query_vars['taxonomy'] ] = (string) $query_vars['term'];
+        $taxonomy_var = self::get_string_query_var( $query_vars, 'taxonomy' );
+
+        if ( $taxonomy_var !== '' && isset( $query_vars['term'] ) ) {
+            $taxonomies_to_check[ $taxonomy_var ] = self::get_string_query_var( $query_vars, 'term' );
         }
 
         foreach ( $taxonomies_to_check as $taxonomy => $path ) {
@@ -723,7 +781,8 @@ class WP_LOC_Routing {
             global $wp_query;
 
             if ( ! $lang && $wp_query instanceof \WP_Query ) {
-                $lang = get_query_var( 'lang' );
+                $query_lang = get_query_var( 'lang' );
+                $lang = is_string( $query_lang ) ? $query_lang : null;
             }
 
             // 3. Fallback: parse from URI
