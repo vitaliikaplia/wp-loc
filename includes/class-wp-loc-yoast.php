@@ -64,6 +64,7 @@ class WP_LOC_Yoast {
         add_filter( 'wpseo_breadcrumb_indexables', [ $this, 'filter_breadcrumb_indexables' ], 20, 1 );
         add_filter( 'wpseo_sitemap_urlset', [ $this, 'filter_sitemap_urlset' ], 20, 1 );
         add_filter( 'wpseo_sitemap_entry', [ $this, 'filter_sitemap_entry' ], 20, 3 );
+        add_filter( 'get_terms', [ $this, 'prime_sitemap_term_translations' ], 30 );
         add_filter( 'wpseo_sitemap_url', [ $this, 'filter_sitemap_url' ], 20, 2 );
         add_filter( 'wpseo_sitemap_post_type_first_links', [ $this, 'filter_sitemap_post_type_first_links' ], 20, 2 );
         add_filter( 'Yoast\\WP\\News\\publication_language', [ $this, 'filter_news_publication_language' ], 20, 2 );
@@ -471,6 +472,25 @@ class WP_LOC_Yoast {
         }
 
         return $entry;
+    }
+
+    /**
+     * A taxonomy sitemap page fetches its terms with get_terms() and then builds every term's
+     * alternates — the translated terms and their links — one entry at a time: load them all first.
+     */
+    public function prime_sitemap_term_translations( $terms ) {
+        $sitemap = get_query_var( 'sitemap' );
+
+        if ( ! is_array( $terms ) || ! is_string( $sitemap ) || ! taxonomy_exists( $sitemap ) || ! WP_LOC_Admin_Settings::is_yoast_sitemap_alternates_enabled() ) {
+            return $terms;
+        }
+
+        WP_LOC_Terms::prime_term_list_translations(
+            array_filter( $terms, static fn( $term ) => $term instanceof \WP_Term && $term->taxonomy === $sitemap ),
+            true
+        );
+
+        return $terms;
     }
 
     public function filter_sitemap_url( string $output, array $url ): string {

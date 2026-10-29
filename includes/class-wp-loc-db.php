@@ -182,15 +182,107 @@ class WP_LOC_DB {
 
         $rows = $wpdb->get_results( "SELECT element_id, language_code, source_language_code FROM {$this->table} {$where}" );
 
+        $result = self::index_translation_rows( $rows );
+        wp_cache_set( $cache_key, $result, 'wp_loc' );
+
+        return $result;
+    }
+
+    /**
+     * Key translation rows by language slug, in the shape get_element_translations() caches.
+     */
+    private static function index_translation_rows( array $rows ): array {
         $result = [];
         foreach ( $rows as $row ) {
-            $row->element_id = (int) $row->element_id;
-            $row->language_code = self::from_db_language_code( $row->language_code ) ?: (string) $row->language_code;
-            $row->source_language_code = self::from_db_language_code( $row->source_language_code );
+            $row = (object) [
+                'element_id'           => (int) $row->element_id,
+                'language_code'        => self::from_db_language_code( $row->language_code ) ?: (string) $row->language_code,
+                'source_language_code' => self::from_db_language_code( $row->source_language_code ),
+            ];
             $result[ $row->language_code ] = $row;
         }
 
-        wp_cache_set( $cache_key, $result, 'wp_loc' );
+        return $result;
+    }
+
+    /**
+     * Load the trid, language and translation group of many elements of one type in a few queries,
+     * so that a loop over them finds every lookup above in the cache. Already cached entries are
+     * kept and not queried again.
+     */
+    public function prime_elements( array $element_ids, string $element_type ): void {
+        global $wpdb;
+
+        foreach ( array_chunk( self::uncached_ids( $element_ids, "trid_{$element_type}_" ), 500 ) as $chunk ) {
+            $rows = $wpdb->get_results( $wpdb->prepare(
+                "SELECT element_id, trid, language_code FROM {$this->table} WHERE element_type = %s AND element_id IN (" . implode( ',', $chunk ) . ')',
+                $element_type
+            ) );
+
+            $values = [];
+            foreach ( $chunk as $element_id ) {
+                $values[ "trid_{$element_type}_{$element_id}" ] = 0;
+                $values[ "lang_{$element_type}_{$element_id}" ] = '';
+            }
+            foreach ( $rows as $row ) {
+                $values[ "trid_{$element_type}_{$row->element_id}" ] = (int) $row->trid;
+                $values[ "lang_{$element_type}_{$row->element_id}" ] = self::from_db_language_code( $row->language_code ) ?: '';
+            }
+
+            wp_cache_set_multiple( $values, 'wp_loc' );
+        }
+
+        $trids = [];
+        foreach ( self::get_cached_ids( $element_ids, "trid_{$element_type}_" ) as $trid ) {
+            if ( $trid ) {
+                $trids[] = $trid;
+            }
+        }
+
+        foreach ( array_chunk( self::uncached_ids( $trids, 'translations_' ), 500 ) as $chunk ) {
+            $rows = $wpdb->get_results( $wpdb->prepare(
+                "SELECT trid, element_id, language_code, source_language_code FROM {$this->table} WHERE element_type = %s AND trid IN (" . implode( ',', $chunk ) . ')',
+                $element_type
+            ) );
+
+            $groups = array_fill_keys( $chunk, [] );
+            foreach ( $rows as $row ) {
+                $groups[ (int) $row->trid ][] = $row;
+            }
+
+            $values = [];
+            foreach ( $groups as $trid => $group_rows ) {
+                $values[ "translations_{$trid}" ] = self::index_translation_rows( $group_rows );
+            }
+
+            wp_cache_set_multiple( $values, 'wp_loc' );
+        }
+    }
+
+    /**
+     * The positive IDs of a list whose "{$key_prefix}{$id}" entry is not in the wp_loc cache group.
+     */
+    public static function uncached_ids( array $ids, string $key_prefix ): array {
+        $cached = self::get_cached_ids( $ids, $key_prefix );
+
+        return array_keys( array_filter( $cached, static fn( $value ) => $value === false ) );
+    }
+
+    /**
+     * The wp_loc cache entries "{$key_prefix}{$id}" of a list of IDs, keyed by ID (false when missing).
+     */
+    public static function get_cached_ids( array $ids, string $key_prefix ): array {
+        $ids = array_values( array_unique( array_filter( array_map( 'intval', $ids ), static fn( $id ) => $id > 0 ) ) );
+        if ( ! $ids ) {
+            return [];
+        }
+
+        $cached = wp_cache_get_multiple( array_map( static fn( $id ) => $key_prefix . $id, $ids ), 'wp_loc' );
+
+        $result = [];
+        foreach ( $ids as $id ) {
+            $result[ $id ] = $cached[ $key_prefix . $id ] ?? false;
+        }
 
         return $result;
     }

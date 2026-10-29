@@ -23,6 +23,10 @@ class WP_LOC_Terms {
         add_action( 'admin_init', [ $this, 'normalize_bulk_delete_request' ], 1 );
         add_action( 'delete_term', [ $this, 'cascade_delete_term_translations' ], 5, 5 );
         add_action( 'delete_term', [ $this, 'delete_term_language' ], 10, 4 );
+        add_action( 'clean_term_cache', [ $this, 'forget_cleaned_term_ids' ], 10, 2 );
+        add_action( 'create_term', [ $this, 'forget_created_or_deleted_term_ids' ], 0, 3 );
+        add_action( 'delete_term', [ $this, 'forget_created_or_deleted_term_ids' ], 0, 3 );
+        add_action( 'split_shared_term', [ $this, 'forget_split_term_ids' ], 0, 4 );
 
         add_action( 'wp_ajax_wp_loc_create_term_translation', [ $this, 'ajax_create_term_translation' ] );
         add_action( 'wp_ajax_wp_loc_refresh_term_translations', [ $this, 'ajax_refresh_term_translations' ] );
@@ -34,6 +38,7 @@ class WP_LOC_Terms {
         add_action( 'init', [ $this, 'maybe_rebuild_term_hierarchy_cache' ], 999 );
         add_filter( 'pre_update_option', [ $this, 'keep_term_hierarchy_language_complete' ], 10, 2 );
         add_filter( 'get_terms', [ $this, 'sort_admin_terms_by_default_language_name' ], 10, 4 );
+        add_filter( 'get_terms', [ $this, 'prime_listed_term_translations' ], 20 );
         add_filter( 'terms_clauses', [ $this, 'filter_terms_clauses' ], 10, 3 );
         add_filter( 'wp_unique_term_slug', [ $this, 'allow_duplicate_term_slugs' ], 99, 3 );
         add_filter( 'wp_insert_term_duplicate_term_check', [ $this, 'filter_duplicate_term_check' ], 10, 5 );
@@ -137,32 +142,219 @@ class WP_LOC_Terms {
 
     /**
      * Get term_taxonomy_id by term_id.
+     *
+     * Both directions of the term_id ↔ term_taxonomy_id mapping are cached in the wp_loc group
+     * ("tt_id_{taxonomy}_{term_id}" and "term_id_{taxonomy}_{term_taxonomy_id}", a miss as 0): every
+     * term translation and language lookup goes through them, and a persistent object cache never
+     * sees a raw $wpdb query. A pair only changes when a term is created, deleted or split, and
+     * forget_term_ids() runs on each of those.
      */
     public static function get_term_taxonomy_id( int $term_id, string $taxonomy ): ?int {
+        $cached = wp_cache_get( "tt_id_{$taxonomy}_{$term_id}", 'wp_loc' );
+        if ( $cached !== false ) {
+            return $cached ? (int) $cached : null;
+        }
+
         global $wpdb;
 
-        $term_taxonomy_id = $wpdb->get_var( $wpdb->prepare(
+        $term_taxonomy_id = (int) $wpdb->get_var( $wpdb->prepare(
             "SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy} WHERE term_id = %d AND taxonomy = %s LIMIT 1",
             $term_id,
             $taxonomy
         ) );
 
-        return $term_taxonomy_id ? (int) $term_taxonomy_id : null;
+        self::cache_term_ids( [ $term_id => $term_taxonomy_id ], [], $taxonomy );
+
+        return $term_taxonomy_id ?: null;
     }
 
     /**
      * Get term_id by term_taxonomy_id.
      */
     public static function get_term_id_from_taxonomy_id( int $term_taxonomy_id, string $taxonomy ): ?int {
+        $cached = wp_cache_get( "term_id_{$taxonomy}_{$term_taxonomy_id}", 'wp_loc' );
+        if ( $cached !== false ) {
+            return $cached ? (int) $cached : null;
+        }
+
         global $wpdb;
 
-        $term_id = $wpdb->get_var( $wpdb->prepare(
+        $term_id = (int) $wpdb->get_var( $wpdb->prepare(
             "SELECT term_id FROM {$wpdb->term_taxonomy} WHERE term_taxonomy_id = %d AND taxonomy = %s LIMIT 1",
             $term_taxonomy_id,
             $taxonomy
         ) );
 
-        return $term_id ? (int) $term_id : null;
+        self::cache_term_ids( [], [ $term_taxonomy_id => $term_id ], $taxonomy );
+
+        return $term_id ?: null;
+    }
+
+    /**
+     * Cache looked-up term_id → term_taxonomy_id and term_taxonomy_id → term_id results; a found
+     * pair is cached in both directions.
+     */
+    private static function cache_term_ids( array $term_taxonomy_ids_by_term_id, array $term_ids_by_term_taxonomy_id, string $taxonomy ): void {
+        $values = [];
+
+        foreach ( $term_taxonomy_ids_by_term_id as $term_id => $term_taxonomy_id ) {
+            $values[ "tt_id_{$taxonomy}_{$term_id}" ] = (int) $term_taxonomy_id;
+            if ( $term_taxonomy_id ) {
+                $values[ "term_id_{$taxonomy}_{$term_taxonomy_id}" ] = (int) $term_id;
+            }
+        }
+
+        foreach ( $term_ids_by_term_taxonomy_id as $term_taxonomy_id => $term_id ) {
+            $values[ "term_id_{$taxonomy}_{$term_taxonomy_id}" ] = (int) $term_id;
+            if ( $term_id ) {
+                $values[ "tt_id_{$taxonomy}_{$term_id}" ] = (int) $term_taxonomy_id;
+            }
+        }
+
+        if ( count( $values ) === 1 ) {
+            wp_cache_set( key( $values ), current( $values ), 'wp_loc' );
+        } elseif ( $values ) {
+            wp_cache_set_multiple( $values, 'wp_loc' );
+        }
+    }
+
+    /**
+     * Load the ID pairs and translation groups of many terms of one taxonomy in a few queries, so
+     * that translating them one by one afterwards — a tax query, a sitemap, a term list — hits only
+     * the cache. With $load_translations the translated terms' languages and objects are loaded
+     * too, for callers that go on to build their links.
+     */
+    public static function prime_term_translations( array $term_ids, string $taxonomy, bool $load_translations = false ): void {
+        $db = WP_LOC::instance()->db;
+        $element_type = WP_LOC_DB::tax_element_type( $taxonomy );
+
+        self::prime_term_ids( 'term_id', $term_ids, $taxonomy );
+
+        $term_taxonomy_ids = array_filter( WP_LOC_DB::get_cached_ids( $term_ids, "tt_id_{$taxonomy}_" ) );
+        if ( ! $term_taxonomy_ids ) {
+            return;
+        }
+
+        $db->prime_elements( $term_taxonomy_ids, $element_type );
+
+        $translated_term_taxonomy_ids = [];
+        foreach ( WP_LOC_DB::get_cached_ids( $term_taxonomy_ids, "trid_{$element_type}_" ) as $trid ) {
+            if ( ! $trid ) {
+                continue;
+            }
+
+            foreach ( $db->get_element_translations( (int) $trid, $element_type ) as $translation ) {
+                $translated_term_taxonomy_ids[] = (int) $translation->element_id;
+            }
+        }
+
+        self::prime_term_ids( 'term_taxonomy_id', $translated_term_taxonomy_ids, $taxonomy );
+
+        if ( $load_translations ) {
+            $db->prime_elements( $translated_term_taxonomy_ids, $element_type );
+            _prime_term_caches( array_filter( WP_LOC_DB::get_cached_ids( $translated_term_taxonomy_ids, "term_id_{$taxonomy}_" ) ), false );
+        }
+    }
+
+    /**
+     * get_terms: a listed term usually gets its language checked or its link built next, one term
+     * at a time — load the whole list's translation groups at once first.
+     */
+    public function prime_listed_term_translations( $terms ) {
+        if ( is_array( $terms ) ) {
+            self::prime_term_list_translations( $terms );
+        }
+
+        return $terms;
+    }
+
+    /**
+     * Prime the translations of the WP_Term objects in a list, per taxonomy (see prime_term_translations()).
+     */
+    public static function prime_term_list_translations( array $terms, bool $load_translations = false ): void {
+        $term_ids_by_taxonomy = [];
+        foreach ( $terms as $term ) {
+            if ( $term instanceof \WP_Term && self::is_translatable( $term->taxonomy ) ) {
+                $term_ids_by_taxonomy[ $term->taxonomy ][] = (int) $term->term_id;
+            }
+        }
+
+        foreach ( $term_ids_by_taxonomy as $taxonomy => $term_ids ) {
+            if ( count( $term_ids ) > 1 ) {
+                self::prime_term_translations( $term_ids, $taxonomy, $load_translations );
+            }
+        }
+    }
+
+    /**
+     * Cache the ID pairs of many terms by term_id or by term_taxonomy_id; already cached ones are skipped.
+     */
+    private static function prime_term_ids( string $field, array $ids, string $taxonomy ): void {
+        global $wpdb;
+
+        $by_term_id = $field === 'term_id';
+        $missing = WP_LOC_DB::uncached_ids( $ids, $by_term_id ? "tt_id_{$taxonomy}_" : "term_id_{$taxonomy}_" );
+
+        foreach ( array_chunk( $missing, 500 ) as $chunk ) {
+            $rows = $wpdb->get_results( $wpdb->prepare(
+                "SELECT term_id, term_taxonomy_id FROM {$wpdb->term_taxonomy} WHERE taxonomy = %s AND " . ( $by_term_id ? 'term_id' : 'term_taxonomy_id' ) . ' IN (' . implode( ',', $chunk ) . ')',
+                $taxonomy
+            ) );
+
+            $found = array_fill_keys( $chunk, 0 );
+            foreach ( $rows as $row ) {
+                $found[ $by_term_id ? (int) $row->term_id : (int) $row->term_taxonomy_id ] = $by_term_id ? (int) $row->term_taxonomy_id : (int) $row->term_id;
+            }
+
+            $by_term_id
+                ? self::cache_term_ids( $found, [], $taxonomy )
+                : self::cache_term_ids( [], $found, $taxonomy );
+        }
+    }
+
+    /**
+     * Drop cached ID pairs of terms whose term_taxonomy row was added, deleted or split. Hooked to
+     * clean_term_cache (term IDs), so plugins that change rows with their own SQL and then clean the
+     * term cache are covered too; the term_taxonomy_ids, when known, clear their own direction.
+     */
+    public static function forget_term_ids( array $term_ids, string $taxonomy, array $term_taxonomy_ids = [] ): void {
+        foreach ( $term_ids as $term_id ) {
+            $term_id = (int) $term_id;
+            $term_taxonomy_id = wp_cache_get( "tt_id_{$taxonomy}_{$term_id}", 'wp_loc' );
+
+            if ( $term_taxonomy_id ) {
+                $term_taxonomy_ids[] = (int) $term_taxonomy_id;
+            }
+
+            wp_cache_delete( "tt_id_{$taxonomy}_{$term_id}", 'wp_loc' );
+        }
+
+        foreach ( array_unique( array_map( 'intval', $term_taxonomy_ids ) ) as $term_taxonomy_id ) {
+            wp_cache_delete( "term_id_{$taxonomy}_{$term_taxonomy_id}", 'wp_loc' );
+        }
+    }
+
+    /**
+     * clean_term_cache: also fired by hand from plugins, so its arguments are not trusted to be typed.
+     */
+    public function forget_cleaned_term_ids( $term_ids, $taxonomy ): void {
+        if ( is_string( $taxonomy ) && $taxonomy !== '' ) {
+            self::forget_term_ids( (array) $term_ids, $taxonomy );
+        }
+    }
+
+    /**
+     * create_term and delete_term: a fresh or removed pair may still be cached as a miss or a hit.
+     */
+    public function forget_created_or_deleted_term_ids( int $term_id, int $term_taxonomy_id, string $taxonomy ): void {
+        self::forget_term_ids( [ $term_id ], $taxonomy, [ $term_taxonomy_id ] );
+    }
+
+    /**
+     * split_shared_term: the term_taxonomy row now belongs to the new term_id.
+     */
+    public function forget_split_term_ids( int $old_term_id, int $new_term_id, int $term_taxonomy_id, string $taxonomy ): void {
+        self::forget_term_ids( [ $old_term_id, $new_term_id ], $taxonomy, [ $term_taxonomy_id ] );
     }
 
     /**
@@ -301,6 +493,10 @@ class WP_LOC_Terms {
 
         if ( ! $translated_term_taxonomy_id ) {
             return null;
+        }
+
+        if ( $translated_term_taxonomy_id === $term_taxonomy_id ) {
+            return $term_id;
         }
 
         return self::get_term_id_from_taxonomy_id( $translated_term_taxonomy_id, $taxonomy );
@@ -512,6 +708,19 @@ class WP_LOC_Terms {
             $term_taxonomy_id,
             WP_LOC_DB::tax_element_type( $taxonomy )
         );
+    }
+
+    /**
+     * Get the language of a term object through the term_taxonomy_id it already carries.
+     */
+    private static function get_term_object_language( \WP_Term $term ): ?string {
+        $term_taxonomy_id = (int) $term->term_taxonomy_id;
+
+        if ( ! $term_taxonomy_id ) {
+            return self::get_term_language( (int) $term->term_id, (string) $term->taxonomy );
+        }
+
+        return WP_LOC::instance()->db->get_element_language( $term_taxonomy_id, WP_LOC_DB::tax_element_type( (string) $term->taxonomy ) );
     }
 
     /**
@@ -1853,6 +2062,12 @@ class WP_LOC_Terms {
             $terms = array_map( 'intval', (array) ( $clause['terms'] ?? [] ) );
             $translated_terms = [];
 
+            if ( count( $terms ) > 1 ) {
+                $field === 'term_taxonomy_id'
+                    ? WP_LOC::instance()->db->prime_elements( $terms, WP_LOC_DB::tax_element_type( $taxonomy ) )
+                    : self::prime_term_translations( $terms, $taxonomy );
+            }
+
             foreach ( $terms as $term_id ) {
                 $translated_terms[] = $field === 'term_taxonomy_id'
                     ? ( WP_LOC::instance()->db->get_element_translation( $term_id, WP_LOC_DB::tax_element_type( $taxonomy ), $lang ) ?: $term_id )
@@ -1907,6 +2122,10 @@ class WP_LOC_Terms {
         $is_csv = is_string( $value );
         $terms = $is_csv ? array_filter( array_map( 'trim', explode( ',', $value ) ) ) : (array) $value;
 
+        if ( count( $terms ) > 1 ) {
+            self::prime_term_translations( array_map( static fn( $term_id ) => abs( (int) $term_id ), $terms ), $taxonomy );
+        }
+
         $translated_terms = [];
         foreach ( $terms as $term_id ) {
             $sign = (int) $term_id < 0 ? -1 : 1;
@@ -1943,6 +2162,13 @@ class WP_LOC_Terms {
         if ( $disable_adjust ) return $term;
 
         $target_lang = self::get_context_language();
+
+        // Terms of a language-scoped query are in the target language already: one language
+        // lookup settles them without loading the translation group.
+        if ( self::get_term_object_language( $term ) === $target_lang ) {
+            return $term;
+        }
+
         $translated_term_id = self::get_term_translation( (int) $term->term_id, $taxonomy, $target_lang );
 
         if ( ! $translated_term_id || $translated_term_id === (int) $term->term_id ) {
@@ -1989,7 +2215,7 @@ class WP_LOC_Terms {
             return $termlink;
         }
 
-        $term_lang = self::get_term_language( (int) $term->term_id, $taxonomy );
+        $term_lang = $term->taxonomy === $taxonomy ? self::get_term_object_language( $term ) : self::get_term_language( (int) $term->term_id, $taxonomy );
         $lang = self::$term_link_lang_override ?: ( is_admin() ? ( $term_lang ?: self::get_context_language() ) : wp_loc_get_current_lang() );
         $default = WP_LOC_Languages::get_default_language();
 
@@ -1999,7 +2225,8 @@ class WP_LOC_Terms {
 
         $translated_term = null;
 
-        if ( ! is_admin() ) {
+        // A term already in the link language is its own translation.
+        if ( ! is_admin() && $term_lang !== $lang ) {
             $translated_term = self::get_translated_term( (int) $term->term_id, $taxonomy, $lang );
         }
 

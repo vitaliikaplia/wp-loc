@@ -22,20 +22,62 @@ class WP_LOC_Options {
     }
 
     private static function get_localized_option_value( string $option, string $language ): array {
-        global $wpdb;
-
         foreach ( self::get_language_option_suffixes( $language ) as $suffix ) {
-            $value = $wpdb->get_var( $wpdb->prepare(
-                "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
-                $option . '_' . $suffix
-            ) );
+            [ $exists, $value ] = self::get_unfiltered_option( $option . '_' . $suffix );
 
-            if ( $value !== null ) {
-                return [ true, maybe_unserialize( $value ) ];
+            if ( $exists ) {
+                return [ true, $value ];
             }
         }
 
         return [ false, null ];
+    }
+
+    /**
+     * Read an option the way get_option() does — through the alloptions, options and notoptions
+     * caches, which update_option(), add_option() and delete_option() keep current — but without
+     * its filters. Localized rows and the raw base value are read from inside the base option's
+     * pre_option filter, and the language configuration before the language is known, where a
+     * filtered read could loop back into WP-LOC.
+     *
+     * @return array{0: bool, 1: mixed} Whether the option exists, and its unserialized value.
+     */
+    public static function get_unfiltered_option( string $option ): array {
+        global $wpdb;
+
+        if ( wp_installing() ) {
+            $row = $wpdb->get_row( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1", $option ) );
+
+            return is_object( $row ) ? [ true, maybe_unserialize( $row->option_value ) ] : [ false, null ];
+        }
+
+        $alloptions = wp_load_alloptions();
+        if ( isset( $alloptions[ $option ] ) ) {
+            return [ true, maybe_unserialize( $alloptions[ $option ] ) ];
+        }
+
+        $notoptions = wp_cache_get( 'notoptions', 'options' );
+        if ( is_array( $notoptions ) && isset( $notoptions[ $option ] ) ) {
+            return [ false, null ];
+        }
+
+        $value = wp_cache_get( $option, 'options' );
+        if ( $value === false ) {
+            $row = $wpdb->get_row( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1", $option ) );
+
+            if ( ! is_object( $row ) ) {
+                $notoptions = is_array( $notoptions ) ? $notoptions : [];
+                $notoptions[ $option ] = true;
+                wp_cache_set( 'notoptions', $notoptions, 'options' );
+
+                return [ false, null ];
+            }
+
+            $value = $row->option_value;
+            wp_cache_add( $option, $value, 'options' );
+        }
+
+        return [ true, maybe_unserialize( $value ) ];
     }
 
     private static function is_valid_localized_page_option_value( string $option, $value ): bool {
@@ -163,19 +205,13 @@ class WP_LOC_Options {
     }
 
     private function resolve_page_option_for_language( string $option, string $language ): ?int {
-        global $wpdb;
-
         [ $has_localized_value, $localized_value ] = self::get_localized_option_value( $option, $language );
 
         if ( $has_localized_value && self::is_valid_localized_page_option_value( $option, $localized_value ) ) {
             return (int) $localized_value;
         }
 
-        $raw_value = $wpdb->get_var( $wpdb->prepare(
-            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
-            $option
-        ) );
-        $raw_page_id = (int) $raw_value;
+        $raw_page_id = (int) self::get_unfiltered_option( $option )[1];
 
         if ( $raw_page_id <= 0 || get_post_type( $raw_page_id ) !== 'page' ) {
             return null;

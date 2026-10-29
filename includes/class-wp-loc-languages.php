@@ -158,6 +158,12 @@ class WP_LOC_Languages {
             return get_option( $option, $default );
         }
 
+        if ( class_exists( 'WP_LOC_Options' ) ) {
+            [ $exists, $value ] = WP_LOC_Options::get_unfiltered_option( $option );
+
+            return $exists ? $value : $default;
+        }
+
         $value = $wpdb->get_var( $wpdb->prepare(
             "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1",
             $option
