@@ -52,6 +52,7 @@ $transition-speed: .15s;
 .wp-loc-gutenberg-lang-badge {
   position: relative;
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   margin-left: 6px;
   height: 36px;
@@ -63,6 +64,18 @@ $transition-speed: .15s;
       visibility: visible;
       transform: translateY(0);
     }
+  }
+}
+
+// The editor header is its own stacking layer (z-index 30) under the block inserter and list view
+// sidebars (z-index 100000), so no z-index of the menu itself can lift it over them: raise the
+// header while the menu is open. Below 480px the core toolbar is also clipped (clip-path).
+.interface-interface-skeleton__header:has(.wp-loc-gutenberg-lang-badge:not(.is-static):hover),
+.interface-interface-skeleton__header:has(.wp-loc-gutenberg-lang-badge:not(.is-static):focus-within) {
+  z-index: 100001;
+
+  .editor-header__toolbar {
+    clip-path: none;
   }
 }
 

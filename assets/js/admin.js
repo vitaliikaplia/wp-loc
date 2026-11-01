@@ -222,20 +222,48 @@
 
     // Gutenberg — show current admin language flag in the header toolbar
     if (wpLocAdmin.adminLangFlag && wpLocAdmin.adminLangName) {
-        const renderGutenbergLanguageBadge = function() {
-            const toolbar = document.querySelector('.edit-post-header-toolbar');
-            if (!toolbar || toolbar.querySelector('.wp-loc-gutenberg-lang-badge')) {
-                return;
+        // Where the switcher goes, first match wins:
+        // 1. a slot the theme provides: .wp-loc-gutenberg-lang-slot, or its own container with the
+        //    pre-6.5 class .edit-post-header-toolbar outside the core toolbar (the Builder theme does that);
+        // 2. right after the core document tools (inserter, undo, list view), as their sibling — since
+        //    WordPress 6.5 those tools carry .edit-post-header-toolbar themselves, and a node added inside
+        //    that React toolbar would sit in its keyboard navigation;
+        // 3. the pre-6.5 .edit-post-header-toolbar, after its .editor-document-tools group.
+        const findLanguageSwitcherPlace = function() {
+            const themeSlot = document.querySelector('.wp-loc-gutenberg-lang-slot')
+                || Array.from(document.querySelectorAll('.edit-post-header-toolbar')).find(function(element) {
+                    return !element.closest('.editor-header__toolbar, .edit-post-header__toolbar');
+                });
+
+            if (themeSlot) {
+                return { parent: themeSlot, after: null };
             }
 
-            const switcher = document.createElement('div');
-            switcher.className = 'wp-loc-gutenberg-lang-badge';
+            const documentTools = document.querySelector('.editor-header__toolbar > .editor-document-tools, .edit-post-header__toolbar > .editor-document-tools');
+            if (documentTools) {
+                return { parent: documentTools.parentNode, after: documentTools };
+            }
+
+            const toolbar = document.querySelector('.edit-post-header-toolbar');
+            if (!toolbar) {
+                return null;
+            }
+
+            const toolsGroup = toolbar.querySelector('.editor-document-tools');
+            return { parent: toolbar, after: toolsGroup && toolsGroup.parentNode === toolbar ? toolsGroup : null };
+        };
+
+        let switcher = null;
+
+        const buildGutenbergLanguageBadge = function() {
+            const badge = document.createElement('div');
+            badge.className = 'wp-loc-gutenberg-lang-badge';
             const hasDropdown = Array.isArray(wpLocAdmin.gutenbergLanguages) && wpLocAdmin.gutenbergLanguages.length > 1;
 
             if (hasDropdown) {
-                switcher.setAttribute('tabindex', '0');
+                badge.setAttribute('tabindex', '0');
             } else {
-                switcher.classList.add('is-static');
+                badge.classList.add('is-static');
             }
 
             let menuHtml = '';
@@ -257,18 +285,42 @@
                 menuHtml += '</div>';
             }
 
-            switcher.innerHTML =
+            badge.innerHTML =
                 '<span class="wp-loc-gutenberg-lang-current" aria-label="' + wpLocAdmin.adminLangName + '" title="' + wpLocAdmin.adminLangName + '">' +
                     '<img src="' + wpLocAdmin.adminLangFlag + '" alt="' + wpLocAdmin.adminLangName + '" />' +
                     '<span class="wp-loc-gutenberg-lang-label">' + wpLocAdmin.adminLangName + '</span>' +
                 '</span>' +
                 menuHtml;
 
-            const toolsGroup = toolbar.querySelector('.editor-document-tools');
-            if (toolsGroup && toolsGroup.nextSibling) {
-                toolbar.insertBefore(switcher, toolsGroup.nextSibling);
+            return badge;
+        };
+
+        // One switcher for the whole page: the header re-renders on mode changes and themes may mount
+        // their slot late, so the same node is moved to the current place instead of building another.
+        const renderGutenbergLanguageBadge = function() {
+            const place = findLanguageSwitcherPlace();
+            if (!place) {
+                return;
+            }
+
+            const inPlace = place.after
+                ? switcher && switcher.previousElementSibling === place.after
+                : switcher && switcher.parentNode === place.parent;
+            if (inPlace) {
+                return;
+            }
+
+            switcher = switcher || buildGutenbergLanguageBadge();
+            document.querySelectorAll('.wp-loc-gutenberg-lang-badge').forEach(function(element) {
+                if (element !== switcher) {
+                    element.remove();
+                }
+            });
+
+            if (place.after) {
+                place.after.after(switcher);
             } else {
-                toolbar.appendChild(switcher);
+                place.parent.appendChild(switcher);
             }
         };
 
