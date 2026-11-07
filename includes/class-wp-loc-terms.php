@@ -1569,7 +1569,13 @@ class WP_LOC_Terms {
                 }
             }
 
-            $items[] = '<span class="wp-loc-t wp-loc-t-missing">' . $flag_img . '</span>';
+            $create_title = sprintf(
+                /* translators: %s: language name */
+                esc_attr__( 'Create %s translation', 'wp-loc' ),
+                WP_LOC_Languages::get_display_name( $slug )
+            );
+            $plus = '<span class="wp-loc-pencil">+</span>';
+            $items[] = '<a href="#" class="wp-loc-t wp-loc-t-missing wp-loc-create-term-translation-link" data-term-id="' . esc_attr( $term_id ) . '" data-taxonomy="' . esc_attr( $taxonomy ) . '" data-lang="' . esc_attr( $slug ) . '" title="' . $create_title . '" aria-label="' . $create_title . '">' . $flag_img . $plus . '</a>';
         }
 
         return implode( '', $items );

@@ -148,6 +148,50 @@
         });
     });
 
+    // Post/term list "Translations" column — clicking a missing-language flag creates
+    // the translation in the background and turns the flag into an edit link in place
+    $(document).on('click', '.wp-loc-create-translation-link, .wp-loc-create-term-translation-link', function(e) {
+        e.preventDefault();
+
+        const $link = $(this);
+        if ($link.hasClass('is-loading')) return;
+
+        const lang = $link.data('lang');
+        const isTerm = $link.hasClass('wp-loc-create-term-translation-link');
+        const data = isTerm
+            ? { action: 'wp_loc_create_term_translation', term_id: $link.data('term-id'), taxonomy: $link.data('taxonomy') }
+            : { action: 'wp_loc_create_translation', post_id: $link.data('post-id') };
+
+        if (!lang || !(data.term_id || data.post_id)) return;
+
+        $link.addClass('is-loading');
+
+        $.post(wpLocAdmin.ajaxUrl, $.extend(data, {
+            nonce: wpLocAdmin.nonce,
+            lang: lang
+        }), function(response) {
+            if (response && response.success && response.data && response.data.edit_url) {
+                // Terms have no status — they are live as soon as they exist
+                const isPublished = isTerm || response.data.status === 'publish';
+                const stateClass = isPublished ? 'wp-loc-t-published' : 'wp-loc-t-draft';
+                const $edit = $('<a class="wp-loc-t"></a>')
+                    .addClass(stateClass)
+                    .attr('href', response.data.edit_url)
+                    .attr('title', wpLocAdmin.i18n.editTranslation || '')
+                    .append($link.find('.wp-loc-flag'))
+                    .append('<span class="wp-loc-pencil">✎</span>');
+                $link.replaceWith($edit);
+                return;
+            }
+            $link.removeClass('is-loading');
+            const msg = (response && response.data && response.data.message) || wpLocAdmin.i18n.requestFailed;
+            window.alert(msg);
+        }).fail(function() {
+            $link.removeClass('is-loading');
+            window.alert(wpLocAdmin.i18n.requestFailed);
+        });
+    });
+
     // Term edit screen — create single translation via AJAX
     $(document).on('click', '.wp-loc-create-single-term-translation', function() {
         const $btn = $(this);
