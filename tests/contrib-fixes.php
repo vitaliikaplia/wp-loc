@@ -1,0 +1,126 @@
+<?php
+/**
+ * Checks for the fixes taken from contributed pull requests (#5, #8, #9, #13).
+ * Run on a site with at least two languages and without a persistent object cache:
+ * wp eval-file wp-content/plugins/wp-loc/tests/contrib-fixes.php
+ * Every write happens inside a transaction that is rolled back.
+ */
+if (!defined('WP_CLI') || !WP_CLI) { exit; }
+if (!class_exists('WP_LOC')) { WP_CLI::error('Active WP LOC is required.'); }
+if (wp_using_ext_object_cache()) { WP_CLI::error('Run on a site without a persistent object cache.'); }
+
+global $wpdb;
+add_filter('pre_http_request', static function () { throw new RuntimeException('Check blocked HTTP.'); }, PHP_INT_MAX);
+$assertions = 0;
+$check = static function ($condition, $message) use (&$assertions) {
+    $assertions++;
+    if (!$condition) { throw new RuntimeException($message); }
+};
+$db = WP_LOC::instance()->db;
+$table = $db->get_table();
+$default = WP_LOC_Languages::get_default_language();
+$other = current(array_diff(array_keys(WP_LOC_Languages::get_active_languages()), [$default])) ?: null;
+if (!$other) { WP_CLI::error('A second active language is required.'); }
+
+try {
+    WP_CLI::log('#5 attachment image filter');
+    // #5: core passes the caller's attachment ID to the filter untouched.
+    foreach (['', null, '0', false] as $empty_id) {
+        $check(wp_get_attachment_image_src($empty_id) === false, 'Empty attachment ID ' . var_export($empty_id, true) . ' returns false');
+    }
+    $attachment_id = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT p.ID FROM {$wpdb->posts} p INNER JOIN {$table} t ON t.element_id = p.ID AND t.element_type = 'post_attachment'
+         WHERE p.post_type = 'attachment' AND p.post_mime_type LIKE 'image/%%' AND t.language_code = %s ORDER BY p.ID LIMIT 1",
+        WP_LOC_DB::to_db_language_code($default) ?: $default));
+    if ($attachment_id) {
+        WP_LOC_Routing::switch_language($other);
+        try {
+            $translated = $db->get_element_translation($attachment_id, 'post_attachment', $other);
+            $image = wp_get_attachment_image_src((string) $attachment_id, 'thumbnail');
+            $check(is_array($image), 'A numeric-string attachment ID still resolves');
+            if ($translated && $translated !== $attachment_id) {
+                $check($image === wp_get_attachment_image_src($translated, 'thumbnail'), 'The image resolves to the attachment of the current language');
+            }
+        } finally {
+            WP_LOC_Routing::switch_language($default);
+        }
+    }
+
+    WP_CLI::log('#8 by-name look-up');
+    // #8: a post type fixed by the rewrite rule restricts the by-name look-up, and media never wins it.
+    $routing = WP_LOC::instance()->routing;
+    $post = $wpdb->get_row($wpdb->prepare(
+        "SELECT p.ID, p.post_name FROM {$wpdb->posts} p INNER JOIN {$table} t ON t.element_id = p.ID AND t.element_type = 'post_post'
+         WHERE p.post_type = 'post' AND p.post_status = 'publish' AND t.language_code = %s ORDER BY p.ID LIMIT 1",
+        WP_LOC_DB::to_db_language_code($default) ?: $default));
+    $check((bool) $post, 'A published default-language post exists');
+    $resolved = $routing->handle_request(['name' => $post->post_name]);
+    $check((int) ($resolved['p'] ?? 0) === (int) $post->ID && ($resolved['post_type'] ?? '') === 'post', 'A post name without a post type resolves to the post');
+    $resolved = $routing->handle_request(['name' => $post->post_name, 'post_type' => 'page']);
+    $check(empty($resolved['p']) && ($resolved['post_type'] ?? '') === 'page', 'A post name under a page rule does not resolve to the post');
+    $resolved = $routing->handle_request(['name' => $post->post_name, 'post_type' => [['post']]]);
+    $check(empty($resolved['p']), 'A nested post_type array resolves nothing');
+    $media_slug = $wpdb->get_var("SELECT post_name FROM {$wpdb->posts} WHERE post_type = 'attachment' AND post_name <> '' ORDER BY ID LIMIT 1");
+    if ($media_slug) {
+        $resolved = $routing->handle_request(['name' => $media_slug, 'post_type' => 'post']);
+        $check(($resolved['post_type'] ?? '') !== 'attachment' && empty($resolved['p']), 'A media slug under a post rule does not resolve to the attachment');
+        $resolved = $routing->handle_request(['name' => $media_slug]);
+        $check(($resolved['post_type'] ?? '') !== 'attachment', 'A bare media slug is left to core');
+    }
+
+    $wpdb->query('START TRANSACTION');
+    try {
+        WP_CLI::log('#9 empty option translation');
+        // #9: an empty option translation falls back to the default-language value.
+        $base = get_option('blogname');
+        $localized = 'blogname_' . WP_LOC_DB::to_db_language_code($other);
+        WP_LOC_Routing::switch_language($other);
+        try {
+            update_option($localized, '');
+            $check(get_option('blogname') === $base, 'An empty blogname translation falls back to the base value');
+            update_option($localized, 'WPLOC contrib name');
+            $check(get_option('blogname') === 'WPLOC contrib name', 'A filled blogname translation is served');
+        } finally {
+            WP_LOC_Routing::switch_language($default);
+        }
+
+        WP_CLI::log('#13 sibling writes');
+        // #13: sibling writes inside the source save do not see the source's submitted form.
+        $pair = $wpdb->get_row($wpdb->prepare(
+            "SELECT s.element_id AS source_id, o.element_id AS sibling_id FROM {$table} s
+             INNER JOIN {$table} o ON o.trid = s.trid AND o.element_type = s.element_type AND o.element_id <> s.element_id
+             INNER JOIN {$wpdb->posts} sp ON sp.ID = s.element_id AND sp.post_status = 'publish'
+             INNER JOIN {$wpdb->posts} op ON op.ID = o.element_id
+             WHERE s.element_type = 'post_post' AND s.language_code = %s ORDER BY s.element_id LIMIT 1",
+            WP_LOC_DB::to_db_language_code($default) ?: $default));
+        $check((bool) $pair, 'A translated post pair exists');
+        $check(WP_LOC_Admin_Settings::should_sync_post_attributes(), 'Post attribute sync is on');
+        $seen = [];
+        $reader = static function ($post_id) use (&$seen) {
+            $seen[] = (int) $post_id;
+            if (isset($_POST['wp_loc_test_seo'])) {
+                update_post_meta((int) $post_id, '_wp_loc_test_seo', $_POST['wp_loc_test_seo']);
+            }
+        };
+        add_action('wp_insert_post', $reader, 10);
+        $posted = $_POST;
+        $_POST = ['post_ID' => (string) $pair->source_id, 'wp_loc_test_seo' => 'SOURCE FORM'];
+        try {
+            wp_update_post(['ID' => (int) $pair->source_id]);
+            $check(in_array((int) $pair->sibling_id, $seen, true), 'The sibling was written during the source save');
+            $check(get_post_meta((int) $pair->source_id, '_wp_loc_test_seo', true) === 'SOURCE FORM', 'The source sees its own form');
+            $check(!metadata_exists('post', (int) $pair->sibling_id, '_wp_loc_test_seo'), 'The sibling write does not see the source form');
+            $check(($_POST['wp_loc_test_seo'] ?? null) === 'SOURCE FORM', 'The submitted form is restored after the sibling write');
+        } finally {
+            remove_action('wp_insert_post', $reader, 10);
+            $_POST = $posted;
+        }
+    } finally {
+        $wpdb->query('ROLLBACK');
+        wp_cache_flush();
+    }
+} catch (Throwable $error) {
+    WP_CLI::error($error->getMessage() . ' (after ' . $assertions . ' assertions)');
+}
+
+WP_CLI::success($assertions . ' assertions passed.');
