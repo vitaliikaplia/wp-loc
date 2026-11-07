@@ -328,9 +328,9 @@ class WP_LOC_Media {
      * Resolve attachment to the current language version (frontend)
      */
     public function maybe_resolve_attachment( $image, $attachment_id, $size = 'thumbnail', $icon = false ) {
-        // No strict scalar types here: core passes $attachment_id to the filter
-        // unfiltered, so wp_get_attachment_image_src( get_post_thumbnail_id() )
-        // with a missing thumbnail delivers '' and a typed signature fatals.
+        // No scalar types here: core hands the filter whatever the caller passed as the
+        // attachment ID, so a template calling wp_get_attachment_image_src() with an empty
+        // image field ('' or null) would hit a TypeError on a typed signature.
         $attachment_id = (int) $attachment_id;
 
         if ( is_admin() || ! $image || ! $attachment_id ) return $image;
