@@ -19,6 +19,8 @@ class WP_LOC_Admin_Settings {
     const SHOW_NAMES_OPTION_KEY = 'wp_loc_show_switcher_names';
     const HIDE_CURRENT_LANGUAGE_OPTION_KEY = 'wp_loc_hide_current_language_switcher';
     const HIDE_UNTRANSLATED_LANGUAGES_OPTION_KEY = 'wp_loc_hide_untranslated_languages_switcher';
+    const MENU_SWITCHER_OPTION_KEY = 'wp_loc_menu_switcher';
+    const MENU_SWITCHER_LOCATION_OPTION_KEY = 'wp_loc_menu_switcher_location';
     const FALLBACK_UNTRANSLATED_TO_HOME_OPTION_KEY = 'wp_loc_fallback_untranslated_switcher_to_home';
     const ENABLE_ACF_COMPAT_OPTION_KEY = 'wp_loc_enable_acf_compat';
     const ACF_MIRROR_UNCONFIGURED_FIELDS_OPTION_KEY = 'wp_loc_acf_mirror_unconfigured_fields';
@@ -435,6 +437,20 @@ TWIG;
         return (bool) get_option( self::HIDE_UNTRANSLATED_LANGUAGES_OPTION_KEY, false );
     }
 
+    /**
+     * Whether the language switcher is appended to menus printed with wp_nav_menu(). Off by default.
+     */
+    public static function should_append_switcher_to_menus(): bool {
+        return (bool) get_option( self::MENU_SWITCHER_OPTION_KEY, false );
+    }
+
+    /**
+     * Theme menu location that gets the switcher, or '' for every menu.
+     */
+    public static function get_menu_switcher_location(): string {
+        return sanitize_key( (string) get_option( self::MENU_SWITCHER_LOCATION_OPTION_KEY, '' ) );
+    }
+
     public static function fallback_untranslated_switcher_links_to_home(): bool {
         return (bool) get_option( self::FALLBACK_UNTRANSLATED_TO_HOME_OPTION_KEY, true );
     }
@@ -648,6 +664,10 @@ TWIG;
             update_option( self::HIDE_CURRENT_LANGUAGE_OPTION_KEY, $hide_current );
             update_option( self::HIDE_UNTRANSLATED_LANGUAGES_OPTION_KEY, $hide_untranslated );
             update_option( self::FALLBACK_UNTRANSLATED_TO_HOME_OPTION_KEY, $fallback_untranslated_to_home );
+
+            $menu_location = isset( $_POST['wp_loc_menu_switcher_location'] ) ? sanitize_key( (string) wp_unslash( $_POST['wp_loc_menu_switcher_location'] ) ) : '';
+            update_option( self::MENU_SWITCHER_OPTION_KEY, isset( $_POST['wp_loc_menu_switcher'] ) ? 1 : 0 );
+            update_option( self::MENU_SWITCHER_LOCATION_OPTION_KEY, isset( get_registered_nav_menus()[ $menu_location ] ) ? $menu_location : '' );
         } elseif ( $current_tab === self::TAB_INTEGRATIONS ) {
             $enable_acf_compat = isset( $_POST['wp_loc_enable_acf_compat'] ) ? 1 : 0;
             $acf_mirror_unconfigured_fields = isset( $_POST['wp_loc_acf_mirror_unconfigured_fields'] ) ? 1 : 0;
@@ -1005,6 +1025,31 @@ TWIG;
                                         </label>
                                     </fieldset>
                                     <p class="description"><?php esc_html_e( 'These options are especially helpful for projects that prefer a stricter switcher with fewer fallback links.', 'wp-loc' ); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><?php esc_html_e( 'Switcher in menus', 'wp-loc' ); ?></th>
+                                <td>
+                                    <fieldset class="wp-loc-settings-stack">
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_menu_switcher"
+                                                   value="1"
+                                                   <?php checked( self::should_append_switcher_to_menus() ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Add the languages as the last items of the site menu', 'wp-loc' ); ?></span>
+                                        </label>
+                                        <label class="wp-loc-settings-label">
+                                            <span><?php esc_html_e( 'Menu location', 'wp-loc' ); ?></span>
+                                            <select name="wp_loc_menu_switcher_location">
+                                                <option value=""><?php esc_html_e( 'Every menu', 'wp-loc' ); ?></option>
+                                                <?php foreach ( get_registered_nav_menus() as $location => $location_label ) : ?>
+                                                    <option value="<?php echo esc_attr( $location ); ?>" <?php selected( self::get_menu_switcher_location(), $location ); ?>><?php echo esc_html( $location_label ); ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </label>
+                                    </fieldset>
+                                    <p class="description"><?php esc_html_e( 'For themes without a switcher of their own. Works with menus printed by wp_nav_menu(), not with the Navigation block, and follows the flag, name and hiding options above.', 'wp-loc' ); ?></p>
                                 </td>
                             </tr>
                         </table>

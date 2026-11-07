@@ -10,6 +10,58 @@ class WP_LOC_Menus {
     private static bool $filtering_nav_menu_posts = false;
     private static array $custom_link_translation_cache = [];
 
+    /**
+     * Append the language switcher to a menu printed with wp_nav_menu(), as list items in the
+     * menu's own markup, when the Switcher in menus setting is on — every menu or one location.
+     */
+    public function append_language_switcher( $items, $args ) {
+        if ( is_admin() || ! is_string( $items ) || ! WP_LOC_Admin_Settings::should_append_switcher_to_menus() ) {
+            return $items;
+        }
+
+        $location = WP_LOC_Admin_Settings::get_menu_switcher_location();
+
+        if ( $location !== '' && ( ! is_object( $args ) || ( $args->theme_location ?? '' ) !== $location ) ) {
+            return $items;
+        }
+
+        $show_flags = WP_LOC_Admin_Settings::show_switcher_flags();
+        $show_names = WP_LOC_Admin_Settings::show_switcher_names() || ! $show_flags;
+        $html = '';
+
+        foreach ( wp_loc_get_lang_switcher() as $language ) {
+            $code = (string) ( $language['code'] ?? '' );
+            $url = (string) ( $language['url'] ?? '' );
+
+            if ( $code === '' || $url === '' ) {
+                continue;
+            }
+
+            $classes = [ 'menu-item', 'wp-loc-menu-language', 'wp-loc-menu-language-' . sanitize_html_class( $code ) ];
+
+            if ( ! empty( $language['active'] ) ) {
+                $classes[] = 'current-menu-item';
+            }
+
+            $label = '';
+
+            if ( $show_flags && ! empty( $language['flag'] ) ) {
+                $label .= '<img class="wp-loc-menu-language-flag" src="' . esc_url( (string) $language['flag'] ) . '" alt="' . esc_attr( (string) ( $language['name'] ?? $code ) ) . '" />';
+            }
+
+            if ( $show_names ) {
+                $label .= ( $label !== '' ? ' ' : '' ) . '<span class="wp-loc-menu-language-name">' . esc_html( (string) ( $language['name'] ?? $code ) ) . '</span>';
+            }
+
+            // hreflang takes the language tag (uk, en-US), not the URL slug (ua).
+            $tag = str_replace( '_', '-', (string) ( $language['locale'] ?? $code ) );
+            $html .= '<li class="' . esc_attr( implode( ' ', $classes ) ) . '"><a href="' . esc_url( $url ) . '" hreflang="' . esc_attr( $tag ) . '"'
+                . ( ! empty( $language['active'] ) ? ' aria-current="true"' : '' ) . '>' . $label . '</a></li>';
+        }
+
+        return $items . $html;
+    }
+
     public function __construct() {
         add_action( 'wp_create_nav_menu', [ $this, 'register_nav_menu_language' ], 10, 2 );
         add_action( 'wp_update_nav_menu', [ $this, 'register_nav_menu_language' ], 10, 2 );
@@ -21,6 +73,7 @@ class WP_LOC_Menus {
 
         add_filter( 'pre_update_option_theme_mods_' . get_option( 'stylesheet' ), [ $this, 'pre_update_theme_mods' ] );
         add_filter( 'theme_mod_nav_menu_locations', [ $this, 'translate_theme_menu_locations' ] );
+        add_filter( 'wp_nav_menu_items', [ $this, 'append_language_switcher' ], 20, 2 );
         add_filter( 'wp_get_nav_menus', [ $this, 'filter_nav_menus_by_language' ], 10, 2 );
         add_filter( 'nav_menu_meta_box_object', [ $this, 'enable_nav_menu_meta_box_filters' ], 20 );
         add_filter( 'wp_ajax_menu_quick_search_args', [ $this, 'filter_nav_menu_quick_search_args' ] );
