@@ -522,7 +522,11 @@ function wp_loc_get_lang_switcher( array $args = [] ): array {
             if ( ! isset( $active[ $slug ] ) ) continue;
 
             $translated_post = get_post( $row->element_id );
-            if ( ! $translated_post || $translated_post->post_status !== 'publish' ) continue;
+            if ( ! $translated_post ) continue;
+
+            // The page being viewed is always its own language's URL, though an attachment page
+            // has the status inherit and a private post or a preview is not published either.
+            if ( (int) $row->element_id !== $current_post_id && $translated_post->post_status !== 'publish' ) continue;
 
             $urls[ $slug ] = get_permalink( $row->element_id );
         }
