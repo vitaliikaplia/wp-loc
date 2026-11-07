@@ -1272,3 +1272,68 @@ msgstr ""
 #: includes/class-wp-loc-admin-settings.php
 msgid "Helps with imported or legacy content. Only a post without translations can change its language, and its terms move to the new language with it."
 msgstr ""
+
+#: includes/class-wp-loc-admin.php
+msgid "This browser has no built-in translator. Use desktop Chrome or turn the browser translator off in the AI settings."
+msgstr ""
+
+#: includes/class-wp-loc-admin.php
+msgid "Chrome's translator does not support this language pair."
+msgstr ""
+
+#: includes/class-wp-loc-admin.php
+msgid "Chrome is downloading the language model…"
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Browser translator"
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Translate titles and term names with Chrome's built-in translator in the browser"
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Free and local, no AI provider needed. Works only in desktop Chrome, which downloads a language model on first use; the quality is lower than with an AI provider. Menu sync keeps using the AI provider."
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "New translation copies"
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Translate automatically created copies with the AI provider in the background"
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Right after a copy is created, WP-Cron translates its title, content and excerpt, so saving the post does not wait. A copy edited before that keeps its text. Needs a connected AI provider: the browser translator cannot run in the background."
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Switcher in menus"
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Add the languages as the last items of the site menu"
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Menu location"
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Every menu"
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "For themes without a switcher of their own. Works with menus printed by wp_nav_menu(), not with the Navigation block, and follows the flag, name and hiding options above."
+msgstr ""
+
+#: includes/class-wp-loc-ai.php
+msgid "No AI provider is connected for translation."
+msgstr ""
+
+#: includes/class-wp-loc-ai.php
+#, php-format
+msgid "Translation failed for the %s."
+msgstr ""

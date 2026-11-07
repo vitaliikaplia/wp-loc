@@ -1,6 +1,6 @@
 <?php
 /**
- * Checks for the fixes taken from contributed pull requests (#2, #3, #5, #6, #7, #8, #9, #10, #12, #13).
+ * Checks for the fixes and features taken from contributed pull requests (#1, #2, #3, #5, #6, #7, #8, #9, #10, #12, #13).
  * Run on a site with at least two languages and without a persistent object cache:
  * wp eval-file wp-content/plugins/wp-loc/tests/contrib-fixes.php
  * Every write happens inside a transaction that is rolled back.
@@ -308,6 +308,67 @@ try {
         $check(isset($group($backfill_other)[$default]), 'An original in a non-default language is a source too');
         $copy = (int) $group($backfill_source)[$other]->element_id;
         $check(count($group($copy)) === count($group($backfill_source)), 'A translation is not used as a source of its own copies');
+
+        // #1: AI translation of copies (a stand-in translator through wp_loc_pre_translate_content),
+        // wp wp-loc translate, background translation of new copies, and the switcher in menus.
+        WP_CLI::log('#1 AI copies, translate command, background task, menu switcher');
+        $fake = static fn($pre, $content, $language) => '[' . $language . '] ' . $content;
+        add_filter('wp_loc_pre_translate_content', $fake, 10, 3);
+        try {
+            $check(WP_LOC_AI::can_translate(), 'A wp_loc_pre_translate_content answer counts as a translator');
+            [$ai_source] = $make('post', $default);
+            wp_update_post(['ID' => $ai_source, 'post_content' => 'WPLOC body', 'post_excerpt' => 'WPLOC excerpt']);
+            WP_LOC::instance()->content->create_translations($ai_source, [$other]);
+            $ai_copy = (int) $db->get_element_translation($ai_source, 'post_post', $other);
+            $check($ai_copy && get_post_status($ai_copy) === 'draft', 'create_translations makes a draft copy');
+            $language_name = WP_LOC_AI::get_target_language_name($other);
+            $check(WP_LOC_AI::translate_post_fields(get_post($ai_source), $ai_copy, $other, ['title', 'content', 'excerpt'], true) === true, 'translate_post_fields succeeds');
+            clean_post_cache($ai_copy);
+            clean_post_cache($ai_source);
+            $copy = get_post($ai_copy);
+            $check(str_starts_with($copy->post_title, '[' . $language_name . '] ') && $copy->post_content === '[' . $language_name . '] WPLOC body', 'The copy gets the translated title and content');
+            $check($copy->post_name === sanitize_title($copy->post_title), 'A new copy gets the slug of its translated title');
+            $check(get_post_status($ai_source) === 'publish', 'Filling in the draft copy leaves the source published');
+
+            [$cli_source] = $make('post', $default);
+            ob_start();
+            (new WP_LOC_CLI_Translate())->post([(string) $cli_source], ['to' => $other]);
+            ob_end_clean();
+            $cli_copy = (int) $db->get_element_translation($cli_source, 'post_post', $other);
+            $check($cli_copy && str_starts_with(get_post($cli_copy)->post_title, '[' . $language_name . '] '), 'wp wp-loc translate post creates and translates the copy');
+            $check(get_post_status($cli_source) === 'publish', 'The translate command leaves the source published');
+
+            update_option(WP_LOC_Admin_Settings::AI_TRANSLATE_NEW_COPIES_OPTION_KEY, 1);
+            [$bg_source] = $make('post', $default);
+            WP_LOC::instance()->content->create_translations($bg_source, [$other]);
+            $bg_copy = (int) $db->get_element_translation($bg_source, 'post_post', $other);
+            $check((bool) wp_next_scheduled('wp_loc_ai_translate_copy', [$bg_copy, $bg_source, $other]), 'A new copy schedules its background translation');
+            do_action('wp_loc_ai_translate_copy', $bg_copy, $bg_source, $other);
+            clean_post_cache($bg_copy);
+            $check(str_starts_with(get_post($bg_copy)->post_title, '[' . $language_name . '] '), 'The background task translates the copy');
+            [$edited_source] = $make('post', $default);
+            WP_LOC::instance()->content->create_translations($edited_source, [$other]);
+            $edited_copy = (int) $db->get_element_translation($edited_source, 'post_post', $other);
+            WP_LOC_Content::without_group_sync(static fn() => wp_update_post(['ID' => $edited_copy, 'post_title' => 'Edited by hand']));
+            do_action('wp_loc_ai_translate_copy', $edited_copy, $edited_source, $other);
+            clean_post_cache($edited_copy);
+            $check(get_post($edited_copy)->post_title === 'Edited by hand', 'A copy edited before the background task keeps its text');
+            update_option(WP_LOC_Admin_Settings::AI_TRANSLATE_NEW_COPIES_OPTION_KEY, 0);
+        } finally {
+            remove_filter('wp_loc_pre_translate_content', $fake, 10);
+        }
+
+        $menu_id = wp_create_nav_menu('WPLOC switcher check');
+        $check(!is_wp_error($menu_id), 'A check menu was created');
+        wp_update_nav_menu_item($menu_id, 0, ['menu-item-title' => 'WPLOC home', 'menu-item-url' => home_url('/'), 'menu-item-status' => 'publish', 'menu-item-type' => 'custom']);
+        $render = static fn() => (string) wp_nav_menu(['menu' => $menu_id, 'echo' => false, 'fallback_cb' => false]);
+        $check(!str_contains($render(), 'wp-loc-menu-language'), 'Menus have no language items by default');
+        update_option(WP_LOC_Admin_Settings::MENU_SWITCHER_OPTION_KEY, 1);
+        $menu = $render();
+        $check(substr_count($menu, 'wp-loc-menu-language-') >= count(WP_LOC_Languages::get_active_languages()) - (WP_LOC_Admin_Settings::hide_current_language_in_switcher() ? 1 : 0), 'With the setting the menu ends with the languages');
+        $check(!preg_match('/hreflang="ua"/', $menu), 'Menu language links use the language tag, not the URL slug');
+        update_option(WP_LOC_Admin_Settings::MENU_SWITCHER_LOCATION_OPTION_KEY, 'wploc_other_location');
+        $check(!str_contains($render(), 'wp-loc-menu-language'), 'A menu outside the chosen location gets no languages');
 
         // #10: a plugin can opt its own screen into localized option values.
         WP_CLI::log('#10 localized options screen filter');

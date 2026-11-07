@@ -1430,3 +1430,68 @@ msgstr "Створювати відсутній переклад одним кл
 #: includes/class-wp-loc-admin-settings.php
 msgid "Helps with imported or legacy content. Only a post without translations can change its language, and its terms move to the new language with it."
 msgstr "Допомагає з імпортованим або старим контентом. Змінити мову можна лише запису без перекладів, і його терміни переходять на нову мову разом із ним."
+
+#: includes/class-wp-loc-admin.php
+msgid "This browser has no built-in translator. Use desktop Chrome or turn the browser translator off in the AI settings."
+msgstr "У цьому браузері немає вбудованого перекладача. Відкрийте десктопний Chrome або вимкніть перекладач браузера в налаштуваннях AI."
+
+#: includes/class-wp-loc-admin.php
+msgid "Chrome's translator does not support this language pair."
+msgstr "Перекладач Chrome не підтримує цю пару мов."
+
+#: includes/class-wp-loc-admin.php
+msgid "Chrome is downloading the language model…"
+msgstr "Chrome завантажує мовну модель…"
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Browser translator"
+msgstr "Перекладач браузера"
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Translate titles and term names with Chrome's built-in translator in the browser"
+msgstr "Перекладати заголовки й назви термінів вбудованим перекладачем Chrome у браузері"
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Free and local, no AI provider needed. Works only in desktop Chrome, which downloads a language model on first use; the quality is lower than with an AI provider. Menu sync keeps using the AI provider."
+msgstr "Безкоштовно й локально, AI-провайдер не потрібен. Працює лише в десктопному Chrome, який при першому використанні завантажує мовну модель; якість нижча, ніж з AI-провайдером. Синхронізація меню й далі використовує AI-провайдера."
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "New translation copies"
+msgstr "Нові копії перекладів"
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Translate automatically created copies with the AI provider in the background"
+msgstr "Перекладати автоматично створені копії AI-провайдером у фоні"
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Right after a copy is created, WP-Cron translates its title, content and excerpt, so saving the post does not wait. A copy edited before that keeps its text. Needs a connected AI provider: the browser translator cannot run in the background."
+msgstr "Одразу після створення копії WP-Cron перекладає її заголовок, текст і уривок, тож збереження запису не чекає. Копія, яку встигли відредагувати, зберігає свій текст. Потрібен підключений AI-провайдер: перекладач браузера у фоні не працює."
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Switcher in menus"
+msgstr "Перемикач у меню"
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Add the languages as the last items of the site menu"
+msgstr "Додавати мови останніми пунктами меню сайту"
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Menu location"
+msgstr "Місце меню"
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Every menu"
+msgstr "Усі меню"
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "For themes without a switcher of their own. Works with menus printed by wp_nav_menu(), not with the Navigation block, and follows the flag, name and hiding options above."
+msgstr "Для тем без власного перемикача. Працює з меню, які виводить wp_nav_menu(), але не з блоком «Навігація», і враховує налаштування прапорів, назв і приховування вище."
+
+#: includes/class-wp-loc-ai.php
+msgid "No AI provider is connected for translation."
+msgstr "Для перекладу не підключено AI-провайдера."
+
+#: includes/class-wp-loc-ai.php
+#, php-format
+msgid "Translation failed for the %s."
+msgstr "Не вдалося перекласти поле %s."
