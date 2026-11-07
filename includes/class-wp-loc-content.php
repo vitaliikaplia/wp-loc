@@ -427,7 +427,13 @@ class WP_LOC_Content {
     /**
      * Create translation drafts for a post
      */
-    public function create_translations( int $post_id ): void {
+    /**
+     * Create the missing translation copies of a post: all active languages, or only those in
+     * $languages when given (the CLI backfill passes its --lang).
+     *
+     * @param string[] $languages
+     */
+    public function create_translations( int $post_id, array $languages = [] ): void {
         if ( self::$creating_translations ) return;
         self::$creating_translations = true;
 
@@ -462,6 +468,7 @@ class WP_LOC_Content {
         foreach ( array_keys( $active ) as $slug ) {
             if ( $slug === $current_lang ) continue;
             if ( isset( $existing[ $slug ] ) ) continue;
+            if ( $languages && ! in_array( $slug, $languages, true ) ) continue;
             $langs_to_create[] = $slug;
         }
 

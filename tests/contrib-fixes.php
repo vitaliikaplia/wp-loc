@@ -1,6 +1,6 @@
 <?php
 /**
- * Checks for the fixes taken from contributed pull requests (#2, #3, #5, #8, #9, #10, #12, #13).
+ * Checks for the fixes taken from contributed pull requests (#2, #3, #5, #6, #7, #8, #9, #10, #12, #13).
  * Run on a site with at least two languages and without a persistent object cache:
  * wp eval-file wp-content/plugins/wp-loc/tests/contrib-fixes.php
  * Every write happens inside a transaction that is rolled back.
@@ -241,6 +241,73 @@ try {
             wp_set_current_user($previous_user);
         }
         $check($saved === ['wp_loc_settings_save_wploc_addon'], 'Only a registered tab fires its save action');
+
+        // #6: Quick/Bulk Edit sets the language of a post without translations and moves its terms;
+        // a post with translations keeps its language.
+        WP_CLI::log('#6 language change from the post list');
+        $category_pair = $wpdb->get_row($wpdb->prepare(
+            "SELECT s.element_id AS source_tt, o.element_id AS other_tt FROM {$table} s
+             INNER JOIN {$table} o ON o.trid = s.trid AND o.element_type = s.element_type
+             WHERE s.element_type = 'tax_category' AND s.language_code = %s AND o.language_code = %s LIMIT 1",
+            WP_LOC_DB::to_db_language_code($default) ?: $default, WP_LOC_DB::to_db_language_code($other) ?: $other));
+        update_option(WP_LOC_Admin_Settings::LIST_LANGUAGE_EDITING_OPTION_KEY, 1);
+        $editor = new WP_LOC_Admin_Language_Editor();
+        $admins = get_users(['role' => 'administrator', 'number' => 1, 'fields' => 'ID']);
+        $previous_user = get_current_user_id();
+        wp_set_current_user((int) ($admins[0] ?? 0));
+        $request = $_REQUEST;
+        try {
+            WP_LOC_Content::$suspend_new_post_registration = true;
+            $loose = wp_insert_post(['post_type' => 'post', 'post_status' => 'draft', 'post_title' => 'WPLOC language change check'], true);
+            WP_LOC_Content::$suspend_new_post_registration = false;
+            $check(!is_wp_error($loose) && !$db->get_element_language($loose, 'post_post'), 'A post without a language exists for the check');
+            if ($category_pair) {
+                // get_term_by() would hand back the context language's sibling; read the IDs raw.
+                $source_cat = (int) WP_LOC_Terms::get_term_id_from_taxonomy_id((int) $category_pair->source_tt, 'category');
+                $other_cat = (int) WP_LOC_Terms::get_term_id_from_taxonomy_id((int) $category_pair->other_tt, 'category');
+                WP_LOC_Terms::without_language_filter(static fn() => wp_set_object_terms($loose, [$source_cat], 'category'));
+            }
+            $_REQUEST[WP_LOC_Admin_Language_Editor::FIELD_NAME] = $other;
+            $_REQUEST[WP_LOC_Admin_Language_Editor::NONCE_FIELD] = wp_create_nonce(WP_LOC_Admin_Language_Editor::NONCE_ACTION);
+            $editor->handle_save($loose, get_post($loose));
+            $check($db->get_element_language($loose, 'post_post') === $other, 'Quick Edit sets the language of a post without one');
+            if ($category_pair) {
+                $cats = WP_LOC_Terms::without_language_filter(static fn() => wp_get_object_terms($loose, 'category', ['fields' => 'ids']));
+                $check(array_map('intval', $cats) === [$other_cat], 'Its category moves to the translation in the new language');
+            }
+            $_REQUEST[WP_LOC_Admin_Language_Editor::FIELD_NAME] = $other;
+            $editor->handle_save((int) $pair->source_id, get_post((int) $pair->source_id));
+            $check($db->get_element_language((int) $pair->source_id, 'post_post') === $default, 'A post with translations keeps its language');
+            $_REQUEST[WP_LOC_Admin_Language_Editor::FIELD_NAME] = '';
+            [$alone] = $make('post', $default);
+            $editor->handle_save($alone, get_post($alone));
+            $check($db->get_element_language($alone, 'post_post') === $default, 'No Change leaves the language alone');
+        } finally {
+            $_REQUEST = $request;
+            WP_LOC_Content::$suspend_new_post_registration = false;
+            wp_set_current_user($previous_user);
+        }
+
+        // #7: wp wp-loc create-translations creates only the asked language, from originals only.
+        WP_CLI::log('#7 wp wp-loc create-translations');
+        $languages = array_keys(WP_LOC_Languages::get_active_languages());
+        $third = current(array_diff($languages, [$default, $other])) ?: null;
+        [$backfill_source] = $make('post', $default);
+        [$backfill_other] = $make('post', $other);
+        $cli = new WP_LOC_CLI_Backfill();
+        ob_start();
+        $only = $backfill_source . ',' . $backfill_other;
+        $cli->create_translations([], ['post_type' => 'post', 'status' => 'publish', 'lang' => $other, 'include' => $only]);
+        $cli->create_translations([], ['post_type' => 'post', 'status' => 'publish', 'lang' => $default, 'include' => $only]);
+        ob_end_clean();
+        $group = static fn(int $id) => $db->get_element_translations($db->get_trid($id, 'post_post'), 'post_post');
+        $check(isset($group($backfill_source)[$other]), 'The backfill creates the asked language');
+        if ($third) {
+            $check(!isset($group($backfill_source)[$third]), 'The backfill does not create other languages than --lang');
+        }
+        $check(isset($group($backfill_other)[$default]), 'An original in a non-default language is a source too');
+        $copy = (int) $group($backfill_source)[$other]->element_id;
+        $check(count($group($copy)) === count($group($backfill_source)), 'A translation is not used as a source of its own copies');
 
         // #10: a plugin can opt its own screen into localized option values.
         WP_CLI::log('#10 localized options screen filter');
