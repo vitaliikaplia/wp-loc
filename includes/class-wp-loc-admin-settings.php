@@ -19,6 +19,7 @@ class WP_LOC_Admin_Settings {
     const HIDE_UNTRANSLATED_LANGUAGES_OPTION_KEY = 'wp_loc_hide_untranslated_languages_switcher';
     const FALLBACK_UNTRANSLATED_TO_HOME_OPTION_KEY = 'wp_loc_fallback_untranslated_switcher_to_home';
     const ENABLE_ACF_COMPAT_OPTION_KEY = 'wp_loc_enable_acf_compat';
+    const ACF_MIRROR_UNCONFIGURED_FIELDS_OPTION_KEY = 'wp_loc_acf_mirror_unconfigured_fields';
     const ENABLE_YOAST_COMPAT_OPTION_KEY = 'wp_loc_enable_yoast_compat';
     const ENABLE_YOAST_SITEMAP_ALTERNATES_OPTION_KEY = 'wp_loc_enable_yoast_sitemap_alternates';
     const AI_ENGINE_OPTION_KEY = 'wp_loc_ai_engine';
@@ -455,6 +456,16 @@ TWIG;
         return (bool) get_option( self::ENABLE_ACF_COMPAT_OPTION_KEY, true );
     }
 
+    /**
+     * Whether saving a source post or term copies its ACF fields without a translation mode
+     * (none, "Don't translate") onto the translations. On by default, which keeps the earlier
+     * behaviour; off, such fields are left to each translation, which reads the source until it
+     * saves its own value, as WPML treats them.
+     */
+    public static function should_mirror_unconfigured_acf_fields(): bool {
+        return (bool) get_option( self::ACF_MIRROR_UNCONFIGURED_FIELDS_OPTION_KEY, true );
+    }
+
     public static function is_yoast_compat_enabled(): bool {
         return (bool) get_option( self::ENABLE_YOAST_COMPAT_OPTION_KEY, true );
     }
@@ -590,10 +601,12 @@ TWIG;
             update_option( self::FALLBACK_UNTRANSLATED_TO_HOME_OPTION_KEY, $fallback_untranslated_to_home );
         } elseif ( $current_tab === self::TAB_INTEGRATIONS ) {
             $enable_acf_compat = isset( $_POST['wp_loc_enable_acf_compat'] ) ? 1 : 0;
+            $acf_mirror_unconfigured_fields = isset( $_POST['wp_loc_acf_mirror_unconfigured_fields'] ) ? 1 : 0;
             $enable_yoast_compat = isset( $_POST['wp_loc_enable_yoast_compat'] ) ? 1 : 0;
             $enable_yoast_sitemap_alternates = isset( $_POST['wp_loc_enable_yoast_sitemap_alternates'] ) ? 1 : 0;
 
             update_option( self::ENABLE_ACF_COMPAT_OPTION_KEY, $enable_acf_compat );
+            update_option( self::ACF_MIRROR_UNCONFIGURED_FIELDS_OPTION_KEY, $acf_mirror_unconfigured_fields );
             update_option( self::ENABLE_YOAST_COMPAT_OPTION_KEY, $enable_yoast_compat );
             update_option( self::ENABLE_YOAST_SITEMAP_ALTERNATES_OPTION_KEY, $enable_yoast_sitemap_alternates );
         } elseif ( $current_tab === self::TAB_AI ) {
@@ -670,6 +683,7 @@ TWIG;
         $hide_untranslated_languages = self::hide_untranslated_languages_in_switcher();
         $fallback_untranslated_to_home = self::fallback_untranslated_switcher_links_to_home();
         $enable_acf_compat = self::is_acf_compat_enabled();
+        $acf_mirror_unconfigured_fields = self::should_mirror_unconfigured_acf_fields();
         $enable_yoast_compat = self::is_yoast_compat_enabled();
         $enable_yoast_sitemap_alternates = self::is_yoast_sitemap_alternates_enabled();
         $translate_custom_menu_links = self::should_ai_translate_custom_menu_links();
@@ -932,8 +946,17 @@ TWIG;
                                             />
                                             <span><?php esc_html_e( 'Enable the ACF multilingual compatibility layer', 'wp-loc' ); ?></span>
                                         </label>
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_acf_mirror_unconfigured_fields"
+                                                   value="1"
+                                                   <?php checked( $acf_mirror_unconfigured_fields ); ?>
+                                            />
+                                            <span><?php esc_html_e( "Copy fields set to \"Don't translate\" from the source post or term to its translations on every save", 'wp-loc' ); ?></span>
+                                        </label>
                                     </fieldset>
                                     <p class="description"><?php esc_html_e( 'Loads the ACF integration for multilingual field groups, options, media, relation fields, and container field behavior.', 'wp-loc' ); ?></p>
+                                    <p class="description"><?php esc_html_e( "Fields with no translation mode count as \"Don't translate\". When copying is off, each translation keeps its own value of such a field and shows the source value until it saves one, as WPML does. Options pages keep one shared value either way.", 'wp-loc' ); ?></p>
                                 </td>
                             </tr>
                             <tr>

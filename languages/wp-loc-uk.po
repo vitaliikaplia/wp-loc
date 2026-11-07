@@ -535,6 +535,14 @@ msgstr "Advanced Custom Fields"
 msgid "Enable the ACF multilingual compatibility layer"
 msgstr "Увімкнути шар багатомовної сумісності для ACF"
 
+#: includes/class-wp-loc-admin-settings.php:955
+msgid "Copy fields set to \"Don't translate\" from the source post or term to its translations on every save"
+msgstr "Копіювати поля з режимом «Не перекладати» з вихідного запису чи терміна в його переклади при кожному збереженні"
+
+#: includes/class-wp-loc-admin-settings.php:959
+msgid "Fields with no translation mode count as \"Don't translate\". When copying is off, each translation keeps its own value of such a field and shows the source value until it saves one, as WPML does. Options pages keep one shared value either way."
+msgstr "Поля без режиму перекладу вважаються «Не перекладати». Коли копіювання вимкнено, кожен переклад зберігає власне значення такого поля й показує значення вихідного запису, доки не збереже своє, — як у WPML. Сторінки опцій у будь-якому разі мають одне спільне значення."
+
 #: includes/class-wp-loc-admin-settings.php:907
 msgid ""
 "Loads the ACF integration for multilingual field groups, options, media, "

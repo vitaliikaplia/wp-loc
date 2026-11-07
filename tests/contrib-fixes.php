@@ -1,6 +1,6 @@
 <?php
 /**
- * Checks for the fixes taken from contributed pull requests (#2, #5, #8, #9, #13).
+ * Checks for the fixes taken from contributed pull requests (#2, #3, #5, #8, #9, #13).
  * Run on a site with at least two languages and without a persistent object cache:
  * wp eval-file wp-content/plugins/wp-loc/tests/contrib-fixes.php
  * Every write happens inside a transaction that is rolled back.
@@ -147,6 +147,50 @@ try {
         $content->sync_translations($subpage, get_post($subpage));
         clean_post_cache($subpage_other);
         $check((int) get_post($subpage_other)->post_parent === $lone_page, 'A same-type parent without a translation keeps the source parent');
+
+        // #3: ACF values — sub-fields of a translated options container, and fields without a mode.
+        if (function_exists('acf_add_local_field_group') && WP_LOC_Admin_Settings::is_acf_compat_enabled()) {
+            WP_CLI::log('#3 ACF options containers and unconfigured fields');
+            $flush_values = static function () { if (function_exists('acf_get_store')) { acf_get_store('values')->reset(); } };
+            acf_add_local_field_group([
+                'key' => 'group_wploc_contrib_check',
+                'title' => 'WPLOC contrib check',
+                'fields' => [
+                    ['key' => 'field_wploc_check_rows', 'name' => 'wploc_check_rows', 'type' => 'repeater', 'wpml_cf_preferences' => 2,
+                     'sub_fields' => [['key' => 'field_wploc_check_rows_label', 'name' => 'label', 'type' => 'text']]],
+                    ['key' => 'field_wploc_check_plain', 'name' => 'wploc_check_plain', 'type' => 'text'],
+                ],
+                'location' => [[['param' => 'post_type', 'operator' => '==', 'value' => 'post']]],
+            ]);
+            update_field('field_wploc_check_rows', [['field_wploc_check_rows_label' => 'Base row']], 'options');
+            WP_LOC_Routing::switch_language($other);
+            try {
+                update_field('field_wploc_check_rows', [['field_wploc_check_rows_label' => 'Translated row']], 'options');
+                $flush_values();
+                $rows = get_field('wploc_check_rows', 'options');
+                $check(($rows[0]['label'] ?? null) === 'Translated row', 'A translated options repeater shows its own sub-values');
+            } finally {
+                WP_LOC_Routing::switch_language($default);
+            }
+            $flush_values();
+            $rows = get_field('wploc_check_rows', 'options');
+            $check(($rows[0]['label'] ?? null) === 'Base row', 'The default-language options repeater keeps its sub-values');
+
+            $source = (int) $pair->source_id;
+            $sibling = (int) $pair->sibling_id;
+            update_field('field_wploc_check_plain', 'Own translation value', $sibling);
+            update_field('field_wploc_check_plain', 'Source value 1', $source);
+            $flush_values();
+            $check(get_post_meta($sibling, 'wploc_check_plain', true) === 'Source value 1', 'By default a field without a mode is copied from the source on save');
+            update_option(WP_LOC_Admin_Settings::ACF_MIRROR_UNCONFIGURED_FIELDS_OPTION_KEY, 0);
+            update_field('field_wploc_check_plain', 'Own translation value', $sibling);
+            update_field('field_wploc_check_plain', 'Source value 2', $source);
+            $flush_values();
+            $check(get_post_meta($sibling, 'wploc_check_plain', true) === 'Own translation value', 'With copying off the translation keeps its own value');
+            delete_post_meta($sibling, 'wploc_check_plain');
+            $flush_values();
+            $check(get_field('wploc_check_plain', $sibling) === 'Source value 2', 'With copying off a translation without a value shows the source value');
+        }
     } finally {
         $wpdb->query('ROLLBACK');
         wp_cache_flush();

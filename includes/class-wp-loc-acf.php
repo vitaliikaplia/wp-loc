@@ -2449,7 +2449,7 @@ class WP_LOC_ACF {
                 return $value;
             }
 
-            if ( $translation_mode === 'shared' ) {
+            if ( $this->is_mirrored_to_translations( $translation_mode ) ) {
                 $this->sync_shared_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $canonical_field, $value );
             } elseif ( $translation_mode === 'copy_once' ) {
                 $this->sync_copy_once_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $canonical_field, $value );
@@ -2465,7 +2465,7 @@ class WP_LOC_ACF {
                 return $value;
             }
 
-            if ( $post_entity_id && $translation_mode === 'shared' ) {
+            if ( $post_entity_id && $this->is_mirrored_to_translations( $translation_mode ) ) {
                 $this->sync_shared_post_field_value( $post_entity_id, $canonical_field, $value );
             } elseif ( $post_entity_id && $translation_mode === 'copy_once' ) {
                 $this->sync_copy_once_post_field_value( $post_entity_id, $canonical_field, $value );
@@ -2550,7 +2550,7 @@ class WP_LOC_ACF {
             $term_context = $this->get_term_context( $post_id );
 
             if ( $term_context ) {
-                if ( $translation_mode === 'shared' ) {
+                if ( $this->is_mirrored_to_translations( $translation_mode ) ) {
                     $this->sync_shared_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $field, $value );
                 } elseif ( $translation_mode === 'copy_once' ) {
                     $this->sync_copy_once_term_field_value( $term_context['term_id'], $term_context['taxonomy'], $field, $value );
@@ -2566,7 +2566,7 @@ class WP_LOC_ACF {
                     continue;
                 }
 
-                if ( $translation_mode === 'shared' ) {
+                if ( $this->is_mirrored_to_translations( $translation_mode ) ) {
                     $this->sync_shared_post_field_value( $post_entity_id, $field, $value );
                 } elseif ( $translation_mode === 'copy_once' ) {
                     $this->sync_copy_once_post_field_value( $post_entity_id, $field, $value );
@@ -3313,6 +3313,16 @@ class WP_LOC_ACF {
     /**
      * Resolve the configured translation mode for a field.
      */
+    /**
+     * Whether saving a source post or term copies a field of this mode onto its translations.
+     * shared always does; none ("Don't translate", also every field without a mode) does while
+     * the ACF setting for unconfigured fields is on, which is the default.
+     */
+    private function is_mirrored_to_translations( string $translation_mode ): bool {
+        return $translation_mode === 'shared'
+            || ( $translation_mode === 'none' && WP_LOC_Admin_Settings::should_mirror_unconfigured_acf_fields() );
+    }
+
     private function get_translation_mode( array $field ): string {
         if ( isset( $field['translation_mode'] ) && in_array( $field['translation_mode'], [ 'none', 'shared', 'copy_once', 'translatable' ], true ) ) {
             return $field['translation_mode'];
