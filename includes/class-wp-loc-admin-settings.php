@@ -27,6 +27,7 @@ class WP_LOC_Admin_Settings {
     const AI_ENGINE_OPTION_KEY = 'wp_loc_ai_engine';
     const AI_MODELS_OPTION_KEY = 'wp_loc_ai_models';
     const AI_TRANSLATE_CUSTOM_MENU_LINKS_OPTION_KEY = 'wp_loc_ai_translate_custom_menu_links';
+    const AI_BROWSER_TRANSLATOR_OPTION_KEY = 'wp_loc_ai_browser_translator';
     const TAB_CONTENT = 'content';
     const TAB_SWITCHER = 'switcher';
     const TAB_INTEGRATIONS = 'integrations';
@@ -539,6 +540,14 @@ TWIG;
         return isset( $models[ $model_id ] ) ? $model_id : (string) array_key_first( $models );
     }
 
+    /**
+     * Whether the Translate title / term name buttons translate with Chrome's built-in Translator
+     * API in the browser instead of the AI provider. Off by default.
+     */
+    public static function should_use_browser_translator(): bool {
+        return (bool) get_option( self::AI_BROWSER_TRANSLATOR_OPTION_KEY, false );
+    }
+
     public static function should_ai_translate_custom_menu_links(): bool {
         return (bool) get_option( self::AI_TRANSLATE_CUSTOM_MENU_LINKS_OPTION_KEY, false );
     }
@@ -650,6 +659,8 @@ TWIG;
             update_option( self::ENABLE_YOAST_COMPAT_OPTION_KEY, $enable_yoast_compat );
             update_option( self::ENABLE_YOAST_SITEMAP_ALTERNATES_OPTION_KEY, $enable_yoast_sitemap_alternates );
         } elseif ( $current_tab === self::TAB_AI ) {
+            update_option( self::AI_BROWSER_TRANSLATOR_OPTION_KEY, isset( $_POST['wp_loc_ai_browser_translator'] ) ? 1 : 0 );
+
             $providers = WP_LOC_AI::get_connected_providers();
             $ai_engine = isset( $_POST['wp_loc_ai_engine'] ) ? sanitize_key( (string) $_POST['wp_loc_ai_engine'] ) : '';
 
@@ -742,7 +753,6 @@ TWIG;
         $ai_selected_models_by_provider = [];
         $ai_engine = '';
         $ai_model = '';
-        $has_ai_models = false;
 
         if ( $current_tab === self::TAB_AI && $core_ai_available ) {
             $ai_engines = WP_LOC_AI::get_connected_providers();
@@ -757,10 +767,6 @@ TWIG;
                 $ai_selected_models_by_provider[ $provider_id ] = isset( $ai_models_by_provider[ $provider_id ][ $saved_model ] )
                     ? $saved_model
                     : (string) ( array_key_first( $ai_models_by_provider[ $provider_id ] ) ?? '' );
-
-                if ( $ai_models_by_provider[ $provider_id ] !== [] ) {
-                    $has_ai_models = true;
-                }
             }
 
             $ai_engine = self::get_ai_engine();
@@ -1116,6 +1122,25 @@ TWIG;
                                 </tr>
                             </table>
                         <?php endif; ?>
+
+                        <table class="form-table" role="presentation">
+                            <tr>
+                                <th scope="row"><?php esc_html_e( 'Browser translator', 'wp-loc' ); ?></th>
+                                <td>
+                                    <fieldset class="wp-loc-settings-stack">
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_ai_browser_translator"
+                                                   value="1"
+                                                   <?php checked( self::should_use_browser_translator() ); ?>
+                                            />
+                                            <span><?php esc_html_e( "Translate titles and term names with Chrome's built-in translator in the browser", 'wp-loc' ); ?></span>
+                                        </label>
+                                    </fieldset>
+                                    <p class="description"><?php esc_html_e( 'Free and local, no AI provider needed. Works only in desktop Chrome, which downloads a language model on first use; the quality is lower than with an AI provider. Menu sync keeps using the AI provider.', 'wp-loc' ); ?></p>
+                                </td>
+                            </tr>
+                        </table>
                     </div>
                 <?php else : ?>
                     <?php do_action( "wp_loc_settings_render_{$current_tab}" ); ?>
@@ -1123,9 +1148,8 @@ TWIG;
 
                 <?php do_action( "wp_loc_settings_fields_{$current_tab}" ); ?>
 
-                <?php if ( $current_tab !== self::TAB_AI || $has_ai_models || has_action( "wp_loc_settings_fields_{$current_tab}" ) ) : ?>
-                    <?php submit_button( __( 'Save', 'wp-loc' ) ); ?>
-                <?php endif; ?>
+                <?php // The AI tab always has the browser translator setting to save. ?>
+                <?php submit_button( __( 'Save', 'wp-loc' ) ); ?>
             </form>
 
             <?php if ( $current_tab === self::TAB_SWITCHER ) : ?>

@@ -925,6 +925,32 @@
 
         const titleNode = modal.querySelector('#wp-loc-title-translate-modal-title');
 
+        // Chrome's built-in Translator API (desktop Chrome): translates in the browser, so the
+        // server only stores the result. Enabled by the browser translator setting on the AI tab.
+        const translateInBrowser = async function(text, sourceLang, targetLang) {
+            const tags = wpLocAdmin.browserTranslatorTags || {};
+            const sourceLanguage = tags[sourceLang] || sourceLang;
+            const targetLanguage = tags[targetLang] || targetLang;
+
+            if (!('Translator' in self)) {
+                throw new Error(i18n.browserTranslatorMissing || i18n.requestFailed);
+            }
+
+            const availability = await self.Translator.availability({ sourceLanguage: sourceLanguage, targetLanguage: targetLanguage });
+
+            if (availability === 'unavailable') {
+                throw new Error(i18n.browserTranslatorPairMissing || i18n.requestFailed);
+            }
+
+            if (availability !== 'available') {
+                setStatus(i18n.browserTranslatorDownloading || i18n.translating, '');
+            }
+
+            const translator = await self.Translator.create({ sourceLanguage: sourceLanguage, targetLanguage: targetLanguage });
+
+            return String(await translator.translate(String(text || ''))).trim();
+        };
+
         const openModal = function(config) {
             currentPostId = parseInt(config.postId || '0', 10);
             currentTermId = parseInt(config.termId || '0', 10);
@@ -1251,9 +1277,24 @@
                 }
             }
 
-            $.post(wpLocAdmin.ajaxUrl, {
-                ...payload
-            }).done(function(response) {
+            const sourceTarget = currentTargets.find(function(target) { return target && target.is_current; });
+            const sourceLang = sourceTarget ? sourceTarget.lang : (wpLocAdmin.adminLang || '');
+            const browserTranslation = wpLocAdmin.browserTranslator
+                ? translateInBrowser(currentTitle, sourceLang, targetLang).then(function(translated) {
+                    if (!translated) {
+                        throw new Error(i18n.requestFailed);
+                    }
+
+                    payload.translated_title = translated;
+                    setStatus(i18n.translating, '');
+                })
+                : Promise.resolve();
+
+            browserTranslation.then(function() {
+                return $.post(wpLocAdmin.ajaxUrl, {
+                    ...payload
+                });
+            }).then(function(response) {
                 if (!response || !response.success) {
                     const message = response && response.data && response.data.message ? response.data.message : i18n.requestFailed;
                     setStatus(message, 'error');
@@ -1317,12 +1358,13 @@
                         window.location.reload();
                     }, 2000);
                 }
-            }).fail(function(xhr) {
-                const message = xhr && xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
-                    ? xhr.responseJSON.data.message
-                    : i18n.requestFailed;
+            }).catch(function(error) {
+                // A failed browser translation is an Error; a failed request is a jqXHR.
+                const message = error && error.responseJSON && error.responseJSON.data && error.responseJSON.data.message
+                    ? error.responseJSON.data.message
+                    : (error instanceof Error && error.message ? error.message : i18n.requestFailed);
                 setStatus(message, 'error');
-            }).always(function() {
+            }).finally(function() {
                 modal.classList.remove('is-loading');
             });
         });

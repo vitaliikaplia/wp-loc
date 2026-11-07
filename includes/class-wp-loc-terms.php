@@ -1849,7 +1849,10 @@ class WP_LOC_Terms {
             wp_send_json_error( [ 'message' => __( 'Translation term was not found for the selected language.', 'wp-loc' ) ], 404 );
         }
 
-        $translated_name = trim( wp_strip_all_tags( WP_LOC_AI::translate_content( $source_name, WP_LOC_AI::get_target_language_name( $target_lang ) ) ) );
+        $translated_name = trim( wp_strip_all_tags(
+            WP_LOC_Admin::get_browser_translation( 'translated_title' )
+                ?? WP_LOC_AI::translate_content( $source_name, WP_LOC_AI::get_target_language_name( $target_lang ) )
+        ) );
 
         if ( $translated_name === '' ) {
             wp_send_json_error( [ 'message' => __( 'Term name translation failed.', 'wp-loc' ) ], 500 );

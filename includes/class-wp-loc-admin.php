@@ -137,11 +137,16 @@ class WP_LOC_Admin {
             'gutenbergLanguages' => $gutenberg_languages,
             'gutenbergTitleTranslate' => $gutenberg_title_translate,
             'classicTitleTranslate' => $classic_title_translate,
+            'browserTranslator' => WP_LOC_Admin_Settings::should_use_browser_translator(),
+            'browserTranslatorTags' => WP_LOC_Admin_Settings::should_use_browser_translator() ? self::get_browser_translator_language_tags() : [],
             'disablePageSelectsMessage' => $disable_page_selects_message,
             'protectedCategoryTermIds' => $protected_category_term_ids,
             'hideProtectedTermDeleteLink' => $hide_protected_term_delete_link,
             'i18n' => [
                 'requestFailed' => __( 'Request failed.', 'wp-loc' ),
+                'browserTranslatorMissing' => __( "This browser has no built-in translator. Use desktop Chrome or turn the browser translator off in the AI settings.", 'wp-loc' ),
+                'browserTranslatorPairMissing' => __( "Chrome's translator does not support this language pair.", 'wp-loc' ),
+                'browserTranslatorDownloading' => __( 'Chrome is downloading the language model…', 'wp-loc' ),
                 'editTranslation' => __( 'Edit translation', 'wp-loc' ),
                 'translating' => __( 'Translating...', 'wp-loc' ),
                 'previewRefreshed' => __( 'Preview refreshed.', 'wp-loc' ),
@@ -1005,6 +1010,36 @@ class WP_LOC_Admin {
         wp_send_json_success( [ 'html' => ob_get_clean() ] );
     }
 
+    /**
+     * The text the browser translator sent with a translate request, or null when the request
+     * should be translated on the server. Only honoured while the browser translator setting is on.
+     */
+    public static function get_browser_translation( string $field ): ?string {
+        if ( ! WP_LOC_Admin_Settings::should_use_browser_translator() || ! isset( $_POST[ $field ] ) || ! is_scalar( $_POST[ $field ] ) ) {
+            return null;
+        }
+
+        $text = sanitize_text_field( wp_unslash( (string) $_POST[ $field ] ) );
+
+        return $text !== '' ? $text : null;
+    }
+
+    /**
+     * BCP 47 language tags for Chrome's Translator API, by WP-LOC slug: the primary subtag of the
+     * locale (uk, en, ru, uz), Chinese split into zh and zh-Hant. Filter: wp_loc_browser_translator_language_tag.
+     */
+    private static function get_browser_translator_language_tags(): array {
+        $tags = [];
+
+        foreach ( WP_LOC_Languages::get_active_languages() as $slug => $data ) {
+            $locale = (string) ( $data['locale'] ?? $slug );
+            $tag = in_array( $locale, [ 'zh_TW', 'zh_HK' ], true ) ? 'zh-Hant' : strtolower( strtok( $locale, '_-' ) );
+            $tags[ $slug ] = (string) apply_filters( 'wp_loc_browser_translator_language_tag', $tag, $slug, $locale );
+        }
+
+        return $tags;
+    }
+
     public function ajax_translate_post_title(): void {
         check_ajax_referer( 'wp_loc_ajax', 'nonce' );
 
@@ -1061,7 +1096,8 @@ class WP_LOC_Admin {
             wp_send_json_error( [ 'message' => __( 'Translation post was not found for the selected language.', 'wp-loc' ) ], 404 );
         }
 
-        $translated_title = WP_LOC_AI::translate_content( $source_title, WP_LOC_AI::get_target_language_name( $target_lang ) );
+        $translated_title = self::get_browser_translation( 'translated_title' )
+            ?? WP_LOC_AI::translate_content( $source_title, WP_LOC_AI::get_target_language_name( $target_lang ) );
         $translated_title = trim( wp_strip_all_tags( $translated_title ) );
 
         if ( $translated_title === '' ) {
