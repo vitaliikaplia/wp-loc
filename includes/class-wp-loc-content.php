@@ -322,6 +322,37 @@ class WP_LOC_Content {
         add_action( 'save_post', [ $this, 'sync_translations' ], 30, 2 );
         add_action( 'set_object_terms', [ $this, 'handle_set_object_terms' ], 20, 4 );
         add_action( 'before_delete_post', [ $this, 'handle_delete_post' ] );
+        add_action( 'wp_loc_ai_translate_copy', [ $this, 'ai_translate_copy' ], 10, 3 );
+    }
+
+    /**
+     * WP-Cron task scheduled by create_translations() while the New translation copies setting is
+     * on: translate the copy's title, content and excerpt from its source. A copy whose text no
+     * longer matches the source was edited in the meantime and keeps that text; a failure is kept
+     * in the copy's _wp_loc_ai_translation_error meta.
+     */
+    public function ai_translate_copy( $translation_id, $source_id, $lang_slug ): void {
+        $translation = get_post( (int) $translation_id );
+        $source = get_post( (int) $source_id );
+
+        if ( ! WP_LOC_Admin_Settings::should_ai_translate_new_copies() || ! $translation instanceof \WP_Post || ! $source instanceof \WP_Post ) {
+            return;
+        }
+
+        foreach ( [ 'post_title', 'post_content', 'post_excerpt' ] as $column ) {
+            if ( $translation->$column !== $source->$column ) {
+                return;
+            }
+        }
+
+        $result = WP_LOC_AI::translate_post_fields( $source, (int) $translation_id, (string) $lang_slug, [ 'title', 'content', 'excerpt' ], true );
+
+        if ( is_wp_error( $result ) ) {
+            update_post_meta( (int) $translation_id, '_wp_loc_ai_translation_error', $result->get_error_message() );
+            return;
+        }
+
+        delete_post_meta( (int) $translation_id, '_wp_loc_ai_translation_error' );
     }
 
     /**
@@ -548,6 +579,11 @@ class WP_LOC_Content {
              * @param string $source_lang  Language slug of the source post.
              */
             do_action( 'wp_loc_translation_created', $duplicate_id, $post_id, $lang_slug, $current_lang );
+
+            // The AI translation runs in WP-Cron, so the save that created the copy does not wait for it.
+            if ( WP_LOC_Admin_Settings::should_ai_translate_new_copies() ) {
+                wp_schedule_single_event( time(), 'wp_loc_ai_translate_copy', [ (int) $duplicate_id, $post_id, $lang_slug ] );
+            }
         }
 
         self::$creating_translations = false;
