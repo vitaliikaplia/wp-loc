@@ -203,15 +203,29 @@ class WP_LOC_Content {
 
     /**
      * Parent for a translation of $post in $lang_slug: the parent's translation when it has one.
+     *
+     * The parent is looked up as its own post type, which need not be $post's: a WooCommerce
+     * variation belongs to a product. When a parent of another type has no translation, the
+     * translation keeps $current_parent, its own parent, instead of moving under the source's
+     * parent in another language. A parent of the same type keeps the earlier fallback.
      */
-    public function get_translated_parent_id( \WP_Post $post, string $lang_slug ): int {
+    public function get_translated_parent_id( \WP_Post $post, string $lang_slug, ?int $current_parent = null ): int {
         if ( ! $post->post_parent ) {
             return 0;
         }
 
-        $translated_parent = WP_LOC::instance()->db->get_element_translation( $post->post_parent, WP_LOC_DB::post_element_type( $post->post_type ), $lang_slug );
+        $parent_type = get_post_type( $post->post_parent ) ?: $post->post_type;
+        $translated_parent = WP_LOC::instance()->db->get_element_translation( $post->post_parent, WP_LOC_DB::post_element_type( $parent_type ), $lang_slug );
 
-        return $translated_parent ?: (int) $post->post_parent;
+        if ( $translated_parent ) {
+            return (int) $translated_parent;
+        }
+
+        if ( $parent_type !== $post->post_type && $current_parent !== null ) {
+            return $current_parent;
+        }
+
+        return (int) $post->post_parent;
     }
 
     /**
@@ -528,7 +542,7 @@ class WP_LOC_Content {
                     'post_password' => $post->post_password,
                 ];
 
-                $update_data['post_parent'] = $this->get_translated_parent_id( $post, $slug );
+                $update_data['post_parent'] = $this->get_translated_parent_id( $post, $slug, (int) $sibling->post_parent );
 
                 self::without_submitted_form( fn() => wp_update_post( $update_data ) );
 

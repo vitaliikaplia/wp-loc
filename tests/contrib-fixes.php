@@ -1,6 +1,6 @@
 <?php
 /**
- * Checks for the fixes taken from contributed pull requests (#5, #8, #9, #13).
+ * Checks for the fixes taken from contributed pull requests (#2, #5, #8, #9, #13).
  * Run on a site with at least two languages and without a persistent object cache:
  * wp eval-file wp-content/plugins/wp-loc/tests/contrib-fixes.php
  * Every write happens inside a transaction that is rolled back.
@@ -115,6 +115,38 @@ try {
             remove_action('wp_insert_post', $reader, 10);
             $_POST = $posted;
         }
+
+        // #2: a parent of another post type is translated as its own type; without a translation
+        // the sibling keeps its own parent, while a parent of the same type keeps the old fallback.
+        WP_CLI::log('#2 translated parent of another post type');
+        $make = static function (string $type, string $lang, int $parent = 0, ?int $trid = null) use ($db) {
+            WP_LOC_Content::$suspend_new_post_registration = true;
+            try {
+                $id = wp_insert_post(['post_type' => $type, 'post_status' => 'publish', 'post_title' => "WPLOC parent check {$type} {$lang}", 'post_parent' => $parent], true);
+            } finally {
+                WP_LOC_Content::$suspend_new_post_registration = false;
+            }
+            if (is_wp_error($id)) { throw new RuntimeException($id->get_error_message()); }
+            $new_trid = $db->set_element_language((int) $id, WP_LOC_DB::post_element_type($type), $lang, $trid);
+            return [(int) $id, $trid ?? $new_trid];
+        };
+        [$page, $page_trid] = $make('page', $default);
+        [$page_other] = $make('page', $other, 0, $page_trid);
+        [$lone_page] = $make('page', $default);
+        [$child, $child_trid] = $make('post', $default, $page);
+        [$child_other] = $make('post', $other, 0, $child_trid);
+        $content = WP_LOC::instance()->content;
+        $content->sync_translations($child, get_post($child));
+        clean_post_cache($child_other);
+        $check((int) get_post($child_other)->post_parent === $page_other, 'A post under a page gets the page translation as its parent');
+        wp_update_post(['ID' => $child, 'post_parent' => $lone_page]);
+        clean_post_cache($child_other);
+        $check((int) get_post($child_other)->post_parent === $page_other, 'Without a parent translation of another type the sibling keeps its own parent');
+        [$subpage, $subpage_trid] = $make('page', $default, $lone_page);
+        [$subpage_other] = $make('page', $other, 0, $subpage_trid);
+        $content->sync_translations($subpage, get_post($subpage));
+        clean_post_cache($subpage_other);
+        $check((int) get_post($subpage_other)->post_parent === $lone_page, 'A same-type parent without a translation keeps the source parent');
     } finally {
         $wpdb->query('ROLLBACK');
         wp_cache_flush();
