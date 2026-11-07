@@ -202,6 +202,31 @@ class WP_LOC_Content {
     }
 
     /**
+     * Give a post whose own language just changed (Quick Edit or Bulk Edit) the terms of that
+     * language: a term already in $lang_slug or without a language stays, a term of another
+     * language becomes its $lang_slug translation or is dropped, and a 'post' left without a
+     * category gets the default category's translation. Runs whatever the taxonomy sync setting,
+     * since a post must never keep terms of another language.
+     */
+    public function move_post_terms_to_language( int $post_id, string $lang_slug ): void {
+        $post = get_post( $post_id );
+
+        if ( ! $post instanceof \WP_Post ) {
+            return;
+        }
+
+        $was_syncing = self::$syncing;
+        self::$syncing = true;
+
+        try {
+            $this->sync_post_terms( $post_id, $post, [ $lang_slug => (object) [ 'element_id' => $post_id ] ] );
+            $this->ensure_default_category( $post, $lang_slug );
+        } finally {
+            self::$syncing = $was_syncing;
+        }
+    }
+
+    /**
      * Parent for a translation of $post in $lang_slug: the parent's translation when it has one.
      *
      * The parent is looked up as its own post type, which need not be $post's: a WooCommerce

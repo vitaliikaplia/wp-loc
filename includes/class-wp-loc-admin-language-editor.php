@@ -3,9 +3,11 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Quick Edit + Bulk Edit support for reassigning a post's language.
- *
- * Touches only the icl_translations row — never wp_posts content.
+ * Quick Edit + Bulk Edit support for setting the language of a post that has no translations
+ * yet — imported or legacy content without a language, or a post alone in its group. A post
+ * with translations keeps its language: moving one member would leave the group with a stale
+ * source language. The post's terms move to the new language with it. Enabled by the
+ * wp_loc_list_language_editing setting (off by default).
  */
 class WP_LOC_Admin_Language_Editor {
 
@@ -22,6 +24,10 @@ class WP_LOC_Admin_Language_Editor {
     }
 
     public function register_hooks(): void {
+        if ( ! WP_LOC_Admin_Settings::allow_list_language_editing() ) {
+            return;
+        }
+
         $post_types = $this->translatable_post_types();
         if ( empty( $post_types ) ) {
             return;
@@ -59,15 +65,15 @@ class WP_LOC_Admin_Language_Editor {
     }
 
     private function render_box( array $languages, bool $is_bulk ): void {
+        unset( $is_bulk );
         ?>
         <fieldset class="inline-edit-col-right inline-edit-wp-loc">
             <div class="inline-edit-col">
                 <label class="inline-edit-language alignleft">
                     <span class="title"><?php esc_html_e( 'Language', 'wp-loc' ); ?></span>
                     <select name="<?php echo esc_attr( self::FIELD_NAME ); ?>">
-                        <?php if ( $is_bulk ) : ?>
-                            <option value=""><?php esc_html_e( '— No Change —', 'wp-loc' ); ?></option>
-                        <?php endif; ?>
+                        <?php // Quick Edit too: a post without a language must not get one just because its title was edited. ?>
+                        <option value=""><?php esc_html_e( '— No Change —', 'wp-loc' ); ?></option>
                         <?php foreach ( $languages as $slug => $data ) : ?>
                             <option value="<?php echo esc_attr( $slug ); ?>">
                                 <?php echo esc_html( WP_LOC_Languages::get_display_name( $slug ) ); ?>
@@ -88,14 +94,33 @@ class WP_LOC_Admin_Language_Editor {
         if ( ! $post_type || ! $this->is_supported_post_type( $post_type ) ) return;
 
         $element_type = WP_LOC_DB::post_element_type( $post_type );
-        $current_lang = WP_LOC::instance()->db->get_element_language( $post_id, $element_type );
-
-        if ( ! $current_lang ) return;
+        $current_lang = (string) WP_LOC::instance()->db->get_element_language( $post_id, $element_type );
 
         printf(
-            '<span class="wp-loc-inline-lang" data-lang="%s" style="display:none;"></span>',
-            esc_attr( $current_lang )
+            '<span class="wp-loc-inline-lang" data-lang="%s" data-locked="%d" style="display:none;"></span>',
+            esc_attr( $current_lang ),
+            $this->has_translations( $post_id, $element_type ) ? 1 : 0
         );
+    }
+
+    /**
+     * Whether the post shares its translation group with another post.
+     */
+    private function has_translations( int $post_id, string $element_type ): bool {
+        $db = WP_LOC::instance()->db;
+        $trid = $db->get_trid( $post_id, $element_type );
+
+        if ( ! $trid ) {
+            return false;
+        }
+
+        foreach ( $db->get_element_translations( $trid, $element_type ) as $row ) {
+            if ( (int) $row->element_id !== $post_id ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function handle_save( int $post_id, WP_Post $post ): void {
@@ -129,18 +154,13 @@ class WP_LOC_Admin_Language_Editor {
             return;
         }
 
-        $trid = $db->get_trid( $post_id, $element_type );
-
-        // Trid collision check: if this trid already has another post in target language, skip.
-        if ( $trid ) {
-            $translations = $db->get_element_translations( $trid, $element_type );
-            if ( isset( $translations[ $target ] ) && (int) $translations[ $target ]->element_id !== $post_id ) {
-                $this->record_result( 'skipped_collision', $post_id );
-                return;
-            }
+        if ( $this->has_translations( $post_id, $element_type ) ) {
+            $this->record_result( 'skipped_translations', $post_id );
+            return;
         }
 
-        $db->set_element_language( $post_id, $element_type, $target, $trid );
+        $db->set_element_language( $post_id, $element_type, $target, $db->get_trid( $post_id, $element_type ) );
+        WP_LOC::instance()->content->move_post_terms_to_language( $post_id, $target );
         $this->record_result( 'changed', $post_id );
     }
 
@@ -175,8 +195,8 @@ class WP_LOC_Admin_Language_Editor {
                 esc_html( sprintf(
                     /* translators: 1: number of skipped posts, 2: comma-separated list of IDs */
                     _n(
-                        'Skipped %1$d post due to translation conflict (target language already taken in its translation group): %2$s',
-                        'Skipped %1$d posts due to translation conflicts (target language already taken in their translation groups): %2$s',
+                        'Kept the language of %1$d post that has translations: %2$s',
+                        'Kept the language of %1$d posts that have translations: %2$s',
                         count( $skipped ),
                         'wp-loc'
                     ),
@@ -188,6 +208,8 @@ class WP_LOC_Admin_Language_Editor {
     }
 
     public function output_inline_script(): void {
+        if ( ! WP_LOC_Admin_Settings::allow_list_language_editing() ) return;
+
         $screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
         if ( ! $screen || $screen->base !== 'edit' ) return;
         if ( ! $this->is_supported_post_type( (string) $screen->post_type ) ) return;
@@ -208,10 +230,11 @@ class WP_LOC_Admin_Language_Editor {
                 }
                 if ( ! postId ) return;
 
-                var lang = $( '#post-' + postId ).find( '.wp-loc-inline-lang' ).data( 'lang' );
-                if ( ! lang ) return;
+                var $data = $( '#post-' + postId ).find( '.wp-loc-inline-lang' );
+                var $select = $( 'tr#edit-' + postId + ' select[name="<?php echo $field; ?>"]' );
 
-                $( 'tr#edit-' + postId + ' select[name="<?php echo $field; ?>"]' ).val( lang );
+                // A post with translations keeps its language, so its select only shows it.
+                $select.val( $data.data( 'lang' ) || '' ).prop( 'disabled', String( $data.data( 'locked' ) ) === '1' );
             };
         } )( jQuery );
         </script>
@@ -245,7 +268,7 @@ class WP_LOC_Admin_Language_Editor {
             $current['changed'] = ( (int) ( $current['changed'] ?? 0 ) ) + 1;
         } elseif ( $kind === 'unchanged' ) {
             $current['unchanged'] = ( (int) ( $current['unchanged'] ?? 0 ) ) + 1;
-        } elseif ( $kind === 'skipped_collision' ) {
+        } elseif ( $kind === 'skipped_translations' ) {
             $current['skipped'][] = $post_id;
         }
 

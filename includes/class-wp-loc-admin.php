@@ -1382,7 +1382,9 @@ class WP_LOC_Admin {
             // No language at all — render only the warning, no flag/+ links
             // (there is no source content to translate from yet).
             if ( ! $current_lang ) {
-                $tip = esc_attr__( 'Language not assigned. Use Quick Edit or Bulk Edit to set a language.', 'wp-loc' );
+                $tip = WP_LOC_Admin_Settings::allow_list_language_editing()
+                    ? esc_attr__( 'Language not assigned. Use Quick Edit or Bulk Edit to set a language.', 'wp-loc' )
+                    : esc_attr__( 'Language not assigned.', 'wp-loc' );
                 echo '<span class="wp-loc-t wp-loc-t-no-lang" title="' . $tip . '" aria-label="' . $tip . '">⚠</span>';
                 return;
             }
@@ -1403,6 +1405,8 @@ class WP_LOC_Admin {
                     $is_published = $translated_post && $translated_post->post_status === 'publish';
                     $cls = $is_published ? 'wp-loc-t-published' : 'wp-loc-t-draft';
                     $items[] = '<a href="' . esc_url( $edit_link ) . '" class="wp-loc-t ' . $cls . '" title="' . esc_attr__( 'Edit translation', 'wp-loc' ) . '">' . $flag_img . $pencil . '</a>';
+                } elseif ( ! WP_LOC_Admin_Settings::allow_list_quick_translations() ) {
+                    $items[] = '<span class="wp-loc-t wp-loc-t-missing">' . $flag_img . '</span>';
                 } else {
                     $create_title = sprintf(
                         /* translators: %s: language name */

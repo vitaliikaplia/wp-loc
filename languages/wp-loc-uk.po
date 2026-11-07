@@ -1377,3 +1377,56 @@ msgstr ""
 #: wp-loc.php:91
 msgid "Wizard"
 msgstr "Майстер"
+
+#: includes/class-wp-loc-admin-language-editor.php
+msgid "Language"
+msgstr "Мова"
+
+#: includes/class-wp-loc-admin-language-editor.php
+msgid "— No Change —"
+msgstr "— Без змін —"
+
+#: includes/class-wp-loc-admin-language-editor.php
+#, php-format
+msgid "Language updated for %d post."
+msgid_plural "Language updated for %d posts."
+msgstr[0] "Мову оновлено для %d запису."
+msgstr[1] "Мову оновлено для %d записів."
+msgstr[2] "Мову оновлено для %d записів."
+
+#: includes/class-wp-loc-admin-language-editor.php
+#, php-format
+msgid "Kept the language of %1$d post that has translations: %2$s"
+msgid_plural "Kept the language of %1$d posts that have translations: %2$s"
+msgstr[0] "Мову %1$d запису з перекладами залишено без змін: %2$s"
+msgstr[1] "Мову %1$d записів з перекладами залишено без змін: %2$s"
+msgstr[2] "Мову %1$d записів з перекладами залишено без змін: %2$s"
+
+#: includes/class-wp-loc-admin.php
+msgid "Language not assigned. Use Quick Edit or Bulk Edit to set a language."
+msgstr "Мову не призначено. Призначте її у «Властивостях» або «Масовому редагуванні»."
+
+#: includes/class-wp-loc-admin.php
+msgid "Language not assigned."
+msgstr "Мову не призначено."
+
+#: includes/class-wp-loc-admin.php
+#, php-format
+msgid "Create %s translation"
+msgstr "Створити переклад: %s"
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Post and term lists"
+msgstr "Списки записів і термінів"
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Set the language of posts without translations from Quick Edit and Bulk Edit"
+msgstr "Призначати мову записам без перекладів у «Властивостях» і «Масовому редагуванні»"
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Create a missing translation with one click on its flag in the Translations column"
+msgstr "Створювати відсутній переклад одним кліком на його прапорець у колонці «Переклади»"
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Helps with imported or legacy content. Only a post without translations can change its language, and its terms move to the new language with it."
+msgstr "Допомагає з імпортованим або старим контентом. Змінити мову можна лише запису без перекладів, і його терміни переходять на нову мову разом із ним."

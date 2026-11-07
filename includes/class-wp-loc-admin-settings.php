@@ -13,6 +13,8 @@ class WP_LOC_Admin_Settings {
     const SYNC_POST_TAXONOMIES_OPTION_KEY = 'wp_loc_sync_post_taxonomies';
     const SYNC_FEATURED_IMAGE_OPTION_KEY = 'wp_loc_sync_featured_image';
     const SYNC_POST_ATTRIBUTES_OPTION_KEY = 'wp_loc_sync_post_attributes';
+    const LIST_LANGUAGE_EDITING_OPTION_KEY = 'wp_loc_list_language_editing';
+    const LIST_QUICK_TRANSLATIONS_OPTION_KEY = 'wp_loc_list_quick_translations';
     const SHOW_FLAGS_OPTION_KEY = 'wp_loc_show_switcher_flags';
     const SHOW_NAMES_OPTION_KEY = 'wp_loc_show_switcher_names';
     const HIDE_CURRENT_LANGUAGE_OPTION_KEY = 'wp_loc_hide_current_language_switcher';
@@ -460,6 +462,22 @@ TWIG;
         return (bool) get_option( self::SYNC_FEATURED_IMAGE_OPTION_KEY, true );
     }
 
+    /**
+     * Whether Quick Edit and Bulk Edit on post lists can set the language of posts that have no
+     * translations yet (imported or legacy content). Off by default.
+     */
+    public static function allow_list_language_editing(): bool {
+        return (bool) get_option( self::LIST_LANGUAGE_EDITING_OPTION_KEY, false );
+    }
+
+    /**
+     * Whether a missing translation's flag in the post and term lists creates that translation
+     * with one click. Off by default.
+     */
+    public static function allow_list_quick_translations(): bool {
+        return (bool) get_option( self::LIST_QUICK_TRANSLATIONS_OPTION_KEY, false );
+    }
+
     public static function should_sync_post_attributes(): bool {
         return (bool) get_option( self::SYNC_POST_ATTRIBUTES_OPTION_KEY, true );
     }
@@ -593,6 +611,8 @@ TWIG;
             $sync_post_taxonomies = isset( $_POST['wp_loc_sync_post_taxonomies'] ) ? 1 : 0;
             $sync_featured_image = isset( $_POST['wp_loc_sync_featured_image'] ) ? 1 : 0;
             $sync_post_attributes = isset( $_POST['wp_loc_sync_post_attributes'] ) ? 1 : 0;
+            $list_language_editing = isset( $_POST['wp_loc_list_language_editing'] ) ? 1 : 0;
+            $list_quick_translations = isset( $_POST['wp_loc_list_quick_translations'] ) ? 1 : 0;
             $translate_custom_menu_links = isset( $_POST['wp_loc_ai_translate_custom_menu_links'] ) ? 1 : 0;
 
             update_option( self::OPTION_KEY, $selected );
@@ -604,6 +624,8 @@ TWIG;
             update_option( self::SYNC_POST_TAXONOMIES_OPTION_KEY, $sync_post_taxonomies );
             update_option( self::SYNC_FEATURED_IMAGE_OPTION_KEY, $sync_featured_image );
             update_option( self::SYNC_POST_ATTRIBUTES_OPTION_KEY, $sync_post_attributes );
+            update_option( self::LIST_LANGUAGE_EDITING_OPTION_KEY, $list_language_editing );
+            update_option( self::LIST_QUICK_TRANSLATIONS_OPTION_KEY, $list_quick_translations );
             update_option( self::AI_TRANSLATE_CUSTOM_MENU_LINKS_OPTION_KEY, $translate_custom_menu_links );
         } elseif ( $current_tab === self::TAB_SWITCHER ) {
             $show_flags = isset( $_POST['wp_loc_show_switcher_flags'] ) ? 1 : 0;
@@ -701,6 +723,8 @@ TWIG;
         $sync_post_taxonomies = self::should_sync_post_taxonomies();
         $sync_featured_image = self::should_sync_featured_image();
         $sync_post_attributes = self::should_sync_post_attributes();
+        $list_language_editing = self::allow_list_language_editing();
+        $list_quick_translations = self::allow_list_quick_translations();
         $show_flags = self::show_switcher_flags();
         $show_names = self::show_switcher_names();
         $hide_current_language = self::hide_current_language_in_switcher();
@@ -866,6 +890,30 @@ TWIG;
                                         </label>
                                     </fieldset>
                                     <p class="description"><?php esc_html_e( 'Use these toggles to control which shared properties stay aligned across a translation group.', 'wp-loc' ); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><?php esc_html_e( 'Post and term lists', 'wp-loc' ); ?></th>
+                                <td>
+                                    <fieldset class="wp-loc-settings-stack">
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_list_language_editing"
+                                                   value="1"
+                                                   <?php checked( $list_language_editing ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Set the language of posts without translations from Quick Edit and Bulk Edit', 'wp-loc' ); ?></span>
+                                        </label>
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_list_quick_translations"
+                                                   value="1"
+                                                   <?php checked( $list_quick_translations ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Create a missing translation with one click on its flag in the Translations column', 'wp-loc' ); ?></span>
+                                        </label>
+                                    </fieldset>
+                                    <p class="description"><?php esc_html_e( 'Helps with imported or legacy content. Only a post without translations can change its language, and its terms move to the new language with it.', 'wp-loc' ); ?></p>
                                 </td>
                             </tr>
                             <tr>

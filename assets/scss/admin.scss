@@ -411,8 +411,6 @@ $transition-speed: .15s;
 .wp-loc-t-draft     .wp-loc-pencil { color: $color-warning; }
 
 .wp-loc-t-missing {
-  cursor: pointer;
-
   .wp-loc-flag    { opacity: .35; }
   .wp-loc-pencil  { color: $color-wp-blue; font-weight: 700; }
 
@@ -423,6 +421,9 @@ $transition-speed: .15s;
     .wp-loc-pencil { opacity: .5; }
   }
 }
+
+// Only the one-click flag (a link) is clickable; the plain flag is a status mark.
+a.wp-loc-t-missing { cursor: pointer; }
 
 .wp-loc-t-no-lang {
   color: $color-warning;

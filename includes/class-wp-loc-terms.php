@@ -1569,6 +1569,11 @@ class WP_LOC_Terms {
                 }
             }
 
+            if ( ! WP_LOC_Admin_Settings::allow_list_quick_translations() ) {
+                $items[] = '<span class="wp-loc-t wp-loc-t-missing">' . $flag_img . '</span>';
+                continue;
+            }
+
             $create_title = sprintf(
                 /* translators: %s: language name */
                 esc_attr__( 'Create %s translation', 'wp-loc' ),
