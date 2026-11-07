@@ -327,8 +327,13 @@ class WP_LOC_Media {
     /**
      * Resolve attachment to the current language version (frontend)
      */
-    public function maybe_resolve_attachment( $image, int $attachment_id, $size, bool $icon ) {
-        if ( is_admin() || ! $image ) return $image;
+    public function maybe_resolve_attachment( $image, $attachment_id, $size = 'thumbnail', $icon = false ) {
+        // No strict scalar types here: core passes $attachment_id to the filter
+        // unfiltered, so wp_get_attachment_image_src( get_post_thumbnail_id() )
+        // with a missing thumbnail delivers '' and a typed signature fatals.
+        $attachment_id = (int) $attachment_id;
+
+        if ( is_admin() || ! $image || ! $attachment_id ) return $image;
 
         $current_lang = wp_loc_get_current_lang();
         $default_lang = WP_LOC_Languages::get_default_language();
