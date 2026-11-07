@@ -1,6 +1,6 @@
 <?php
 /**
- * Checks for the fixes taken from contributed pull requests (#2, #3, #5, #8, #9, #13).
+ * Checks for the fixes taken from contributed pull requests (#2, #3, #5, #8, #9, #10, #12, #13).
  * Run on a site with at least two languages and without a persistent object cache:
  * wp eval-file wp-content/plugins/wp-loc/tests/contrib-fixes.php
  * Every write happens inside a transaction that is rolled back.
@@ -190,6 +190,76 @@ try {
             delete_post_meta($sibling, 'wploc_check_plain');
             $flush_values();
             $check(get_field('wploc_check_plain', $sibling) === 'Source value 2', 'With copying off a translation without a value shows the source value');
+        }
+
+        // #12: creation actions carry the source language; add-on settings tabs register and save.
+        WP_CLI::log('#12 creation actions and settings tabs');
+        $created = [];
+        $record = static function (...$args) use (&$created) { $created[] = $args; };
+        add_action('wp_loc_translation_created', $record, 10, 4);
+        [$lone_post] = $make('post', $default);
+        WP_LOC::instance()->content->create_translations($lone_post);
+        remove_action('wp_loc_translation_created', $record, 10);
+        $post_event = current(array_filter($created, static fn($args) => $args[1] === $lone_post));
+        $check($post_event && $post_event[2] === $other && $post_event[3] === $default, 'wp_loc_translation_created passes the target and the source language');
+
+        // wp_loc_term_translation_created is checked over HTTP (the add-tag form and the "+" button):
+        // outside a real admin request core's duplicate-name check rejects the same-name copy.
+
+        $settings = new ReflectionClass('WP_LOC_Admin_Settings');
+        $settings_instance = $settings->newInstanceWithoutConstructor();
+        $tabs = $settings->getMethod('get_tabs');
+        $tabs->setAccessible(true);
+        $current_tab = $settings->getMethod('get_current_tab');
+        $current_tab->setAccessible(true);
+        $add_tab = static fn(array $tabs) => $tabs + ['wploc_addon' => 'Add-on'];
+        add_filter('wp_loc_settings_tabs', $add_tab);
+        $get = $_GET;
+        $_GET['tab'] = 'wploc_addon';
+        $check($current_tab->invoke($settings_instance) === 'wploc_addon', 'An add-on tab registered with wp_loc_settings_tabs can be opened');
+        $_GET['tab'] = 'wploc_unknown';
+        $check($current_tab->invoke($settings_instance) === WP_LOC_Admin_Settings::TAB_CONTENT, 'An unknown tab falls back to the first tab');
+        $_GET = $get;
+        $admins = get_users(['role' => 'administrator', 'number' => 1, 'fields' => 'ID']);
+        $previous_user = get_current_user_id();
+        wp_set_current_user((int) ($admins[0] ?? 0));
+        $saved = [];
+        $save_hook = static function () use (&$saved) { $saved[] = current_action(); throw new RuntimeException('wploc-saved'); };
+        add_action('wp_loc_settings_save_wploc_addon', $save_hook);
+        add_action('wp_loc_settings_save_wploc_unknown', $save_hook);
+        $post = $_POST;
+        try {
+            foreach (['wploc_unknown', 'wploc_addon'] as $tab) {
+                $_POST = ['wp_loc_settings_nonce' => wp_create_nonce('wp_loc_save_settings'), 'wp_loc_settings_tab' => $tab];
+                try { $settings_instance->handle_save(); } catch (RuntimeException $stop) { if ($stop->getMessage() !== 'wploc-saved') { throw $stop; } }
+            }
+        } finally {
+            $_POST = $post;
+            remove_filter('wp_loc_settings_tabs', $add_tab);
+            remove_action('wp_loc_settings_save_wploc_addon', $save_hook);
+            remove_action('wp_loc_settings_save_wploc_unknown', $save_hook);
+            wp_set_current_user($previous_user);
+        }
+        $check($saved === ['wp_loc_settings_save_wploc_addon'], 'Only a registered tab fires its save action');
+
+        // #10: a plugin can opt its own screen into localized option values.
+        WP_CLI::log('#10 localized options screen filter');
+        $locale = WP_LOC_Languages::get_language_locale($other);
+        update_option('blogname_' . WP_LOC_DB::to_db_language_code($other), 'WPLOC screen name');
+        $cookie = $_COOKIE['admin_lang'] ?? null;
+        $_COOKIE['admin_lang'] = $locale;
+        $screen = (object) ['id' => 'wploc_page_settings', 'base' => 'wploc_page_settings', 'parent_base' => 'wploc'];
+        $opt_in = static fn($is_settings, $screen) => $is_settings || $screen->id === 'wploc_page_settings';
+        try {
+            $base_name = get_option('blogname');
+            WP_LOC::instance()->options->filter_admin_options($screen);
+            $check(get_option('blogname') === $base_name, 'A plugin screen without the filter keeps the default-language value');
+            add_filter('wp_loc_is_localized_options_screen', $opt_in, 10, 2);
+            WP_LOC::instance()->options->filter_admin_options($screen);
+            $check(get_option('blogname') === 'WPLOC screen name', 'A screen opted in with wp_loc_is_localized_options_screen shows the admin-language value');
+        } finally {
+            remove_filter('wp_loc_is_localized_options_screen', $opt_in, 10);
+            if ($cookie === null) { unset($_COOKIE['admin_lang']); } else { $_COOKIE['admin_lang'] = $cookie; }
         }
     } finally {
         $wpdb->query('ROLLBACK');
