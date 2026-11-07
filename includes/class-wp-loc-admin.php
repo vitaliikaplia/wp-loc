@@ -977,6 +977,9 @@ class WP_LOC_Admin {
         /** This action is documented in includes/class-wp-loc-content.php */
         do_action( 'wp_loc_translation_created', $duplicate_id, $post_id, $lang_slug );
 
+        /** This action is documented in includes/class-wp-loc-content.php */
+        do_action( 'wp_loc_post_translation_created', $duplicate_id, $post_id, $lang_slug, $source_lang );
+
         wp_send_json_success( [
             'edit_url' => get_edit_post_link( $duplicate_id, 'raw' ),
             'status'   => get_post_status( $duplicate_id ),
