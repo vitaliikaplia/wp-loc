@@ -15,6 +15,22 @@ class WP_LOC_Content {
     public static $suspend_new_post_registration = false;
 
     /**
+     * Run a write to one member of a translation group without syncing the group's shared
+     * attributes from it. Saving a translation copy syncs its status (a copy is a draft) onto
+     * every sibling, the source included, so writes that only fill in a copy's text use this.
+     */
+    public static function without_group_sync( callable $write ) {
+        $was_syncing = self::$syncing;
+        self::$syncing = true;
+
+        try {
+            return $write();
+        } finally {
+            self::$syncing = $was_syncing;
+        }
+    }
+
+    /**
      * Get multilingual taxonomies that should be synced for a post type.
      *
      * @return string[]

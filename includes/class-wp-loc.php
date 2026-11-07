@@ -80,7 +80,9 @@ class WP_LOC {
 
         if ( defined( 'WP_CLI' ) && WP_CLI ) {
             require_once WP_LOC_PATH . 'includes/class-wp-loc-cli-backfill.php';
+            require_once WP_LOC_PATH . 'includes/class-wp-loc-cli-translate.php';
             WP_CLI::add_command( 'wp-loc', 'WP_LOC_CLI_Backfill' );
+            WP_CLI::add_command( 'wp-loc translate', 'WP_LOC_CLI_Translate' );
         }
     }
 

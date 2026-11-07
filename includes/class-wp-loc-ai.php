@@ -138,7 +138,82 @@ class WP_LOC_AI {
         return $response;
     }
 
+    /**
+     * Whether text can be translated on the server: a connected AI provider, or an add-on that
+     * answers wp_loc_pre_translate_content.
+     */
+    public static function can_translate(): bool {
+        return has_filter( 'wp_loc_pre_translate_content' )
+            || ( self::is_core_ai_available() && WP_LOC_Admin_Settings::get_ai_engine() !== '' );
+    }
+
+    /**
+     * Translate the title, content and excerpt of $source into its translation $target_id and
+     * save them there. The write skips the group sync: the translation is usually a draft copy,
+     * and a sync would copy that status onto the source. Empty source fields are left alone.
+     *
+     * @param string[] $fields Any of title, content, excerpt.
+     * @param bool     $update_slug Also set the slug from the translated title (for new copies).
+     * @return true|\WP_Error
+     */
+    public static function translate_post_fields( \WP_Post $source, int $target_id, string $target_lang, array $fields = [ 'title', 'content', 'excerpt' ], bool $update_slug = false ) {
+        if ( ! self::can_translate() ) {
+            return new \WP_Error( 'wp_loc_ai_unavailable', __( 'No AI provider is connected for translation.', 'wp-loc' ) );
+        }
+
+        $columns = [ 'title' => 'post_title', 'content' => 'post_content', 'excerpt' => 'post_excerpt' ];
+        $language_name = self::get_target_language_name( $target_lang );
+        $update = [ 'ID' => $target_id ];
+
+        foreach ( array_intersect( array_keys( $columns ), $fields ) as $field ) {
+            $value = (string) $source->{ $columns[ $field ] };
+
+            if ( trim( wp_strip_all_tags( $value ) ) === '' ) {
+                continue;
+            }
+
+            $translated = self::translate_content( $value, $language_name );
+
+            if ( $field === 'title' ) {
+                $translated = trim( wp_strip_all_tags( $translated ) );
+            }
+
+            if ( trim( $translated ) === '' ) {
+                /* translators: %s: post field name (title, content, excerpt) */
+                return new \WP_Error( 'wp_loc_ai_translation_failed', sprintf( __( 'Translation failed for the %s.', 'wp-loc' ), $field ) );
+            }
+
+            $update[ $columns[ $field ] ] = $translated;
+        }
+
+        if ( count( $update ) === 1 ) {
+            return true;
+        }
+
+        if ( $update_slug && isset( $update['post_title'] ) ) {
+            $update['post_name'] = sanitize_title( $update['post_title'] );
+        }
+
+        $result = WP_LOC_Content::without_group_sync( static fn() => wp_update_post( wp_slash( $update ), true ) );
+
+        return is_wp_error( $result ) ? $result : true;
+    }
+
     public static function translate_content( string $content, string $target_lang ): string {
+        /**
+         * Short-circuit AI translation: return a string to use it as the translation, for
+         * example from an external translation service. Null keeps the AI provider.
+         *
+         * @param string|null $translation Null.
+         * @param string      $content     Text or HTML to translate.
+         * @param string      $target_lang Target language name, as passed to the AI prompt.
+         */
+        $pre = apply_filters( 'wp_loc_pre_translate_content', null, $content, $target_lang );
+
+        if ( is_string( $pre ) ) {
+            return $pre;
+        }
+
         $prompt = sprintf(
             'Translate the following content into natural %1$s. The source may be a short CTA, menu label, button text, sentence, or HTML fragment. Always translate the text itself when possible, even if it is very short. Preserve all HTML formatting and structure exactly when it exists. Do not add explanations. Return only the translated result wrapped in <result></result>. Content: %2$s',
             $target_lang,
