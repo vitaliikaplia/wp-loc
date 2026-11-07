@@ -491,11 +491,15 @@ class WP_LOC_Content {
              * Fires once a translation draft is fully created: registered in
              * icl_translations, with the source post's meta and thumbnail copied.
              *
+             * Fires for the auto-create workflow and for the per-language "+" button alike.
+             * Terms have the matching wp_loc_term_translation_created action.
+             *
              * @param int    $duplicate_id The new translation post ID.
              * @param int    $post_id      The source post it was copied from.
              * @param string $lang_slug    Language slug of the new translation.
+             * @param string $source_lang  Language slug of the source post.
              */
-            do_action( 'wp_loc_translation_created', $duplicate_id, $post_id, $lang_slug );
+            do_action( 'wp_loc_translation_created', $duplicate_id, $post_id, $lang_slug, $current_lang );
         }
 
         self::$creating_translations = false;

@@ -577,6 +577,12 @@ TWIG;
 
         $current_tab = isset( $_POST['wp_loc_settings_tab'] ) ? sanitize_key( (string) $_POST['wp_loc_settings_tab'] ) : self::TAB_CONTENT;
 
+        // Only a registered tab saves, so the wp_loc_settings_save_{$tab} action below never
+        // takes its name from an arbitrary posted value.
+        if ( ! isset( $this->get_tabs()[ $current_tab ] ) ) {
+            return;
+        }
+
         if ( $current_tab === self::TAB_CONTENT ) {
             $selected = isset( $_POST['wp_loc_post_types'] ) ? array_map( 'sanitize_key', (array) $_POST['wp_loc_post_types'] ) : [];
             $selected_taxonomies = isset( $_POST['wp_loc_taxonomies'] ) ? array_map( 'sanitize_key', (array) $_POST['wp_loc_taxonomies'] ) : [];
