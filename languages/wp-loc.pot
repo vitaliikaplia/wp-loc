@@ -2,7 +2,7 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: WP-LOC 1.13.0\n"
+"Project-Id-Version: WP-LOC 1.13.1\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/wp-loc\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1336,4 +1336,24 @@ msgstr ""
 #: includes/class-wp-loc-ai.php
 #, php-format
 msgid "Translation failed for the %s."
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "AI agents"
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Give AI agents the WP-LOC translation tools"
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Registers three WordPress Abilities — get, link and create translations of posts and terms — which MCP servers such as Simple MCP offer to AI agents as tools. Each call runs with the rights of the user the agent connects as."
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "In Simple MCP 2.7 or newer, turn on \"Plugin and theme tools\" for the roles that need them under Settings → Simple MCP → Role permissions; until then agents keep the wploc_* tools built into Simple MCP."
+msgstr ""
+
+#: includes/class-wp-loc-admin-settings.php
+msgid "Requires WordPress 6.9 or newer."
 msgstr ""
