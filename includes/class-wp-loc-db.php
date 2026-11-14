@@ -21,6 +21,8 @@ class WP_LOC_DB {
 
         $table = $wpdb->prefix . 'icl_translations';
         $charset = $wpdb->get_charset_collate();
+        $had_translation_rows = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table
+            && (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" ) > 0;
 
         $sql = "CREATE TABLE {$table} (
             translation_id bigint(20) NOT NULL AUTO_INCREMENT,
@@ -39,7 +41,17 @@ class WP_LOC_DB {
 
         self::normalize_compat_language_codes();
         update_option( 'wp_loc_db_version', WP_LOC_VERSION );
-        add_option( 'wp_loc_db_optimization_wizard_status', 'pending' );
+
+        // The first activation arms the migration wizard only if another multilingual plugin left data.
+        if ( get_option( 'wp_loc_db_optimization_wizard_status', '' ) === '' ) {
+            if ( ! class_exists( 'WP_LOC_DB_Optimization_Wizard' ) ) {
+                require_once WP_LOC_PATH . 'includes/class-wp-loc-db-optimization-wizard.php';
+            }
+
+            add_option( 'wp_loc_db_optimization_wizard_status', WP_LOC_DB_Optimization_Wizard::initial_status( $had_translation_rows ) );
+            WP_LOC_DB_Optimization_Wizard::mark_checked();
+        }
+
         flush_rewrite_rules();
     }
 

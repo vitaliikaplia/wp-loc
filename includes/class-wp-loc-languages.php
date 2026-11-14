@@ -47,6 +47,9 @@ class WP_LOC_Languages {
     public function __construct() {
         $this->ensure_current_language_exists();
         add_action( 'update_option_WPLANG', [ $this, 'on_wplang_change' ], 10, 2 );
+        add_action( 'add_option_WPLANG', function ( $option, $value ): void {
+            $this->on_wplang_change( '', $value );
+        }, 10, 2 );
     }
 
     private function ensure_current_language_exists(): void {
@@ -82,8 +85,30 @@ class WP_LOC_Languages {
             return self::$languages;
         }
 
-        self::$languages = get_option( 'wp_loc_languages', [] );
-        foreach ( self::$languages as $slug => &$language ) {
+        // A generic pre_option filter that asks for the current language (WPML-era themes call
+        // $sitepress->get_current_language() there) would land back here while get_option() runs:
+        // answer that nested call from the raw row instead of looping.
+        static $loading = false;
+
+        if ( $loading ) {
+            return self::with_wpml_codes( (array) self::get_raw_option( 'wp_loc_languages', [] ) );
+        }
+
+        $loading = true;
+
+        try {
+            $languages = get_option( 'wp_loc_languages', [] );
+        } finally {
+            $loading = false;
+        }
+
+        self::$languages = self::with_wpml_codes( is_array( $languages ) ? $languages : [] );
+
+        return self::$languages;
+    }
+
+    private static function with_wpml_codes( array $languages ): array {
+        foreach ( $languages as $slug => &$language ) {
             if ( is_array( $language ) && empty( $language['wpml_code'] ) ) {
                 $language['wpml_code'] = class_exists( 'WP_LOC_Language_Registry' )
                     ? WP_LOC_Language_Registry::wpml_code_from_locale( (string) ( $language['locale'] ?? $slug ) )
@@ -92,7 +117,7 @@ class WP_LOC_Languages {
         }
         unset( $language );
 
-        return self::$languages;
+        return $languages;
     }
 
     /**
@@ -310,30 +335,56 @@ class WP_LOC_Languages {
     }
 
     /**
-     * Update languages when WPLANG option changes
+     * When the WordPress site language changes (Settings → General, WP-CLI), add or enable that
+     * language. If the site language was the default language before, the new one becomes the
+     * default, with its data (WP_LOC_Language_Setup::switch_default_language()), so the two stay
+     * one setting. A site whose default language was set apart from the site language keeps it.
      */
     public function on_wplang_change( $old, $new ): void {
-        $langs = self::get_languages();
+        $old_locale = (string) $old !== '' ? (string) $old : 'en_US';
+        $new_locale = (string) $new !== '' ? (string) $new : 'en_US';
 
-        $slug = self::locale_to_slug( $new ?: 'en_US' );
+        if ( $old_locale === $new_locale ) {
+            return;
+        }
 
-        if ( ! isset( $langs[ $slug ] ) ) {
-            $langs[ $slug ] = [
-                'locale'    => $new ?: 'en_US',
-                'enabled'   => true,
-                'wpml_code' => class_exists( 'WP_LOC_Language_Registry' ) ? WP_LOC_Language_Registry::wpml_code_from_locale( $new ?: 'en_US' ) : $slug,
-            ];
+        $old_default = self::resolve_default_for_site_locale( $old_locale );
+        $slug = WP_LOC_Language_Setup::register_language( $new_locale );
+
+        update_option( 'wp_loc_flush_rewrite_rules', true );
+
+        if ( WP_LOC_Language_Setup::is_switching() || $old_default === null || $old_default === $slug ) {
+            return;
+        }
+
+        WP_LOC_Language_Setup::switch_default_language( $slug, $old_default, false );
+    }
+
+    /**
+     * The default language as it was while the site language was $site_locale, if the two matched
+     * (null if they did not).
+     */
+    private static function resolve_default_for_site_locale( string $site_locale ): ?string {
+        $languages = self::get_active_languages();
+        $configured = sanitize_key( (string) self::get_raw_option( self::DEFAULT_LANGUAGE_OPTION_KEY, '' ) );
+        $default = null;
+
+        if ( $configured && isset( $languages[ $configured ] ) ) {
+            $default = $configured;
         } else {
-            $langs[ $slug ]['enabled'] = true;
-            if ( empty( $langs[ $slug ]['wpml_code'] ) ) {
-                $langs[ $slug ]['wpml_code'] = class_exists( 'WP_LOC_Language_Registry' ) ? WP_LOC_Language_Registry::wpml_code_from_locale( $new ?: 'en_US' ) : $slug;
+            foreach ( $languages as $slug => $data ) {
+                if ( ( $data['locale'] ?? '' ) === $site_locale ) {
+                    $default = (string) $slug;
+                    break;
+                }
             }
         }
 
-        update_option( 'wp_loc_languages', $langs );
-        update_option( 'wp_loc_flush_rewrite_rules', true );
-        self::$languages = null;
-        self::$default_language = null;
+        if ( $default === null || ( $languages[ $default ]['locale'] ?? '' ) !== $site_locale ) {
+            return null;
+        }
+
+        return $default;
     }
 
     /**

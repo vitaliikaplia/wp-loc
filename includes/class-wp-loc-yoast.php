@@ -55,6 +55,7 @@ class WP_LOC_Yoast {
         add_action( 'edited_term', [ $this, 'handle_save_term' ], 30, 3 );
         add_action( 'update_option', [ $this, 'handle_update_option' ], 20, 3 );
         add_action( 'update_option_wpseo_titles', [ $this, 'handle_update_wpseo_titles' ], 20, 2 );
+        add_action( 'wp_loc_default_language_changed', [ $this, 'handle_default_language_changed' ] );
 
         add_filter( 'wpseo_title', [ $this, 'filter_wpseo_title' ], 20, 2 );
         add_filter( 'wpseo_metadesc', [ $this, 'filter_wpseo_metadesc' ], 20, 2 );
@@ -304,6 +305,11 @@ class WP_LOC_Yoast {
             return;
         }
 
+        $this->invalidate_general_indexables();
+    }
+
+    /** The wpseo_* options moved to the new default language without update_option(): rebuild what depends on them. */
+    public function handle_default_language_changed(): void {
         $this->invalidate_general_indexables();
     }
 

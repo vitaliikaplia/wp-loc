@@ -8,6 +8,11 @@ class WP_LOC_DB_Optimization_Wizard {
     private const STATUS_PENDING = 'pending';
     private const STATUS_DISMISSED = 'dismissed';
     private const STATUS_COMPLETED = 'completed';
+    private const STATUS_NOT_NEEDED = 'not_needed';
+    private const CHECKED_OPTION = 'wp_loc_db_optimization_wizard_checked';
+
+    /** Keys WP-LOC itself writes to icl_sitepress_settings (WP_LOC_Compat::sync_legacy_settings()). */
+    private const OWN_SITEPRESS_SETTINGS_KEYS = [ 'default_language', 'active_languages' ];
 
     public function __construct() {
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
@@ -28,7 +33,101 @@ class WP_LOC_DB_Optimization_Wizard {
 
         $status = get_option( self::STATUS_OPTION, self::STATUS_PENDING );
 
-        return ! in_array( $status, [ self::STATUS_DISMISSED, self::STATUS_COMPLETED ], true );
+        // Earlier versions set every first activation to "pending", with or without data to adopt.
+        // Look once: with nothing another multilingual plugin left behind, there is nothing to offer.
+        if ( $status === self::STATUS_PENDING && get_option( self::CHECKED_OPTION ) !== '1' ) {
+            update_option( self::CHECKED_OPTION, '1' );
+
+            if ( ! self::has_legacy_data() ) {
+                update_option( self::STATUS_OPTION, self::STATUS_NOT_NEEDED );
+                return false;
+            }
+        }
+
+        return $status === self::STATUS_PENDING;
+    }
+
+    /**
+     * Status for the first activation: the wizard is armed only when the site has data another
+     * multilingual plugin left behind. A translation table that already had rows before WP-LOC
+     * created it counts too.
+     */
+    public static function initial_status( bool $had_translation_rows ): string {
+        return $had_translation_rows || self::has_legacy_data() ? self::STATUS_PENDING : self::STATUS_NOT_NEEDED;
+    }
+
+    public static function mark_checked(): void {
+        update_option( self::CHECKED_OPTION, '1' );
+    }
+
+    /**
+     * Whether the wizard has something to offer on the Plugins page: it is pending, or it was not
+     * completed and the site has data to adopt (for example, a WPML database imported later).
+     */
+    public static function is_offered(): bool {
+        $status = get_option( self::STATUS_OPTION, self::STATUS_PENDING );
+
+        if ( $status === self::STATUS_COMPLETED ) {
+            return false;
+        }
+
+        return $status === self::STATUS_PENDING || self::has_legacy_data();
+    }
+
+    /**
+     * Whether the database holds data of another multilingual plugin (WPML and its add-ons):
+     * its own tables, options or post meta. WP-LOC itself creates icl_translations and writes
+     * default_language and active_languages into icl_sitepress_settings, so those alone do not count.
+     */
+    public static function has_legacy_data(): bool {
+        global $wpdb;
+
+        static $found = null;
+
+        if ( $found !== null ) {
+            return $found;
+        }
+
+        $found = false;
+        $translations_table = $wpdb->prefix . 'icl_translations';
+        $tables = $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $wpdb->prefix . 'icl_' ) . '%' ) );
+
+        foreach ( (array) $tables as $table ) {
+            if ( (string) $table !== $translations_table ) {
+                $found = true;
+                break;
+            }
+        }
+
+        if ( ! $found ) {
+            $found = (bool) $wpdb->get_var(
+                "SELECT option_id FROM {$wpdb->options}
+                 WHERE ( option_name LIKE 'icl\_%' AND option_name <> 'icl_sitepress_settings' )
+                    OR option_name LIKE '\_icl\_%'
+                    OR option_name LIKE '\_transient\_icl\_%'
+                    OR option_name LIKE 'wpml\_%'
+                    OR option_name LIKE 'WPML(%'
+                    OR option_name LIKE 'acfml\_%'
+                 LIMIT 1"
+            );
+        }
+
+        if ( ! $found ) {
+            $settings = get_option( 'icl_sitepress_settings', [] );
+            $found = is_array( $settings ) && array_diff( array_keys( $settings ), self::OWN_SITEPRESS_SETTINGS_KEYS ) !== [];
+        }
+
+        if ( ! $found ) {
+            $found = (bool) $wpdb->get_var(
+                "SELECT meta_id FROM {$wpdb->postmeta}
+                 WHERE meta_key LIKE '\_icl\_%' OR meta_key LIKE '\_wpml\_%'
+                 LIMIT 1"
+            );
+        }
+
+        $found = (bool) apply_filters( 'wp_loc_has_legacy_multilingual_data', $found );
+
+        return $found;
     }
 
     public function enqueue_assets(): void {

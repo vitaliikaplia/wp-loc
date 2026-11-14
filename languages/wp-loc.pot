@@ -1357,3 +1357,101 @@ msgstr ""
 #: includes/class-wp-loc-admin-settings.php
 msgid "Requires WordPress 6.9 or newer."
 msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Adding the language and downloading its WordPress translation files…"
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "The default language opens at the site root and is also the WordPress site language under Settings → General: changing one changes the other."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Add a language"
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "WordPress downloads the translation files for the new language, as when you pick it as the Site Language under Settings → General, but the site language and the default language stay the same. The new language is enabled at once."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "There are no other languages to add."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "— Select a language —"
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Installed"
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Available"
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Add language"
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "This site cannot download translation files, so only languages already installed in WordPress are listed."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+#, php-format
+msgid "WordPress translation files for %s have been installed."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+#, php-format
+msgid "The WordPress translation files for %s could not be downloaded, so WordPress shows its interface in English for it. Try again later under Dashboard → Updates or Settings → General."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+#, php-format
+msgid "The WordPress translation files for %s were not installed: this site or your account cannot install languages."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+#, php-format
+msgid "Language %s added."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+#, php-format
+msgid "%s is now the default language and the WordPress site language."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+#: includes/class-wp-loc-language-setup.php
+msgid "This language cannot be added."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+#: includes/class-wp-loc-language-setup.php
+msgid "Only an enabled language can be the default one."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+#: includes/class-wp-loc-language-setup.php
+msgid "This language is already the default one."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "The default language could not be changed; nothing was changed."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Security check failed."
+msgstr ""
+
+#. translators: 1: language name, 2: current default language name, 3: URL prefix the current default language moves to
+#: includes/class-wp-loc-admin-languages.php
+#, php-format
+msgid "Make %1$s the default language? It will open at the site root and %2$s will move to /%3$s/. The WordPress site language becomes %1$s too, and the site title, homepage, ACF options and Yoast settings saved for %1$s become the main ones."
+msgstr ""
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Make default"
+msgstr ""

@@ -63,6 +63,7 @@ class WP_LOC {
             'class-wp-loc-ai',
             'class-wp-loc-menu-sync',
             'class-wp-loc-db-optimization-wizard',
+            'class-wp-loc-language-setup',
             'class-wp-loc-github-updater',
             'class-wp-loc-duplicate-post',
             'class-wp-loc-translation-tools',

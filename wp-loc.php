@@ -83,7 +83,7 @@ add_action( 'plugins_loaded', function () {
 add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), function ( array $links ): array {
     $links[] = '<a href="' . admin_url( 'admin.php?page=wp-loc-settings' ) . '">' . __( 'Settings', 'wp-loc' ) . '</a>';
 
-    if ( current_user_can( 'manage_options' ) && get_option( 'wp_loc_db_optimization_wizard_status', 'pending' ) !== 'completed' ) {
+    if ( current_user_can( 'manage_options' ) && class_exists( 'WP_LOC_DB_Optimization_Wizard' ) && WP_LOC_DB_Optimization_Wizard::is_offered() ) {
         $wizard_url = wp_nonce_url(
             admin_url( 'admin-post.php?action=wp_loc_restart_db_optimization_wizard' ),
             'wp_loc_restart_db_optimization_wizard'

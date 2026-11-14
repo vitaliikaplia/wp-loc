@@ -104,6 +104,33 @@
         }
     });
 
+    $(document).on('click', '.wp-loc-make-default-link', function(event) {
+        const message = $(this).data('confirm');
+
+        if (message && !window.confirm(message)) {
+            event.preventDefault();
+        }
+    });
+
+    // Downloading translation files takes a while: show it and keep the form from being sent twice.
+    $(document).on('submit', '.wp-loc-language-add-form', function() {
+        const $form = $(this);
+
+        if ($form.hasClass('is-busy')) {
+            return false;
+        }
+
+        $form.addClass('is-busy');
+        $form.find('[type="submit"]').prop('disabled', true);
+        $form.find('.spinner').addClass('is-active');
+
+        if (i18n.addingLanguage) {
+            $form.find('.spinner').attr('title', i18n.addingLanguage);
+        }
+
+        return true;
+    });
+
     $(document).on('click', '.wp-loc-config-delete', function(event) {
         const message = i18n.confirmDeleteWpmlConfig
             ? i18n.confirmDeleteWpmlConfig

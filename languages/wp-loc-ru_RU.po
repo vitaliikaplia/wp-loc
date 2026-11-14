@@ -1522,3 +1522,101 @@ msgstr "В Simple MCP 2.7 и новее включите строку «Інст
 #: includes/class-wp-loc-admin-settings.php
 msgid "Requires WordPress 6.9 or newer."
 msgstr "Требуется WordPress 6.9 или новее."
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Adding the language and downloading its WordPress translation files…"
+msgstr "Добавляем язык и загружаем для него файлы перевода WordPress…"
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "The default language opens at the site root and is also the WordPress site language under Settings → General: changing one changes the other."
+msgstr "Основной язык открывается с корня сайта и одновременно является языком сайта WordPress в «Настройки → Общие»: изменение одного меняет другой."
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Add a language"
+msgstr "Добавить язык"
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "WordPress downloads the translation files for the new language, as when you pick it as the Site Language under Settings → General, but the site language and the default language stay the same. The new language is enabled at once."
+msgstr "WordPress загрузит файлы перевода для нового языка, как при выборе языка сайта в «Настройки → Общие», но язык сайта и основной язык не изменятся. Новый язык будет сразу включён."
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "There are no other languages to add."
+msgstr "Других языков для добавления нет."
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "— Select a language —"
+msgstr "— Выберите язык —"
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Installed"
+msgstr "Установленные"
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Available"
+msgstr "Доступные"
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Add language"
+msgstr "Добавить язык"
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "This site cannot download translation files, so only languages already installed in WordPress are listed."
+msgstr "Этот сайт не может загружать файлы перевода, поэтому в списке только языки, уже установленные в WordPress."
+
+#: includes/class-wp-loc-admin-languages.php
+#, php-format
+msgid "WordPress translation files for %s have been installed."
+msgstr "Файлы перевода WordPress для языка %s установлены."
+
+#: includes/class-wp-loc-admin-languages.php
+#, php-format
+msgid "The WordPress translation files for %s could not be downloaded, so WordPress shows its interface in English for it. Try again later under Dashboard → Updates or Settings → General."
+msgstr "Не удалось загрузить файлы перевода WordPress для языка %s, поэтому интерфейс WordPress на этом языке будет английским. Попробуйте позже в «Консоль → Обновления» или «Настройки → Общие»."
+
+#: includes/class-wp-loc-admin-languages.php
+#, php-format
+msgid "The WordPress translation files for %s were not installed: this site or your account cannot install languages."
+msgstr "Файлы перевода WordPress для языка %s не установлены: этот сайт или ваша учётная запись не может устанавливать языки."
+
+#: includes/class-wp-loc-admin-languages.php
+#, php-format
+msgid "Language %s added."
+msgstr "Язык %s добавлен."
+
+#: includes/class-wp-loc-admin-languages.php
+#, php-format
+msgid "%s is now the default language and the WordPress site language."
+msgstr "%s теперь основной язык и язык сайта WordPress."
+
+#: includes/class-wp-loc-admin-languages.php
+#: includes/class-wp-loc-language-setup.php
+msgid "This language cannot be added."
+msgstr "Этот язык нельзя добавить."
+
+#: includes/class-wp-loc-admin-languages.php
+#: includes/class-wp-loc-language-setup.php
+msgid "Only an enabled language can be the default one."
+msgstr "Основным может быть только включённый язык."
+
+#: includes/class-wp-loc-admin-languages.php
+#: includes/class-wp-loc-language-setup.php
+msgid "This language is already the default one."
+msgstr "Этот язык уже основной."
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "The default language could not be changed; nothing was changed."
+msgstr "Не удалось изменить основной язык; ничего не изменено."
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Security check failed."
+msgstr "Проверка безопасности не пройдена."
+
+#. translators: 1: language name, 2: current default language name, 3: URL prefix the current default language moves to
+#: includes/class-wp-loc-admin-languages.php
+#, php-format
+msgid "Make %1$s the default language? It will open at the site root and %2$s will move to /%3$s/. The WordPress site language becomes %1$s too, and the site title, homepage, ACF options and Yoast settings saved for %1$s become the main ones."
+msgstr "Сделать %1$s основным языком? Он будет открываться с корня сайта, а %2$s переедет на /%3$s/. Языком сайта WordPress тоже станет %1$s, а название сайта, главная страница, опции ACF и настройки Yoast, сохранённые для %1$s, станут основными."
+
+#: includes/class-wp-loc-admin-languages.php
+msgid "Make default"
+msgstr "Сделать основным"

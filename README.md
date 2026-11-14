@@ -13,7 +13,8 @@ It keeps translation links in the same `icl_translations` table and provides the
 - Optional AI translation of titles, term names and menu links through the WordPress 7 AI connectors, or of titles and term names with Chrome's built-in translator. New translation copies can be translated in the background.
 - WP-CLI commands: `wp wp-loc create-translations` creates missing translation copies, `wp wp-loc translate` translates posts with AI.
 - Tools for AI agents: three WordPress Abilities — `wp-loc/get-translations`, `wp-loc/link-translation` and `wp-loc/create-translation` — that MCP servers offer to agents. [Simple MCP](https://github.com/vitaliikaplia/simple-mcp) 2.7+ shows them as `wp-loc-get-translations` and so on once **Plugin and theme tools** is on for the role in its **Role permissions**; until then agents keep its built-in `wploc_*` tools. They can be switched off under **Multilingual → Settings → Integrations**.
-- A one-time wizard adopts the data another multilingual plugin left behind.
+- Languages are added under **Multilingual → Languages**, which also downloads WordPress's translation files for them. The default language is the WordPress site language: making another language the default there (or picking it under **Settings → General**) moves the site title, homepage, ACF options and Yoast settings saved for it into place.
+- When another multilingual plugin has left its data behind, a one-time wizard offers to adopt it; on a site without such data it does not appear.
 
 ## Requirements
 
@@ -21,7 +22,7 @@ WordPress 6.0 or newer (6.9 for the AI-agent tools, 7.0 for the AI features) and
 
 ## Installation
 
-Upload the `wp-loc` folder to `wp-content/plugins/` and activate it. A language is added by picking it once as the Site Language in **Settings → General**; after that it is managed under **Multilingual → Languages**. Updates come through the normal WordPress updater, straight from this repository.
+Upload the `wp-loc` folder to `wp-content/plugins/` and activate it. The site language becomes the default language; add the others under **Multilingual → Languages**. Updates come through the normal WordPress updater, straight from this repository.
 
 ## Contributors
 

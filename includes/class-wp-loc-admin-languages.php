@@ -12,6 +12,8 @@ class WP_LOC_Admin_Languages {
         add_action( 'admin_menu', [ $this, 'add_menu' ] );
         add_action( 'admin_init', [ $this, 'handle_save' ] );
         add_action( 'admin_init', [ $this, 'handle_delete' ] );
+        add_action( 'admin_init', [ $this, 'handle_add' ] );
+        add_action( 'admin_init', [ $this, 'handle_make_default' ] );
 
         add_action( 'wp_ajax_wp_loc_save_order', [ $this, 'ajax_save_order' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_scripts' ] );
@@ -54,6 +56,7 @@ class WP_LOC_Admin_Languages {
                 'nonce'   => wp_create_nonce( 'wp_loc_ajax' ),
                 'i18n'    => [
                     'confirmDeleteLanguage' => __( 'Delete this language? Its language files will also be removed from WordPress.', 'wp-loc' ),
+                    'addingLanguage' => __( 'Adding the language and downloading its WordPress translation files…', 'wp-loc' ),
                     'missingSlug' => __( 'Slug is required.', 'wp-loc' ),
                     'duplicateSlug' => __( 'Each language slug must be unique.', 'wp-loc' ),
                     'missingDisplayName' => __( 'Display name is required.', 'wp-loc' ),
@@ -74,6 +77,7 @@ class WP_LOC_Admin_Languages {
         echo '<div class="wrap wp-loc-languages-page">';
         echo '<h1>' . esc_html__( 'Languages', 'wp-loc' ) . '</h1>';
         echo '<p class="description">' . esc_html__( 'Manage site languages, URL slugs, display labels, and ordering for the multilingual interface.', 'wp-loc' ) . '</p>';
+        echo '<p class="description">' . esc_html__( 'The default language opens at the site root and is also the WordPress site language under Settings → General: changing one changes the other.', 'wp-loc' ) . '</p>';
 
         if ( ! empty( $_GET['saved'] ) ) {
             echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Languages saved.', 'wp-loc' ) . '</p></div>';
@@ -82,6 +86,8 @@ class WP_LOC_Admin_Languages {
         if ( ! empty( $_GET['deleted'] ) ) {
             echo '<div class="notice notice-warning is-dismissible"><p>' . sprintf( esc_html__( 'Language "%s" deleted.', 'wp-loc' ), esc_html( $_GET['deleted'] ) ) . '</p></div>';
         }
+
+        $this->render_action_notices( $languages );
 
         echo '<div class="wp-loc-menu-sync-summary wp-loc-languages-summary">';
         echo '<div class="wp-loc-menu-sync-summary-card">';
@@ -111,7 +117,142 @@ class WP_LOC_Admin_Languages {
         echo '</div>';
         echo '</form>';
 
+        $this->render_add_form();
+
         echo '</div>';
+    }
+
+    private function render_add_form(): void {
+        $addable = WP_LOC_Language_Setup::get_addable_languages();
+        $installed = array_values( array_filter( $addable, static fn( array $language ): bool => $language['installed'] ) );
+        $available = array_values( array_filter( $addable, static fn( array $language ): bool => ! $language['installed'] ) );
+
+        echo '<div class="wp-loc-language-add">';
+        echo '<h2>' . esc_html__( 'Add a language', 'wp-loc' ) . '</h2>';
+        echo '<p class="description">' . esc_html__( 'WordPress downloads the translation files for the new language, as when you pick it as the Site Language under Settings → General, but the site language and the default language stay the same. The new language is enabled at once.', 'wp-loc' ) . '</p>';
+
+        if ( ! $addable ) {
+            echo '<p>' . esc_html__( 'There are no other languages to add.', 'wp-loc' ) . '</p>';
+            echo '</div>';
+            return;
+        }
+
+        echo '<form method="post" action="' . esc_url( admin_url( 'admin.php?page=wp-loc' ) ) . '" class="wp-loc-language-add-form">';
+        wp_nonce_field( 'wp_loc_add_language', '_wp_loc_add_nonce' );
+        echo '<label class="screen-reader-text" for="wp-loc-new-language">' . esc_html__( 'Language', 'wp-loc' ) . '</label>';
+        echo '<select name="wp_loc_add_language" id="wp-loc-new-language" required>';
+        echo '<option value="">' . esc_html__( '— Select a language —', 'wp-loc' ) . '</option>';
+
+        foreach ( [
+            __( 'Installed', 'wp-loc' ) => $installed,
+            __( 'Available', 'wp-loc' ) => $available,
+        ] as $label => $group ) {
+            if ( ! $group ) {
+                continue;
+            }
+
+            echo '<optgroup label="' . esc_attr( $label ) . '">';
+
+            foreach ( $group as $language ) {
+                echo '<option value="' . esc_attr( $language['locale'] ) . '">' . esc_html( $language['name'] . ' (' . $language['locale'] . ')' ) . '</option>';
+            }
+
+            echo '</optgroup>';
+        }
+
+        echo '</select>';
+        submit_button( __( 'Add language', 'wp-loc' ), 'secondary', 'submit', false );
+        echo '<span class="spinner"></span>';
+        echo '</form>';
+
+        if ( ! $available && ! WP_LOC_Language_Setup::can_install_files() ) {
+            echo '<p class="description">' . esc_html__( 'This site cannot download translation files, so only languages already installed in WordPress are listed.', 'wp-loc' ) . '</p>';
+        }
+
+        echo '</div>';
+    }
+
+    private function render_action_notices( array $languages ): void {
+        $files_notice = function ( string $files, string $name ): void {
+            if ( $files === 'installed' ) {
+                echo '<div class="notice notice-success is-dismissible"><p>' . sprintf( esc_html__( 'WordPress translation files for %s have been installed.', 'wp-loc' ), esc_html( $name ) ) . '</p></div>';
+            } elseif ( $files === 'failed' ) {
+                echo '<div class="notice notice-warning is-dismissible"><p>' . sprintf( esc_html__( 'The WordPress translation files for %s could not be downloaded, so WordPress shows its interface in English for it. Try again later under Dashboard → Updates or Settings → General.', 'wp-loc' ), esc_html( $name ) ) . '</p></div>';
+            } elseif ( $files === 'not_allowed' ) {
+                echo '<div class="notice notice-warning is-dismissible"><p>' . sprintf( esc_html__( 'The WordPress translation files for %s were not installed: this site or your account cannot install languages.', 'wp-loc' ), esc_html( $name ) ) . '</p></div>';
+            }
+        };
+
+        $added = sanitize_key( (string) ( $_GET['added'] ?? '' ) );
+
+        if ( $added && isset( $languages[ $added ] ) ) {
+            $name = WP_LOC_Languages::get_language_display_name( (string) $languages[ $added ]['locale'] );
+            echo '<div class="notice notice-success is-dismissible"><p>' . sprintf( esc_html__( 'Language %s added.', 'wp-loc' ), '<strong>' . esc_html( $name ) . '</strong>' ) . '</p></div>';
+            $files_notice( sanitize_key( (string) ( $_GET['files'] ?? '' ) ), $name );
+        }
+
+        $default = sanitize_key( (string) ( $_GET['default'] ?? '' ) );
+
+        if ( $default && isset( $languages[ $default ] ) ) {
+            $name = WP_LOC_Languages::get_language_display_name( (string) $languages[ $default ]['locale'] );
+            echo '<div class="notice notice-success is-dismissible"><p>' . sprintf( esc_html__( '%s is now the default language and the WordPress site language.', 'wp-loc' ), '<strong>' . esc_html( $name ) . '</strong>' ) . '</p></div>';
+            $files_notice( sanitize_key( (string) ( $_GET['files'] ?? '' ) ), $name );
+        }
+
+        $error = sanitize_key( (string) ( $_GET['wp_loc_error'] ?? '' ) );
+        $messages = [
+            'wp_loc_unknown_locale'    => __( 'This language cannot be added.', 'wp-loc' ),
+            'wp_loc_inactive_language' => __( 'Only an enabled language can be the default one.', 'wp-loc' ),
+            'wp_loc_same_language'     => __( 'This language is already the default one.', 'wp-loc' ),
+            'wp_loc_switch_failed'     => __( 'The default language could not be changed; nothing was changed.', 'wp-loc' ),
+        ];
+
+        if ( isset( $messages[ $error ] ) ) {
+            echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $messages[ $error ] ) . '</p></div>';
+        }
+    }
+
+    public function handle_add(): void {
+        if ( ( $_SERVER['REQUEST_METHOD'] ?? '' ) !== 'POST' || ! isset( $_POST['wp_loc_add_language'] ) ) return;
+
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'wp_loc_add_language', '_wp_loc_add_nonce' ) ) {
+            wp_die( esc_html__( 'Security check failed.', 'wp-loc' ) );
+        }
+
+        $result = WP_LOC_Language_Setup::add_language( sanitize_text_field( wp_unslash( (string) $_POST['wp_loc_add_language'] ) ) );
+        $redirect = remove_query_arg( [ 'saved', 'deleted', 'added', 'files', 'default', 'wp_loc_error' ], admin_url( 'admin.php?page=wp-loc' ) );
+
+        if ( is_wp_error( $result ) ) {
+            wp_safe_redirect( add_query_arg( 'wp_loc_error', $result->get_error_code(), $redirect ) );
+            exit;
+        }
+
+        wp_safe_redirect( add_query_arg( [ 'added' => $result['slug'], 'files' => $result['files'] ], $redirect ) );
+        exit;
+    }
+
+    public function handle_make_default(): void {
+        if ( ! isset( $_GET['action'], $_GET['locale'] ) || $_GET['action'] !== 'wp_loc_make_default' ) return;
+
+        $locale = sanitize_text_field( wp_unslash( (string) $_GET['locale'] ) );
+
+        if ( ! current_user_can( 'manage_options' ) || ! wp_verify_nonce( $_GET['_wpnonce'] ?? '', 'wp_loc_make_default_' . $locale ) ) {
+            wp_die( esc_html__( 'Security check failed.', 'wp-loc' ) );
+        }
+
+        $redirect = admin_url( 'admin.php?page=wp-loc' );
+        $slug = WP_LOC_Languages::get_language_slug( $locale );
+        $result = $slug !== null
+            ? WP_LOC_Language_Setup::switch_default_language( $slug )
+            : new WP_Error( 'wp_loc_inactive_language' );
+
+        if ( is_wp_error( $result ) ) {
+            wp_safe_redirect( add_query_arg( 'wp_loc_error', $result->get_error_code(), $redirect ) );
+            exit;
+        }
+
+        wp_safe_redirect( add_query_arg( [ 'default' => $result['to'], 'files' => $result['files'] ], $redirect ) );
+        exit;
     }
 
     public function handle_save(): void {
@@ -292,6 +433,8 @@ class WP_LOC_Admin_Languages {
             "$base/core/$locale.*",
             "$base/plugins/*-$locale.*",
             "$base/themes/*-$locale.*",
+            "$base/plugins/*-{$locale}-*.json",
+            "$base/themes/*-{$locale}-*.json",
             "$base/{$locale}-*.json",
             "$base/continents-cities-{$locale}.*",
         ];
@@ -403,19 +546,44 @@ class WP_LOC_Languages_List_Table extends WP_List_Table {
     }
 
     public function column_delete( $item ): string {
-        if ( $item['is_default'] || $item['locale'] === 'en_US' ) {
+        if ( $item['is_default'] ) {
             return '<span class="wp-loc-default-only">&ndash;</span>';
         }
 
-        $url = wp_nonce_url(
-            add_query_arg( [
-                'action' => 'wp_loc_delete_lang',
-                'locale' => $item['locale'],
-            ] ),
-            'wp_loc_delete_lang_' . $item['locale']
-        );
+        $links = [];
 
-        return '<a href="' . esc_url( $url ) . '" class="wp-loc-delete-link">' . esc_html__( 'Delete', 'wp-loc' ) . '</a>';
+        if ( $item['enabled'] ) {
+            $default_slug = WP_LOC_Languages::get_default_language();
+            $url = wp_nonce_url(
+                add_query_arg( [
+                    'action' => 'wp_loc_make_default',
+                    'locale' => $item['locale'],
+                ], admin_url( 'admin.php?page=wp-loc' ) ),
+                'wp_loc_make_default_' . $item['locale']
+            );
+            $confirm = sprintf(
+                /* translators: 1: language name, 2: current default language name, 3: URL prefix the current default language moves to */
+                __( 'Make %1$s the default language? It will open at the site root and %2$s will move to /%3$s/. The WordPress site language becomes %1$s too, and the site title, homepage, ACF options and Yoast settings saved for %1$s become the main ones.', 'wp-loc' ),
+                WP_LOC_Languages::get_language_display_name( $item['locale'] ),
+                WP_LOC_Languages::get_language_display_name( WP_LOC_Languages::get_language_locale( $default_slug ) ),
+                $default_slug
+            );
+            $links[] = '<a href="' . esc_url( $url ) . '" class="wp-loc-make-default-link" data-confirm="' . esc_attr( $confirm ) . '">' . esc_html__( 'Make default', 'wp-loc' ) . '</a>';
+        }
+
+        if ( $item['locale'] !== 'en_US' ) {
+            $url = wp_nonce_url(
+                add_query_arg( [
+                    'action' => 'wp_loc_delete_lang',
+                    'locale' => $item['locale'],
+                ], admin_url( 'admin.php?page=wp-loc' ) ),
+                'wp_loc_delete_lang_' . $item['locale']
+            );
+
+            $links[] = '<a href="' . esc_url( $url ) . '" class="wp-loc-delete-link">' . esc_html__( 'Delete', 'wp-loc' ) . '</a>';
+        }
+
+        return $links ? '<span class="wp-loc-language-actions">' . implode( '', $links ) . '</span>' : '<span class="wp-loc-default-only">&ndash;</span>';
     }
 
     public function column_default( $item, $column_name ): string {

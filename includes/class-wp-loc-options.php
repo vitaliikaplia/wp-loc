@@ -9,6 +9,9 @@ class WP_LOC_Options {
      */
     private static $multilingual_options = [];
 
+    /** While true, option writes go to the rows they name (set while the default language changes). */
+    private static $routing_suspended = false;
+
     private static function get_language_option_suffixes( string $language ): array {
         $compat_code = WP_LOC_DB::to_db_language_code( $language ) ?: $language;
 
@@ -153,6 +156,80 @@ class WP_LOC_Options {
     }
 
     /**
+     * Called when the default language changes from $from to $to (slugs). A multilingual option keeps
+     * the default language's value in its base row and the others' in {option}_{code} rows. Where $to
+     * has a value of its own, it becomes the base value and the old base value becomes $from's row;
+     * where it has none, $to showed the base value and keeps showing it, so nothing moves.
+     * page_on_front / page_for_posts take $to's page the way it was shown (its row, else the
+     * translation of the base page).
+     *
+     * @return string[] Options whose values moved.
+     */
+    public function move_default_language_values( string $from, string $to ): array {
+        $moved = [];
+        self::$routing_suspended = true;
+
+        try {
+            foreach ( array_keys( self::$multilingual_options ) as $option ) {
+                $option = (string) $option;
+                [ $has_base, $base_value ] = self::get_unfiltered_option( $option );
+
+                if ( in_array( $option, [ 'page_on_front', 'page_for_posts' ], true ) ) {
+                    $resolved = $this->resolve_page_option_for_language( $option, $to );
+                    $to_value = $resolved !== null && $resolved !== (int) $base_value ? $resolved : null;
+                } else {
+                    [ $has_to, $to_value ] = self::get_localized_option_value( $option, $to );
+                    // An empty translation falls back to the base value, as filter_pre_option() does.
+                    $to_value = $has_to && $to_value !== '' ? $to_value : null;
+                }
+
+                if ( $to_value !== null ) {
+                    foreach ( self::get_language_option_suffixes( $from ) as $suffix ) {
+                        delete_option( $option . '_' . $suffix );
+                    }
+
+                    if ( $has_base ) {
+                        self::write_option_row( $option . '_' . self::get_primary_language_option_suffix( $from ), $base_value );
+                    }
+
+                    self::write_option_row( $option, $to_value );
+                    $moved[] = $option;
+                }
+
+                foreach ( self::get_language_option_suffixes( $to ) as $suffix ) {
+                    delete_option( $option . '_' . $suffix );
+                }
+            }
+        } finally {
+            self::$routing_suspended = false;
+        }
+
+        return $moved;
+    }
+
+    /**
+     * Write an option row as given. update_option() would compare the value with get_option(),
+     * which language filters (WP-LOC's own, Yoast's in the admin, a theme's) may answer with
+     * another language's value, and then skip the write.
+     */
+    private static function write_option_row( string $option, $value ): void {
+        global $wpdb;
+
+        $serialized = maybe_serialize( $value );
+        $exists = $wpdb->get_var( $wpdb->prepare( "SELECT option_id FROM {$wpdb->options} WHERE option_name = %s LIMIT 1", $option ) );
+
+        if ( $exists ) {
+            $wpdb->update( $wpdb->options, [ 'option_value' => $serialized ], [ 'option_name' => $option ] );
+        } else {
+            $wpdb->insert( $wpdb->options, [ 'option_name' => $option, 'option_value' => $serialized, 'autoload' => 'yes' ] );
+        }
+
+        wp_cache_delete( $option, 'options' );
+        wp_cache_delete( 'alloptions', 'options' );
+        wp_cache_delete( 'notoptions', 'options' );
+    }
+
+    /**
      * Check if an option is registered as multilingual
      */
     public static function is_multilingual( string $option_name ): bool {
@@ -240,6 +317,8 @@ class WP_LOC_Options {
      * $old_value short-circuits the update and leaves the default row untouched.
      */
     public function route_localized_option_update( $value, string $option, $old_value ) {
+        if ( self::$routing_suspended ) return $value;
+
         $is_page_option = in_array( $option, [ 'page_on_front', 'page_for_posts' ], true );
         if ( ! is_admin() && ! $is_page_option ) return $value;
         if ( ! self::is_multilingual( $option ) ) return $value;
@@ -266,6 +345,8 @@ class WP_LOC_Options {
      * Non-default-language saves are routed by route_localized_option_update().
      */
     public function save_localized_option( string $option, $old_value, $value ): void {
+        if ( self::$routing_suspended ) return;
+
         $is_page_option = in_array( $option, [ 'page_on_front', 'page_for_posts' ], true );
         if ( ! is_admin() && ! $is_page_option ) return;
         if ( ! self::is_multilingual( $option ) ) return;

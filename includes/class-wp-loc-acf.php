@@ -1418,6 +1418,380 @@ class WP_LOC_ACF {
         }
     }
 
+    /**
+     * Called when the default language changes from $from to $to (slugs). Values of the default
+     * language live in the base rows — {post_id}_{field} for options pages, {field} in user meta —
+     * and the other languages' in their own rows: {post_id}_{slug}_{field} and {field}_{code}.
+     * For every translatable top-level field that $to has a value of its own, $to's rows become
+     * the base rows and the old base rows become $from's. A field $to has no value for showed
+     * the base value as its fallback and keeps showing it; shared fields keep one base value.
+     * Base values keep the IDs of the default language, so the ones that stay are mapped to $to.
+     *
+     * @return array{options: int, users: int} Moved fields on options pages, and user rows.
+     */
+    public function move_default_language_values( string $from, string $to ): array {
+        return [
+            'options' => $this->move_options_page_default_values( $from, $to ),
+            'users'   => $this->move_user_default_values( $from, $to ),
+        ];
+    }
+
+    /**
+     * Top-level fields of the given field groups as name => field, with translation settings.
+     *
+     * @return array<string,array>
+     */
+    private function get_top_level_fields( array $field_groups ): array {
+        $fields = [];
+
+        foreach ( $field_groups as $field_group ) {
+            $group_fields = is_array( $field_group ) && function_exists( 'acf_get_fields' ) ? acf_get_fields( $field_group ) : [];
+
+            foreach ( (array) $group_fields as $field ) {
+                if ( is_array( $field ) && ! empty( $field['name'] ) ) {
+                    $fields[ (string) $field['name'] ] = $this->normalize_field_translation_settings( $field );
+                }
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * The top-level field a stored row name (without its post_id/language prefix) belongs to:
+     * the field itself ({name}) or its sub-values ({name}_0_sub, {name}_sub). The longest
+     * matching name wins, so "title_extra" is not taken for a sub-value of "title".
+     */
+    private function get_row_owner_field( string $rest, array $names_longest_first ): ?string {
+        foreach ( $names_longest_first as $name ) {
+            if ( $rest === $name || str_starts_with( $rest, $name . '_' ) ) {
+                return $name;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The top-level field a stored row belongs to. The row's reference (the field key ACF stores
+     * in "_{row}") decides: a key of the field or of its sub-fields — a clone's composite key by
+     * its clone field — gives the field, a key no field has any more gives none. A row without a
+     * reference is placed by its name.
+     */
+    private function get_option_row_owner( string $rest, ?string $reference, array $names_longest_first, array $key_owners ): ?string {
+        if ( $reference === null || $reference === '' ) {
+            return $this->get_row_owner_field( $rest, $names_longest_first );
+        }
+
+        $candidates = $key_owners[ $reference ] ?? [];
+
+        for ( $offset = 0; ( $position = strpos( $reference, '_field_', $offset ) ) !== false; $offset = $position + 1 ) {
+            $candidates = array_merge( $candidates, $key_owners[ substr( $reference, 0, $position ) ] ?? [] );
+        }
+
+        // A key can belong to several fields (a clone repeats the keys it clones), and under the
+        // base prefix "{slug}_{field}" rows carry the field's key but belong to a language: the
+        // field whose name the row starts with wins, the longest one.
+        $owner = null;
+
+        foreach ( array_unique( $candidates ) as $candidate ) {
+            if ( ( $rest === $candidate || str_starts_with( $rest, $candidate . '_' ) ) && strlen( $candidate ) > strlen( (string) $owner ) ) {
+                $owner = $candidate;
+            }
+        }
+
+        return $owner;
+    }
+
+    /**
+     * Field key => names of the top-level fields it belongs to, for every field of the given field groups.
+     *
+     * @return array<string,string[]>
+     */
+    private function get_field_key_owners( array $field_groups ): array {
+        $owners = [];
+
+        foreach ( $field_groups as $field_group ) {
+            $fields = is_array( $field_group ) && function_exists( 'acf_get_fields' ) ? acf_get_fields( $field_group ) : [];
+
+            foreach ( (array) $fields as $top_field ) {
+                if ( ! is_array( $top_field ) || empty( $top_field['name'] ) ) {
+                    continue;
+                }
+
+                $walk = static function ( array $field ) use ( &$walk, &$owners, $top_field ): void {
+                    if ( ! empty( $field['key'] ) ) {
+                        $owners[ (string) $field['key'] ][] = (string) $top_field['name'];
+                    }
+
+                    foreach ( (array) ( $field['sub_fields'] ?? [] ) as $sub_field ) {
+                        if ( is_array( $sub_field ) ) {
+                            $walk( $sub_field );
+                        }
+                    }
+
+                    foreach ( (array) ( $field['layouts'] ?? [] ) as $layout ) {
+                        foreach ( (array) ( $layout['sub_fields'] ?? [] ) as $sub_field ) {
+                            if ( is_array( $sub_field ) ) {
+                                $walk( $sub_field );
+                            }
+                        }
+                    }
+                };
+
+                $walk( $top_field );
+            }
+        }
+
+        return $owners;
+    }
+
+    /**
+     * Rows of one field under one prefix, value and reference rows, keyed by their name after the
+     * prefix (references with a leading "_").
+     *
+     * @param array<string,string> $option_rows option name => value of the options page's rows
+     * @return array<string,string> key => full option name
+     */
+    private function collect_field_option_rows( array $option_rows, string $prefix, string $field_name, array $names_longest_first, array $key_owners ): array {
+        $rows = [];
+
+        foreach ( array_keys( $option_rows ) as $option_name ) {
+            $option_name = (string) $option_name;
+            $reference = str_starts_with( $option_name, '_' . $prefix ) ? '_' : '';
+
+            if ( ! $reference && ! str_starts_with( $option_name, $prefix ) ) {
+                continue;
+            }
+
+            $rest = substr( $option_name, strlen( $reference . $prefix ) );
+            $field_key = $option_rows[ '_' . $prefix . $rest ] ?? null;
+
+            if ( $this->get_option_row_owner( $rest, is_string( $field_key ) ? $field_key : null, $names_longest_first, $key_owners ) === $field_name ) {
+                $rows[ $reference . $rest ] = $option_name;
+            }
+        }
+
+        return $rows;
+    }
+
+    private function move_options_page_default_values( string $from, string $to ): int {
+        global $wpdb;
+
+        if ( ! function_exists( 'acf_get_field_groups' ) ) {
+            return 0;
+        }
+
+        $field_groups = (array) acf_get_field_groups();
+        $fields = $this->get_top_level_fields( $field_groups );
+
+        if ( ! $fields ) {
+            return 0;
+        }
+
+        $key_owners = $this->get_field_key_owners( $field_groups );
+        $names = array_map( 'strval', array_keys( $fields ) );
+        usort( $names, static fn( $a, $b ) => strlen( $b ) <=> strlen( $a ) );
+        $to_locale = $this->get_language_locale( $to );
+        $from_locale = $this->get_language_locale( $from );
+        $moved = 0;
+        $touched = [];
+
+        foreach ( array_unique( $this->get_options_base_post_ids() ) as $base_post_id ) {
+            $option_rows = [];
+
+            foreach ( (array) $wpdb->get_results( $wpdb->prepare(
+                "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+                $wpdb->esc_like( $base_post_id . '_' ) . '%',
+                $wpdb->esc_like( '_' . $base_post_id . '_' ) . '%'
+            ) ) as $row ) {
+                $option_rows[ (string) $row->option_name ] = (string) $row->option_value;
+            }
+
+            foreach ( $fields as $field_name => $field ) {
+                $field_name = (string) $field_name;
+                $base_rows = $this->collect_field_option_rows( $option_rows, "{$base_post_id}_", $field_name, $names, $key_owners );
+
+                // Shared and untranslated fields keep one value for all languages, stored with the
+                // IDs of the default language: they become the new default language's IDs.
+                if ( ! in_array( $this->get_translation_mode( $field ), [ 'translatable', 'copy_once' ], true ) ) {
+                    $this->map_option_rows_to_language( $base_rows, [], $to, $touched );
+                    continue;
+                }
+
+                $to_rows = $this->collect_field_option_rows( $option_rows, "{$base_post_id}_{$to}_", $field_name, $names, $key_owners );
+
+                if ( ! isset( $to_rows[ $field_name ] ) && $to_locale && $to_locale !== $to ) {
+                    // Values saved before options pages were keyed by slug.
+                    $to_rows = $this->collect_field_option_rows( $option_rows, "{$base_post_id}_{$to_locale}_", $field_name, $names, $key_owners );
+                }
+
+                if ( ! isset( $to_rows[ $field_name ] ) ) {
+                    // $to showed the base value as its fallback, with its own IDs, and keeps
+                    // showing it; $from falls back to the same value, mapped back to its IDs.
+                    $this->map_option_rows_to_language( $base_rows, [], $to, $touched );
+                    continue;
+                }
+
+                $stale_rows = $this->collect_field_option_rows( $option_rows, "{$base_post_id}_{$from}_", $field_name, $names, $key_owners );
+
+                if ( $from_locale && $from_locale !== $from ) {
+                    $stale_rows += $this->collect_field_option_rows( $option_rows, "{$base_post_id}_{$from_locale}_", $field_name, $names, $key_owners );
+                }
+
+                foreach ( $stale_rows as $option_name ) {
+                    $wpdb->delete( $wpdb->options, [ 'option_name' => $option_name ] );
+                    $touched[] = $option_name;
+                }
+
+                // The old base rows become $from's, exactly as they are.
+                foreach ( $base_rows as $key => $option_name ) {
+                    $from_name = $this->prefixed_option_row_name( $key, "{$base_post_id}_{$from}_" );
+
+                    $wpdb->query( $wpdb->prepare(
+                        "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) SELECT %s, option_value, autoload FROM {$wpdb->options} WHERE option_name = %s",
+                        $from_name,
+                        $option_name
+                    ) );
+                    $touched[] = $from_name;
+                }
+
+                if ( ! isset( $base_rows[ $field_name ] ) ) {
+                    // $from had no value and showed it empty; without a row of its own it would
+                    // now fall back to $to's value.
+                    $wpdb->insert( $wpdb->options, [ 'option_name' => "{$base_post_id}_{$from}_{$field_name}", 'option_value' => '', 'autoload' => 'no' ] );
+                    $touched[] = "{$base_post_id}_{$from}_{$field_name}";
+                }
+
+                // Sub-values $to has none of were its fallback, shown with its own IDs.
+                $this->map_option_rows_to_language( $base_rows, $to_rows, $to, $touched );
+
+                foreach ( $to_rows as $key => $option_name ) {
+                    $base_name = $this->prefixed_option_row_name( $key, "{$base_post_id}_" );
+
+                    $wpdb->delete( $wpdb->options, [ 'option_name' => $base_name ] );
+                    $wpdb->update( $wpdb->options, [ 'option_name' => $base_name ], [ 'option_name' => $option_name ] );
+                    $touched[] = $base_name;
+                    $touched[] = $option_name;
+                }
+
+                $moved++;
+            }
+        }
+
+        if ( $touched ) {
+            foreach ( array_unique( $touched ) as $option_name ) {
+                wp_cache_delete( $option_name, 'options' );
+            }
+
+            wp_cache_delete( 'alloptions', 'options' );
+            wp_cache_delete( 'notoptions', 'options' );
+        }
+
+        return $moved;
+    }
+
+    /** A collected row key ("rest" or "_rest") under another prefix, keeping the reference underscore. */
+    private function prefixed_option_row_name( string $key, string $prefix ): string {
+        return str_starts_with( $key, '_' ) ? '_' . $prefix . substr( $key, 1 ) : $prefix . $key;
+    }
+
+    /**
+     * Map the stored IDs of option rows (value rows, skipping the keys in $except) to their
+     * translations in $language. Each row's field comes from its reference row; containers keep
+     * their row counts.
+     */
+    private function map_option_rows_to_language( array $rows, array $except, string $language, array &$touched ): void {
+        global $wpdb;
+
+        if ( ! function_exists( 'acf_get_field' ) ) {
+            return;
+        }
+
+        foreach ( $rows as $key => $option_name ) {
+            if ( str_starts_with( (string) $key, '_' ) || isset( $except[ $key ] ) ) {
+                continue;
+            }
+
+            $field_key = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", '_' . $option_name ) );
+            $field = is_string( $field_key ) && $field_key !== '' ? acf_get_field( $field_key ) : null;
+
+            if ( ! is_array( $field ) || $this->is_deferred_container_field( $field ) ) {
+                continue;
+            }
+
+            $raw = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $option_name ) );
+
+            if ( $raw === null || $raw === '' ) {
+                continue;
+            }
+
+            $value = maybe_unserialize( $raw );
+            $mapped = $this->map_field_value_to_language( $value, $field, $language );
+
+            if ( (string) maybe_serialize( $mapped ) !== (string) $raw ) {
+                $wpdb->update( $wpdb->options, [ 'option_value' => maybe_serialize( $mapped ) ], [ 'option_name' => $option_name ] );
+                $touched[] = $option_name;
+            }
+        }
+    }
+
+    private function move_user_default_values( string $from, string $to ): int {
+        global $wpdb;
+
+        $to_suffix = $this->get_language_meta_suffix( $to );
+        $from_suffix = $this->get_language_meta_suffix( $from );
+        $moved = 0;
+        $users = [];
+
+        foreach ( $this->get_top_level_fields( $this->get_user_field_groups() ) as $field_name => $field ) {
+            $field_name = (string) $field_name;
+
+            // User values are stored whole under one key; container sub-values stay in the base.
+            if ( ! $this->is_user_translatable_field( $field ) || in_array( $field['type'] ?? '', [ 'repeater', 'group', 'flexible_content', 'clone' ], true ) ) {
+                continue;
+            }
+
+            $to_key = "{$field_name}_{$to_suffix}";
+            $from_key = "{$field_name}_{$from_suffix}";
+            $user_ids = array_map( 'intval', (array) $wpdb->get_col( $wpdb->prepare(
+                "SELECT DISTINCT user_id FROM {$wpdb->usermeta} WHERE meta_key = %s",
+                $to_key
+            ) ) );
+
+            foreach ( $user_ids as $user_id ) {
+                $wpdb->query( $wpdb->prepare(
+                    "DELETE FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key IN (%s, %s)",
+                    $user_id,
+                    $from_key,
+                    "_{$from_key}"
+                ) );
+
+                if ( ! $wpdb->update( $wpdb->usermeta, [ 'meta_key' => $from_key ], [ 'user_id' => $user_id, 'meta_key' => $field_name ] ) ) {
+                    // $from had no value; an empty row keeps it from falling back to $to's.
+                    $wpdb->insert( $wpdb->usermeta, [ 'user_id' => $user_id, 'meta_key' => $from_key, 'meta_value' => '' ] );
+                }
+
+                $wpdb->query( $wpdb->prepare(
+                    "INSERT INTO {$wpdb->usermeta} (user_id, meta_key, meta_value) SELECT user_id, %s, meta_value FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key = %s",
+                    "_{$from_key}",
+                    $user_id,
+                    "_{$field_name}"
+                ) );
+                $wpdb->update( $wpdb->usermeta, [ 'meta_key' => $field_name ], [ 'user_id' => $user_id, 'meta_key' => $to_key ] );
+                $wpdb->delete( $wpdb->usermeta, [ 'user_id' => $user_id, 'meta_key' => "_{$to_key}" ] );
+                $users[ $user_id ] = true;
+                $moved++;
+            }
+        }
+
+        foreach ( array_keys( $users ) as $user_id ) {
+            wp_cache_delete( $user_id, 'user_meta' );
+        }
+
+        return $moved;
+    }
+
     public function __construct() {
         add_action( 'add_meta_boxes', [ $this, 'register_field_group_mode_meta_box' ] );
         add_action( 'acf/render_field_settings', [ $this, 'add_translation_mode_setting' ] );
