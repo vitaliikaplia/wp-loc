@@ -26,6 +26,7 @@ class WP_LOC_Admin_Settings {
     const ACF_MIRROR_UNCONFIGURED_FIELDS_OPTION_KEY = 'wp_loc_acf_mirror_unconfigured_fields';
     const ENABLE_YOAST_COMPAT_OPTION_KEY = 'wp_loc_enable_yoast_compat';
     const ENABLE_YOAST_SITEMAP_ALTERNATES_OPTION_KEY = 'wp_loc_enable_yoast_sitemap_alternates';
+    const ENABLE_ABILITIES_OPTION_KEY = 'wp_loc_enable_abilities';
     const AI_ENGINE_OPTION_KEY = 'wp_loc_ai_engine';
     const AI_MODELS_OPTION_KEY = 'wp_loc_ai_models';
     const AI_TRANSLATE_CUSTOM_MENU_LINKS_OPTION_KEY = 'wp_loc_ai_translate_custom_menu_links';
@@ -522,6 +523,14 @@ TWIG;
         return (bool) get_option( self::ENABLE_YOAST_SITEMAP_ALTERNATES_OPTION_KEY, true );
     }
 
+    /**
+     * Whether WP-LOC registers its translation tools for AI agents as WordPress Abilities. On by
+     * default: the tools moved here from Simple MCP's built-in wploc_* ones, so agents keep them.
+     */
+    public static function are_abilities_enabled(): bool {
+        return (bool) get_option( self::ENABLE_ABILITIES_OPTION_KEY, true );
+    }
+
     private static function normalize_ai_engine( string $engine ): string {
         return match ( sanitize_key( $engine ) ) {
             'claude' => 'anthropic',
@@ -687,6 +696,7 @@ TWIG;
             update_option( self::ACF_MIRROR_UNCONFIGURED_FIELDS_OPTION_KEY, $acf_mirror_unconfigured_fields );
             update_option( self::ENABLE_YOAST_COMPAT_OPTION_KEY, $enable_yoast_compat );
             update_option( self::ENABLE_YOAST_SITEMAP_ALTERNATES_OPTION_KEY, $enable_yoast_sitemap_alternates );
+            update_option( self::ENABLE_ABILITIES_OPTION_KEY, isset( $_POST['wp_loc_enable_abilities'] ) ? 1 : 0 );
         } elseif ( $current_tab === self::TAB_AI ) {
             update_option( self::AI_BROWSER_TRANSLATOR_OPTION_KEY, isset( $_POST['wp_loc_ai_browser_translator'] ) ? 1 : 0 );
             update_option( self::AI_TRANSLATE_NEW_COPIES_OPTION_KEY, isset( $_POST['wp_loc_ai_translate_new_copies'] ) ? 1 : 0 );
@@ -1114,6 +1124,27 @@ TWIG;
                                         </label>
                                     </fieldset>
                                     <p class="description"><?php esc_html_e( 'Use the master toggle to disable the Yoast integration entirely, or keep it enabled and control sitemap alternates separately.', 'wp-loc' ); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><?php esc_html_e( 'AI agents', 'wp-loc' ); ?></th>
+                                <td>
+                                    <fieldset class="wp-loc-settings-stack">
+                                        <label class="wp-loc-settings-label">
+                                            <input type="checkbox"
+                                                   name="wp_loc_enable_abilities"
+                                                   value="1"
+                                                   <?php checked( WP_LOC_Admin_Settings::are_abilities_enabled() ); ?>
+                                                   <?php disabled( ! WP_LOC_Abilities::is_available() ); ?>
+                                            />
+                                            <span><?php esc_html_e( 'Give AI agents the WP-LOC translation tools', 'wp-loc' ); ?></span>
+                                        </label>
+                                    </fieldset>
+                                    <p class="description"><?php esc_html_e( 'Registers three WordPress Abilities — get, link and create translations of posts and terms — which MCP servers such as Simple MCP offer to AI agents as tools. Each call runs with the rights of the user the agent connects as.', 'wp-loc' ); ?></p>
+                                    <p class="description"><?php esc_html_e( 'In Simple MCP 2.7 or newer, turn on "Plugin and theme tools" for the roles that need them under Settings → Simple MCP → Role permissions; until then agents keep the wploc_* tools built into Simple MCP.', 'wp-loc' ); ?></p>
+                                    <?php if ( ! WP_LOC_Abilities::is_available() ) : ?>
+                                        <p class="description"><?php esc_html_e( 'Requires WordPress 6.9 or newer.', 'wp-loc' ); ?></p>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         </table>

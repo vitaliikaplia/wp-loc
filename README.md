@@ -12,11 +12,12 @@ It keeps translation links in the same `icl_translations` table and provides the
 - Works with Advanced Custom Fields, Yoast SEO, Timber and Yoast Duplicate Post.
 - Optional AI translation of titles, term names and menu links through the WordPress 7 AI connectors, or of titles and term names with Chrome's built-in translator. New translation copies can be translated in the background.
 - WP-CLI commands: `wp wp-loc create-translations` creates missing translation copies, `wp wp-loc translate` translates posts with AI.
+- Tools for AI agents: three WordPress Abilities — `wp-loc/get-translations`, `wp-loc/link-translation` and `wp-loc/create-translation` — that MCP servers offer to agents. [Simple MCP](https://github.com/vitaliikaplia/simple-mcp) 2.7+ shows them as `wp-loc-get-translations` and so on once **Plugin and theme tools** is on for the role in its **Role permissions**; until then agents keep its built-in `wploc_*` tools. They can be switched off under **Multilingual → Settings → Integrations**.
 - A one-time wizard adopts the data another multilingual plugin left behind.
 
 ## Requirements
 
-WordPress 6.0 or newer (7.0 for the AI features) and PHP 8.1 or newer.
+WordPress 6.0 or newer (6.9 for the AI-agent tools, 7.0 for the AI features) and PHP 8.1 or newer.
 
 ## Installation
 

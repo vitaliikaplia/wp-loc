@@ -28,6 +28,7 @@ class WP_LOC {
     public $ai;
     public $yoast;
     public $duplicate_post;
+    public $abilities;
 
     public static function instance() {
         if ( self::$instance === null ) {
@@ -64,6 +65,8 @@ class WP_LOC {
             'class-wp-loc-db-optimization-wizard',
             'class-wp-loc-github-updater',
             'class-wp-loc-duplicate-post',
+            'class-wp-loc-translation-tools',
+            'class-wp-loc-abilities',
         ];
 
         foreach ( $includes as $file ) {
@@ -102,6 +105,7 @@ class WP_LOC {
         $this->menus           = new WP_LOC_Menus();
         $this->ai              = new WP_LOC_AI();
         $this->github_updater  = new WP_LOC_GitHub_Updater();
+        $this->abilities       = new WP_LOC_Abilities();
 
         if ( ( defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Meta' ) ) && WP_LOC_Admin_Settings::is_yoast_compat_enabled() ) {
             $this->yoast = new WP_LOC_Yoast();
